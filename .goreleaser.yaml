@@ -5,8 +5,8 @@ before:
     - go mod tidy
 
 builds:
-  - id: git-workspace
-    binary: git-workspace
+  - id: git-w
+    binary: git-w
     main: .
     goos:
       - linux
@@ -18,7 +18,7 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  - id: git-workspace
+  - id: git-w
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     format: tar.gz
     files:
@@ -36,15 +36,15 @@ changelog:
 
 # TODO: Add Homebrew tap release config once we have a tap repo set up.
 # brews:
-#   - name: git-workspace
+#   - name: git-w
 #     repository:
 #       owner: robertwritescode
-#       name: homebrew-git-workspace
+#       name: homebrew-git-w
 #       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-#     homepage: "https://github.com/robertwritescode/git-workspace"
-#     description: "Manage multiple git repos defined in .gitworkspace"
+#     homepage: "https://github.com/robertwritescode/git-w"
+#     description: "Manage multiple git repos defined in .gitw"
 #     install: |
-#       bin.install "git-workspace"
-#       bin.install_symlink "git-workspace" => "git-w"
+#       bin.install "git-w"
+#       bin.install_symlink "git-w" => "git-w"
 #     test: |
-#       system "#{bin}/git-workspace", "--help"
+#       system "#{bin}/git-w", "--help"

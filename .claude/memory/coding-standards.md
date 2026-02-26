@@ -113,3 +113,63 @@ Before marking any source file as done, verify:
 - [ ] Exported symbols have godoc; unexported helpers do not need comments
 - [ ] Test file uses `testify/suite` — not bare `func TestXxx(t *testing.T)` functions
 - [ ] Every multi-case test uses table-driven `[]struct{ name, ... }` + `s.Run(tc.name, ...)`
+
+---
+
+## 6. Domain Package Convention
+
+Commands live in domain packages under `pkg/` (`workspace`, `repo`, or `git`).
+Each domain package has a single exported `Register` in `register.go`, which calls private `register<Name>` functions defined in each command file.
+
+```go
+// pkg/workspace/mycommand.go  (or pkg/repo/, pkg/git/)
+package workspace  // or repo, or git
+
+import (
+    "github.com/spf13/cobra"
+)
+
+func registerMyCommand(root *cobra.Command) {
+    root.AddCommand(&cobra.Command{
+        Use:   "mycommand",
+        Short: "Description of the command",
+        RunE:  runMyCommand,
+    })
+}
+
+func runMyCommand(cmd *cobra.Command, args []string) error {
+    // workspace package: call LoadConfig directly (same package)
+    cfg, cfgPath, err := LoadConfig(cmd)
+    // repo/git packages: use workspace.LoadConfig(cmd) via pkg/workspace import
+    if err != nil {
+        return err
+    }
+    // ... command logic using cfg and cfgPath
+}
+```
+
+```go
+// pkg/workspace/register.go
+package workspace
+
+import "github.com/spf13/cobra"
+
+func Register(root *cobra.Command) {
+    registerInit(root)
+    registerContext(root)
+    registerGroup(root)
+    registerMyCommand(root)  // add new commands here
+}
+```
+
+**Key rules:**
+- Only `Register(root *cobra.Command)` is exported per domain package — no other public symbols from command files
+- Config loading: `LoadConfig(cmd)` (same-package in workspace) or `workspace.LoadConfig(cmd)` (in repo/git)
+- `RunE` (not `Run`) — return errors to cobra for consistent error handling
+- Prefer inline `&cobra.Command{...}` over package-level `var xxxCmd` for leaf commands (avoids pflag state bleed between test runs); use named vars only when needed for flag attachment or subcommand trees
+- Flag variables prefixed with command name if generic (e.g., `addRecursive`, `groupName`)
+- Test files use `testutil.CmdSuite` and `s.SetRoot(<domain>.Register)` + `s.ExecuteCmd(args...)`
+- `nolint:errcheck` applied to intentional stdout writes (`fmt.Fprintf(cmd.OutOrStdout(), ...)`)
+
+**Note on `pkg/repo` subcommand structure:**
+`repo.Register` creates a `repo` parent command (alias `r`) and adds most lifecycle commands under it. `restore` is added directly to root. When testing repo commands, `s.SetRoot(repo.Register)` registers everything including the `repo` subcommand — use `s.ExecuteCmd("repo", "add", ...)` accordingly.

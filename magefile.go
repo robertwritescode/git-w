@@ -4,8 +4,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -15,13 +13,13 @@ import (
 var Default = All
 
 func All() {
-	mg.Deps(Vet, Test, Build)
+	mg.Deps(Lint, Test, Build)
 }
 
 func Build() error {
 	version := gitVersion()
 	ldflags := fmt.Sprintf("-X main.version=%s", version)
-	return sh.RunV("go", "build", "-ldflags="+ldflags, "-o", "bin/git-workspace", ".")
+	return sh.RunV("go", "build", "-ldflags="+ldflags, "-o", "bin/git-w", ".")
 }
 
 func Install() error {
@@ -39,16 +37,28 @@ func Cover() error {
 	return sh.RunV("go", "tool", "cover", "-html=coverage.out")
 }
 
-func Vet() error {
-	return sh.RunV("go", "vet", "./...")
+func Lint() error {
+	if err := sh.RunV("golangci-lint", "fmt", "--diff", "./..."); err != nil {
+		return err
+	}
+	return sh.RunV("golangci-lint", "run", "./...")
+}
+
+func LintFix() error {
+	if err := sh.RunV("golangci-lint", "fmt", "./..."); err != nil {
+		return err
+	}
+	return sh.RunV("golangci-lint", "run", "--fix", "./...")
+}
+
+func Fmt() error {
+	return sh.RunV("golangci-lint", "fmt", "./...")
 }
 
 func gitVersion() string {
-	cmd := exec.Command("git", "describe", "--tags", "--always", "--dirty")
-	cmd.Stderr = os.Stderr
-	out, err := cmd.Output()
+	out, err := sh.Output("git", "describe", "--tags", "--always", "--dirty")
 	if err != nil {
 		return "dev"
 	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(out)
 }

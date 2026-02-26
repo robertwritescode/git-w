@@ -1,32 +1,32 @@
-# git-workspace Architecture
+# git-w Architecture
 
-## How `git workspace` Works
+## How `git w` Works
 
-The binary is named `git-workspace`. Git's plugin system discovers any executable
+The binary is named `git-w`. Git's plugin system discovers any executable
 named `git-<subcommand>` in `$PATH` and invokes it, passing remaining args through.
-So `git workspace fetch` → `git-workspace fetch`.
+So `git w fetch` → `git-w fetch`.
 
 ---
 
 ## Config Files
 
-Discovered by walking up from CWD. Env var `GIT_WORKSPACE_CONFIG` or `--config` flag override.
+Discovered by walking up from CWD. Env var `GIT_W_CONFIG` or `--config` flag override.
 
-**`.gitworkspace`** — committed, shared workspace definition (repos, groups)
-**`.gitworkspace.local`** — gitignored, per-developer state (active context)
+**`.gitw`** — committed, shared workspace definition (repos, groups)
+**`.gitw.local`** — gitignored, per-developer state (active context)
 
 Both files are TOML. The loader reads both and merges them; `.local` values take precedence.
-`git workspace init` automatically adds `.gitworkspace.local` to `.gitignore`.
+`git w init` automatically adds `.gitw.local` to `.gitignore`.
 
 ```toml
-# .gitworkspace  (committed, shared)
+# .gitw  (committed, shared)
 
 [workspace]
 name = "my-workspace"
 auto_gitignore = true       # Add repo paths to .gitignore on add/clone/restore (default: true)
 
 [repos.frontend]
-path = "apps/frontend"      # Relative to .gitworkspace location
+path = "apps/frontend"      # Relative to .gitw location
 url  = "https://github.com/org/frontend"   # Set by clone/add; used by restore
 flags = []                  # Optional custom git flags (e.g., bare repo worktrees)
 
@@ -43,7 +43,7 @@ repos = ["infra"]
 ```
 
 ```toml
-# .gitworkspace.local  (gitignored, per-developer)
+# .gitw.local  (gitignored, per-developer)
 
 [context]
 active = "web"
@@ -54,73 +54,106 @@ active = "web"
 ## Directory Structure
 
 ```
-git-workspace/
+git-w/
 ├── main.go
-├── go.mod
-├── go.sum
-├── magefile.go                     # Mage build targets (excluded from normal builds)
+├── go.mod / go.sum
+├── magefile.go                     # Mage build targets (excluded via //go:build mage)
 ├── .goreleaser.yaml                # GoReleaser: cross-compile, archive, Homebrew tap
-├── release-please-config.json      # Release Please: release type + changelog config
-├── .release-please-manifest.json   # Release Please: tracks current version
-├── CHANGELOG.md                    # Auto-updated by Release Please on each release
 │
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                  # vet + test + build on push/PR to main
+│       ├── ci.yml                  # lint + test + build on push/PR
 │       ├── release-please.yml      # Opens Release PR on push to main
-│       └── release.yml             # test + GoReleaser on v* tag push
+│       └── goreleaser.yml          # test + GoReleaser on v* tag push
 │
-├── cmd/
-│   ├── root.go             # Root cmd, config loading, global flags
-│   ├── init.go             # Create new .gitworkspace
-│   ├── add.go              # Add repos
-│   ├── remove.go           # Remove repos
-│   ├── rename.go           # Rename a repo
-│   ├── list.go             # List repo names / get path of one (alias: ls)
-│   ├── info.go             # Status table for all or group repos (alias: ll)
-│   ├── group.go            # Group subcommand tree
-│   ├── context.go          # Context subcommand
-│   ├── exec.go             # Execute arbitrary git commands across repos
-│   ├── clone.go            # Clone a single remote repo and register it
-│   ├── restore.go          # Materialize all repos from .gitworkspace (clone missing, pull existing)
-│   └── git_cmds.go         # Predefined git commands (fetch, pull, push, status)
-│
-└── internal/
-    ├── config/
-    │   ├── types.go        # Config structs
-    │   ├── loader.go       # TOML load/save
-    │   └── discovery.go    # Walk-up .gitworkspace search
+└── pkg/
+    ├── cmd/
+    │   ├── root.go             # Root cmd, global --config flag, wires 3 domain Register funcs
+    │   ├── completion.go       # Shell completion (bash/zsh/fish/powershell) — registerCompletion
+    │   └── completion_test.go
     │
-    ├── repo/
-    │   ├── repo.go         # Repo type, path resolution, git detection
-    │   └── status.go       # Status detection (dirty/staged/untracked/stash/remote)
+    ├── workspace/              # domain: workspace definition, state, and commands
+    │   ├── config.go           # WorkspaceConfig, RepoConfig, GroupConfig, ContextConfig
+    │   ├── loader.go           # TOML load/save, atomic writes, LoadCWD, LoadConfig(cmd)
+    │   ├── discovery.go        # Walk-up .gitw search, Discover()
+    │   ├── register.go         # Register(root) → registerInit + registerContext + registerGroup
+    │   ├── init.go             # Create new .gitw + .gitignore setup
+    │   ├── context.go          # Context show/set/clear/auto
+    │   ├── group.go            # Group subcommand tree (add/rm/rename/rmrepo/list/info/edit)
+    │   └── *_test.go
     │
-    ├── executor/
-    │   ├── parallel.go     # Goroutine pool + semaphore, result collection
-    │   └── result.go       # ExecResult type, output formatting
+    ├── repo/                   # domain: repository lifecycle and commands
+    │   ├── repo.go             # Repo type, FromConfig, FromNames, IsGitRepo
+    │   ├── filter.go           # Filter, ForContext, ForGroup — repo selection cascade
+    │   ├── status.go           # GetStatus, parse functions, RemoteState enum
+    │   ├── register.go         # Register(root): creates "repo" subcommand; restore on root directly
+    │   ├── add.go              # Add repos (single or -r recursive)
+    │   ├── clone.go            # Clone remote repo and register it
+    │   ├── unlink.go           # Unregister repos from workspace (command: "unlink")
+    │   ├── rename.go           # Rename a repo (alias: mv)
+    │   ├── restore.go          # Clone missing, pull existing repos
+    │   ├── list.go             # List repo names / get path of one (alias: ls)
+    │   └── *_test.go
     │
-    ├── display/
-    │   ├── table.go        # Status table renderer (ll command)
-    │   └── colors.go       # ANSI color constants and helpers
+    ├── git/                    # domain: cross-repo git execution and commands
+    │   ├── executor.go         # RunParallel: goroutine pool using pkg/parallel
+    │   ├── result.go           # ExecResult, WriteResults, ExecErrors
+    │   ├── register.go         # Register(root) → registerGit + registerExec + registerInfo
+    │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root)
+    │   ├── runner.go           # Shared runGitCmd helper for git subcommands
+    │   ├── exec.go             # Execute arbitrary git commands across repos
+    │   ├── info.go             # Status table for all or group repos (alias: ll)
+    │   └── *_test.go
     │
-    └── testutil/
-        └── helpers.go      # MakeGitRepo, MakeWorkspace — shared test helpers (test-only)
+    ├── gitutil/                # shared utility: low-level git subprocess wrappers
+    │   ├── gitutil.go          # Clone, CloneContext, RemoteURL, EnsureGitignore (mutex-protected)
+    │   └── gitutil_test.go
+    │
+    ├── parallel/               # shared utility: generic concurrency primitives
+    │   ├── parallel.go         # RunFanOut[T,R], MaxWorkers, FormatFailureError
+    │   └── parallel_test.go
+    │
+    ├── display/                # shared utility: terminal output formatting
+    │   ├── table.go            # RenderTable: tabwriter-based status table
+    │   ├── colors.go           # ANSI color helpers, visualWidth()
+    │   └── *_test.go
+    │
+    └── testutil/               # shared utility: test infrastructure
+        ├── helpers.go          # MakeGitRepo, MakeWorkspace, InitBareGitRepo, ChangeToDir, etc.
+        ├── cmd.go              # CmdSuite type: SetRoot, ExecuteCmd for integration tests
+        └── suite.go            # CmdSuite method delegates (all helpers available as suite methods)
+```
+
+Dependency graph (cycle-free):
+```
+workspace  → gitutil
+repo       → workspace, gitutil
+display    → repo
+git        → repo, workspace, display, parallel
+parallel   → (none)
+gitutil    → (none)
+testutil   → (none)
 ```
 
 ---
 
 ## Go Types
 
-### Config (`internal/config/types.go`)
+### Config (`pkg/workspace/`)
 
 ```go
-// Merged from .gitworkspace + .gitworkspace.local at load time
+// config.go — merged from .gitw + .gitw.local at load time
 type WorkspaceConfig struct {
     Workspace WorkspaceMeta          `toml:"workspace"`
     Context   ContextConfig          `toml:"context"`  // from .local
     Repos     map[string]RepoConfig  `toml:"repos"`
     Groups    map[string]GroupConfig `toml:"groups"`
 }
+
+// Methods on WorkspaceConfig:
+func (c *WorkspaceConfig) AutoGitignoreEnabled() bool  // nil → true
+func (c *WorkspaceConfig) AddRepoToGroup(group, name string)
+func (c *WorkspaceConfig) RepoName(absPath string) (string, error)
 
 type WorkspaceMeta struct {
     Name          string `toml:"name"`
@@ -135,26 +168,52 @@ type RepoConfig struct {
 
 type GroupConfig struct {
     Repos []string `toml:"repos"`
-    Path  string   `toml:"path"` // for auto-context detection
+    Path  string   `toml:"path,omitempty"` // for auto-context detection
 }
 
 type ContextConfig struct {
     Active string `toml:"active"`
 }
+
+// loader.go
+func Load(configPath string) (*WorkspaceConfig, error)
+func Save(configPath string, cfg *WorkspaceConfig) error
+func SaveLocal(configPath string, ctx ContextConfig) error
+func LoadCWD(override string) (*WorkspaceConfig, string, error)
+func LoadConfig(cmd *cobra.Command) (*WorkspaceConfig, string, error)
+func ConfigDir(configPath string) string
+func ResolveRepoPath(cfgPath, repoPath string) (string, error)
+func RelPath(cfgPath, absPath string) (string, error)
+
+// discovery.go
+const ConfigFileName = ".gitw"
+var ErrNotFound = errors.New("no .gitw found")
+func Discover(startDir string) (string, error)
 ```
 
-### Repo (`internal/repo/repo.go`)
+### Repo (`pkg/repo/`)
 
 ```go
+// repo.go
 type Repo struct {
     Name    string
     AbsPath string    // config root dir + RepoConfig.Path
     Flags   []string
 }
 
+func FromConfig(cfg *workspace.WorkspaceConfig, cfgPath string) []Repo
+func FromNames(cfg *workspace.WorkspaceConfig, cfgPath string, names []string) []Repo
+func IsGitRepo(path string) bool
+
+// filter.go — repo selection cascade
+func Filter(cfg *workspace.WorkspaceConfig, cfgPath string, names []string) ([]Repo, error)
+func ForContext(cfg *workspace.WorkspaceConfig, cfgPath string) ([]Repo, error)
+func ForGroup(cfg *workspace.WorkspaceConfig, cfgPath string, groupName string) ([]Repo, error)
+
+// status.go
 type RemoteState int
 const (
-    RemoteUnknown RemoteState = iota
+    Detached RemoteState = iota
     InSync
     LocalAhead
     RemoteAhead
@@ -171,17 +230,32 @@ type RepoStatus struct {
     Stashed     bool
     LastCommit  string
 }
+
+func GetStatus(r Repo) (RepoStatus, error)
 ```
 
-### Executor (`internal/executor/parallel.go`)
+### Parallel (`pkg/parallel/`)
 
 ```go
+// parallel.go
+func MaxWorkers(configured, total int) int  // bounds worker count; falls back to NumCPU
+func RunFanOut[T any, R any](items []T, workers int, fn func(T) R) []R  // ordered fan-out
+func FormatFailureError(failures []string, total int) error  // nil if no failures
+```
+
+### Executor (`pkg/git/`)
+
+```go
+// executor.go — uses pkg/parallel internally
 type ExecOptions struct {
-    MaxConcurrency int           // default: runtime.NumCPU()
-    Timeout        time.Duration // default: 0 (no timeout)
-    Async          bool          // false = single serial run with stdin passthrough
+    MaxConcurrency int           // 0 → runtime.NumCPU()
+    Timeout        time.Duration // 0 → no timeout
+    Async          bool          // false = serial run with stdin passthrough
 }
 
+func RunParallel(repos []repo.Repo, args []string, opts ExecOptions) []ExecResult
+
+// result.go
 type ExecResult struct {
     RepoName string
     Stdout   []byte
@@ -190,64 +264,94 @@ type ExecResult struct {
     Err      error
 }
 
-// RunParallel executes args in each repo concurrently.
-// Single-repo or non-async: stdin passes through (interactive).
-// Multi-repo async: stdin suppressed (os.DevNull), output prefixed "[repo-name]".
-func RunParallel(repos []repo.Repo, args []string, opts ExecOptions) []ExecResult
+func WriteResults(w io.Writer, results []ExecResult)  // writes prefixed output
+func ExecErrors(results []ExecResult) error           // returns combined error if any failed
+```
+
+### Display (`pkg/display/`)
+
+```go
+// table.go
+type TableEntry struct {
+    Name        string
+    Branch      string
+    RemoteState repo.RemoteState  // uses canonical repo.RemoteState enum
+    Dirty       bool
+    Staged      bool
+    Untracked   bool
+    Stashed     bool
+    LastCommit  string
+}
+
+func RenderTable(w io.Writer, entries []TableEntry)
+```
+
+### Gitutil (`pkg/gitutil/`)
+
+```go
+func Clone(url, destPath string) error
+func CloneContext(ctx context.Context, url, destPath string) error
+func RemoteURL(repoPath string) string
+func EnsureGitignore(dir, entry string) error  // mutex-protected for concurrent use
 ```
 
 ---
 
 ## Command Inventory
 
-### Workspace Management
+### Workspace Management (directly on root)
 
 | Command | Description |
 |---|---|
-| `git workspace init [name]` | Create `.gitworkspace` in current directory; add `.gitworkspace.local` to `.gitignore` |
-| `git workspace add <path> [-g group]` | Register an existing local repo |
-| `git workspace add -r <dir>` | Recursively find and register all repos under `<dir>`; auto-create groups from directory structure |
-| `git workspace clone <url> [<path>]` | Clone a remote repo and register it |
-| `git workspace rm <name(s)>` | Unregister repos |
-| `git workspace rename <old> <new>` | Rename a tracked repo |
-| `git workspace list [name]` (alias: `ls`) | List repo names or print path of one |
-| `git workspace info [group]` (alias: `ll`) | Status table for all or group repos |
-| `git workspace restore` | For each repo in `.gitworkspace`: clone if path missing, pull if present; enforce gitignore |
+| `git w init [name]` | Create `.gitw` in current directory; add `.gitw.local` to `.gitignore` |
+| `git w restore` | For each repo in `.gitw`: clone if path missing, pull if present; enforce gitignore |
+
+### Repo Lifecycle (`git w repo` / `git w r`)
+
+| Command | Description |
+|---|---|
+| `git w repo add <path> [-g group]` | Register an existing local repo |
+| `git w repo add -r <dir>` | Recursively find and register all repos under `<dir>`; auto-create groups from directory structure |
+| `git w repo clone <url> [<path>]` | Clone a remote repo and register it |
+| `git w repo unlink <name(s)>` | Unregister repos from workspace (does not delete directories) |
+| `git w repo rename <old> <new>` | Rename a tracked repo (alias: `mv`) |
+| `git w repo list [name]` | List repo names or print path of one (alias: `ls`) |
 
 ### Group Management
 
-`group` has alias `g` — e.g. `git workspace g add ...` works identically.
+`group` has alias `g` — e.g. `git w g add ...` works identically.
 
 | Command | Description |
 |---|---|
-| `git workspace group add <repos> -n <name>` | Create group / add repos to group |
-| `git workspace group rm <name>` | Delete group |
-| `git workspace group rename <old> <new>` | Rename group |
-| `git workspace group rmrepo <repos> -n <name>` | Remove repos from group |
-| `git workspace group list` (alias: `ls`) | List group names |
-| `git workspace group info [name]` (alias: `ll`) | List groups with their repos |
+| `git w group add <repos> -n <name>` | Create group / add repos to group |
+| `git w group rm <name>` | Delete group |
+| `git w group rename <old> <new>` | Rename group |
+| `git w group rmrepo <repos> -n <name>` | Remove repos from group |
+| `git w group list` (alias: `ls`) | List group names |
+| `git w group info [name]` (alias: `ll`) | List groups with their repos |
 
 ### Context
 
 | Command | Description |
 |---|---|
-| `git workspace context <group>` | Scope all commands to group |
-| `git workspace context auto` | Auto-detect group from CWD |
-| `git workspace context none` | Clear active context |
-| `git workspace context` | Show active context |
+| `git w context <group>` | Scope all commands to group |
+| `git w context auto` | Auto-detect group from CWD |
+| `git w context none` | Clear active context |
+| `git w context` | Show active context |
 
-### Execution
+### Execution (directly on root)
 
 All execution commands accept optional `[repo/group names...]` to filter targets.
 When no filter: uses active context if set, otherwise all repos.
 
-| Command | Async | Description |
-|---|---|---|
-| `git workspace fetch [repos]` | yes | `git fetch` |
-| `git workspace pull [repos]` | yes | `git pull` |
-| `git workspace push [repos]` | yes | `git push` |
-| `git workspace status [repos]` (alias: `st`) | yes | `git status -sb` |
-| `git workspace exec [repos] -- <git-args>` | yes* | Any git command |
+| Command | Alias | Async | Description |
+|---|---|---|---|
+| `git w fetch [repos]` | `f` | yes | `git fetch` |
+| `git w pull [repos]` | `pl` | yes | `git pull` |
+| `git w push [repos]` | `ps` | yes | `git push` |
+| `git w status [repos]` | `st` | yes | `git status -sb` |
+| `git w exec [repos] -- <git-args>` | — | yes* | Any git command |
+| `git w info [group]` | `ll` | — | Status table for all or group repos |
 
 *`exec` with a single repo target: always synchronous (stdin passthrough).
 
@@ -279,7 +383,7 @@ infra         main ↓          ?       chore: bump versions
 
 ## Auto-Gitignore Logic
 
-Applied on `add`, `clone`, `add -r`, and `restore` when `auto_gitignore` is true (default).
+Applied on `repo add`, `repo clone`, `repo add -r`, and `restore` when `auto_gitignore` is true (default).
 
 **Checking if a path is already ignored:**
 1. Run `git check-ignore -q <path>` from workspace root
@@ -289,14 +393,14 @@ Applied on `add`, `clone`, `add -r`, and `restore` when `auto_gitignore` is true
 2. Write `<path>` as a new line in the workspace-root `.gitignore`; create file if absent
 
 **`restore` enforcement:**
-After cloning/pulling each repo, apply the same check — ensures a fresh-machine restore also sets up `.gitignore` correctly, even if the `.gitworkspace` was committed before auto-gitignore existed.
+After cloning/pulling each repo, apply the same check — ensures a fresh-machine restore also sets up `.gitignore` correctly.
 
 ---
 
 ## `git w` Short Alias
 
 `git w <cmd>` requires a `git-w` executable in `$PATH`. Implemented as a symlink
-(`git-w` → `git-workspace`) installed by the Homebrew formula. No code changes
+(`git-w` → `git-w`) installed by the Homebrew formula. No code changes
 needed — Cobra parses `os.Args[1:]` regardless of `os.Args[0]`.
 
 See [release.md](release.md) for full build, CI/CD, and distribution details.
@@ -310,9 +414,9 @@ All non-trivial logic has unit tests. See `testing.md` for full details.
 **Key patterns:**
 - `status.go` separates parsing from subprocess calls — parse functions take `[]byte` and are tested with fixture strings
 - Filesystem tests use `t.TempDir()`; git repo tests use `testutil.MakeGitRepo` (runs `git init` + initial commit)
-- `cmd/` tests use black-box `package cmd_test`, call `Execute()` with captured stdout
+- `pkg/` tests use black-box `package <domain>_test`, call via `s.ExecuteCmd()` with captured stdout
 - `display/` tests set `color.NoColor = true` and compare against golden strings
-- CI: `go test -race -count=1 ./...` in both `ci.yml` and `release.yml`
+- CI: `go test -race -count=1 ./...` in both `ci.yml` and `goreleaser.yml`
 
 ---
 
@@ -322,21 +426,22 @@ All non-trivial logic has unit tests. See `testing.md` for full details.
 github.com/spf13/cobra          v1.x   CLI framework
 github.com/pelletier/go-toml/v2 v2.x   TOML parsing
 github.com/fatih/color          v1.x   ANSI terminal colors
-golang.org/x/sync               v0.x   errgroup for parallel execution
 github.com/stretchr/testify     v1.x   assert + require for unit tests (test only)
 ```
+
+No `golang.org/x/sync` — parallel execution uses native goroutines with channels and `sync.WaitGroup` in `pkg/parallel`.
 
 ---
 
 ## Key Differences from gita
 
-| Concern | gita | git-workspace |
+| Concern | gita | git-w |
 |---|---|---|
 | Language | Python 3.6+ | Go — single compiled binary |
-| Config location | `~/.config/gita/` (global) | `.gitworkspace` (local, workspace-scoped) |
+| Config location | `~/.config/gita/` (global) | `.gitw` (local, workspace-scoped) |
 | Config format | Multiple CSV + JSON files | Single TOML file |
 | Config discovery | Env var or global default | Walk up from CWD (like `.git`) |
-| Concurrency | asyncio + ThreadPoolExecutor | goroutines + semaphore |
+| Concurrency | asyncio + ThreadPoolExecutor | goroutines + semaphore (`pkg/parallel`) |
 | Installation | pip/pipx | `go install` or release binary |
-| Invocation | `gita <cmd>` | `git workspace <cmd>` |
-| Version control | Config is global, not in repo | `.gitworkspace` can be committed |
+| Invocation | `gita <cmd>` | `git w <cmd>` |
+| Version control | Config is global, not in repo | `.gitw` can be committed |

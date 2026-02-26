@@ -20,59 +20,64 @@ package main
 
 import (
     "fmt"
-    "os"
+    "strings"
 
     "github.com/magefile/mage/mg"
     "github.com/magefile/mage/sh"
 )
 
-const bin = "git-workspace"
+var Default = All
 
-func version() string {
-    v, err := sh.Output("git", "describe", "--tags", "--always", "--dirty")
-    if err != nil {
-        return "dev"
-    }
-    return v
+func All() {
+    mg.Deps(Lint, Test, Build)
 }
 
-func ldflags() string {
-    return fmt.Sprintf("-s -w -X main.version=%s", version())
-}
-
-// Build compiles the binary into bin/git-workspace.
 func Build() error {
-    return sh.RunV("go", "build", "-ldflags", ldflags(), "-o", "bin/"+bin, ".")
+    version := gitVersion()
+    ldflags := fmt.Sprintf("-X main.version=%s", version)
+    return sh.RunV("go", "build", "-ldflags="+ldflags, "-o", "bin/git-w", ".")
 }
 
-// Install installs the binary to $GOPATH/bin.
 func Install() error {
-    return sh.RunV("go", "install", "-ldflags", ldflags(), ".")
+    return sh.RunV("go", "install", ".")
 }
 
-// Test runs the test suite with race detection.
 func Test() error {
     return sh.RunV("go", "test", "-race", "-count=1", "./...")
 }
 
-// Cover runs tests and opens an HTML coverage report.
 func Cover() error {
-    if err := sh.RunV("go", "test", "-coverprofile=coverage.out", "./..."); err != nil {
+    if err := sh.RunV("go", "test", "-race", "-count=1", "-coverprofile=coverage.out", "./..."); err != nil {
         return err
     }
     return sh.RunV("go", "tool", "cover", "-html=coverage.out")
 }
 
-// Lint runs go vet.
 func Lint() error {
-    return sh.RunV("go", "vet", "./...")
+    if err := sh.RunV("golangci-lint", "fmt", "--diff", "./..."); err != nil {
+        return err
+    }
+    return sh.RunV("golangci-lint", "run", "./...")
 }
 
-// Check runs Lint then Test.
-func Check() { mg.Deps(Lint, Test) }
+func LintFix() error {
+    if err := sh.RunV("golangci-lint", "fmt", "./..."); err != nil {
+        return err
+    }
+    return sh.RunV("golangci-lint", "run", "--fix", "./...")
+}
 
-// Clean removes build artifacts.
-func Clean() error { return os.RemoveAll("bin") }
+func Fmt() error {
+    return sh.RunV("golangci-lint", "fmt", "./...")
+}
+
+func gitVersion() string {
+    out, err := sh.Output("git", "describe", "--tags", "--always", "--dirty")
+    if err != nil {
+        return "dev"
+    }
+    return strings.TrimSpace(out)
+}
 ```
 
 `magefile.go` is added to `go.mod` as a tool dependency:
@@ -85,7 +90,7 @@ require github.com/magefile/mage v1.x
 ## Versioning
 
 Semver tags: `v0.1.0`, `v0.2.0`, etc. GoReleaser reads the tag; `main.version`
-is injected via ldflags and exposed by `git workspace --version`.
+is injected via ldflags and exposed by `git w --version`.
 
 `--version` is provided for free by Cobra when `rootCmd.Version` is set:
 ```go
@@ -106,11 +111,11 @@ and Homebrew tap updates from a single `.goreleaser.yaml`.
 **`.goreleaser.yaml` key configuration:**
 
 ```yaml
-project_name: git-workspace
+project_name: git-w
 
 builds:
   - main: .
-    binary: git-workspace
+    binary: git-w
     goos: [darwin, linux]
     goarch: [amd64, arm64]
     ldflags:
@@ -134,17 +139,17 @@ changelog:
   disable: true
 
 brews:
-  - name: git-workspace
+  - name: git-w
     repository:
       owner: <github-user>
-      name: homebrew-git-workspace
-    homepage: https://github.com/<github-user>/git-workspace
+      name: homebrew-git-w
+    homepage: https://github.com/<github-user>/git-w
     description: "Manage multiple git repos from a single workspace"
     install: |
-      bin.install "git-workspace"
-      bin.install_symlink bin/"git-workspace" => "git-w"
+      bin.install "git-w"
+      bin.install_symlink bin/"git-w" => "git-w"
     test: |
-      system "#{bin}/git-workspace", "--version"
+      system "#{bin}/git-w", "--version"
 ```
 
 ---
@@ -155,21 +160,28 @@ Three workflows in `.github/workflows/`:
 
 ---
 
-**`ci.yml`** — runs on PRs and pushes to `main`; gates merges:
+**`ci.yml`** — runs on pushes, PRs, and workflow dispatch; gates merges:
 ```yaml
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
 jobs:
-  ci:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version-file: go.mod }
-      - run: go vet ./...
+        with: { go-version: "1.26" }
+      - uses: golangci/golangci-lint-action@v7
+        with: { version: v2.10.1 }
+      - run: golangci-lint fmt --diff ./...
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.26" }
       - run: go test -race -count=1 ./...
       - run: go build ./...
 ```
@@ -181,16 +193,16 @@ jobs:
 on:
   push:
     branches: [main]
+permissions:
+  contents: write
+  pull-requests: write
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
         with:
-          config-file: release-please-config.json
+          config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
 ```
 
@@ -200,21 +212,21 @@ Merging that PR creates the tag and a **draft** GitHub Release with generated no
 
 ---
 
-**`release.yml`** — runs when Release Please pushes a `v*` tag:
+**`goreleaser.yml`** — runs when Release Please pushes a `v*` tag (renamed from `release.yml`):
 ```yaml
 on:
   push:
     tags: ["v*"]
+permissions:
+  contents: write
 jobs:
-  release:
+  goreleaser:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }  # GoReleaser needs full tag history
       - uses: actions/setup-go@v5
-        with: { go-version-file: go.mod }
+        with: { go-version: "1.26" }
       - name: Test
         run: go test -race -count=1 ./...
       - uses: goreleaser/goreleaser-action@v6
@@ -234,7 +246,7 @@ archives, and publishes it — rather than creating a second release.
 
 ## Release Please Config Files
 
-**`release-please-config.json`** — committed to repo root:
+**`.release-please-config.json`** — committed to repo root:
 ```json
 {
   "release-type": "go",
@@ -264,17 +276,17 @@ Release Please updates this file automatically on each release.
 1. Work on branch with conventional commits:
      feat: add recursive add support
      fix: handle missing .git in status check
-     feat!: rename `ll` to `info`  ← triggers major bump
+     feat!: rename `rm` to `unlink`  ← triggers major bump
 
 2. Merge PR to main
-   → ci.yml runs (vet + test + build)
+   → ci.yml runs (lint + test + build)
    → release-please.yml runs; opens/updates Release PR
 
 3. When ready to ship: merge the Release Please PR
    → Release Please pushes tag (e.g. v0.3.0)
    → Release Please creates draft GitHub Release with CHANGELOG entries
 
-4. release.yml fires on the tag:
+4. goreleaser.yml fires on the tag:
    → go test ./...  (if fails: release aborted)
    → GoReleaser: builds darwin/linux × amd64/arm64, creates archives + checksums,
      attaches to the draft release, publishes it, updates Homebrew tap formula
@@ -292,18 +304,18 @@ Release Please updates this file automatically on each release.
 
 ## Homebrew Tap Repo
 
-Separate repo: `github.com/<user>/homebrew-git-workspace`
+Separate repo: `github.com/<user>/homebrew-git-w`
 
 ```
-homebrew-git-workspace/
+homebrew-git-w/
 └── Formula/
-    └── git-workspace.rb    # auto-updated by GoReleaser on each release
+    └── git-w.rb    # auto-updated by GoReleaser on each release
 ```
 
 Install:
 ```sh
-brew tap <user>/git-workspace
-brew install git-workspace
-# installs git-workspace binary + git-w symlink
-# → both `git workspace <cmd>` and `git w <cmd>` work
+brew tap <user>/git-w
+brew install git-w
+# installs git-w binary
+# → both `git w <cmd>` and `git-w <cmd>` work
 ```

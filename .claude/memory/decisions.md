@@ -4,9 +4,9 @@ All decisions are resolved.
 
 ---
 
-### Binary Name: `git-workspace`
+### Binary Name: `git-w`
 Git's plugin system finds executables named `git-<subcommand>` in `$PATH`.
-Binary must be named `git-workspace` for `git workspace` to work. Non-negotiable.
+Binary must be named `git-w` for `git w` to work. Non-negotiable.
 
 ### Config Format: TOML
 Chosen over YAML:
@@ -20,25 +20,25 @@ Chosen over `BurntSushi/toml`:
 - Identical struct-tag API for our use case
 
 ### Config Discovery: Walk Up from CWD
-Same pattern as `git` finding `.git`. Walk up from CWD until `.gitworkspace` is found.
-Stops at filesystem root. Override via `GIT_WORKSPACE_CONFIG` env var or `--config` flag.
+Same pattern as `git` finding `.git`. Walk up from CWD until `.gitw` is found.
+Stops at filesystem root. Override via `GIT_W_CONFIG` env var or `--config` flag.
 
 ### Config Scope: Local (not global)
-`.gitworkspace` lives at workspace root, not `~/.config/`. Benefits:
+`.gitw` lives at workspace root, not `~/.config/`. Benefits:
 - Can be committed to a meta-repo; multiple independent workspaces per machine
 - No hidden global state
 
 ### Two Config Files
-- **`.gitworkspace`** — committed, shared (repos, groups, settings)
-- **`.gitworkspace.local`** — gitignored, per-developer (active context only)
+- **`.gitw`** — committed, shared (repos, groups, settings)
+- **`.gitw.local`** — gitignored, per-developer (active context only)
 
 Loader merges both at startup; `.local` values take precedence.
 
 ### `init` Command Behavior
-`git workspace init [name]` does:
-1. Creates `.gitworkspace` with minimal scaffold — errors if already exists
-2. Appends `.gitworkspace.local` to `.gitignore` (creates `.gitignore` if absent)
-3. Does NOT create `.gitworkspace.local` — created on first `context` write
+`git w init [name]` does:
+1. Creates `.gitw` with minimal scaffold — errors if already exists
+2. Appends `.gitw.local` to `.gitignore` (creates `.gitignore` if absent)
+3. Does NOT create `.gitw.local` — created on first `context` write
 
 Initial scaffold:
 ```toml
@@ -58,9 +58,13 @@ Implemented via Cobra's `Aliases` field — both forms work identically.
 
 | Canonical | Alias |
 |---|---|
-| `list` | `ls` |
+| `repo list` | `repo ls` |
 | `info` | `ll` |
 | `status` | `st` |
+| `fetch` | `f` |
+| `pull` | `pl` |
+| `push` | `ps` |
+| `repo` | `r` |
 | `group` | `g` |
 | `group list` | `group ls`, `g ls` |
 | `group info` | `group ll`, `g ll` |
@@ -78,19 +82,37 @@ behavior predictable in CI/scripts.
 
 ### Predefined Command Set: Hardcoded
 Static, not configurable. Final execution commands:
-- `fetch` — `git fetch`
-- `pull` — `git pull`
-- `push` — `git push`
+- `fetch` (alias: `f`) — `git fetch`
+- `pull` (alias: `pl`) — `git pull`
+- `push` (alias: `ps`) — `git push`
 - `status` (alias: `st`) — `git status -sb`
 - `exec` — any git command (escape hatch)
 
 Cut: `br`, `log`, `diff` (covered by `ll` or `exec`), `shell` (too broad).
 
+### Repo Lifecycle Commands Under `repo` Subcommand
+Repo lifecycle operations (`add`, `clone`, `unlink`, `rename`, `list`) are grouped
+under a `repo` parent command (alias `r`) rather than as direct root subcommands.
+Benefits:
+- Clearer command surface — `git w repo add` reads as "repo management operation"
+- Avoids collision with common git command names at root level
+- `restore` is kept directly on root since it's a workspace-wide operation
+
+`repo.Register` creates the parent command, registers lifecycle commands under it,
+and adds `restore` directly to root.
+
+### `unlink` Replaces `rm`/`remove` for Repo Removal
+`git w repo unlink <name>` removes a repo from the workspace config.
+`unlink` was chosen over `rm`/`remove` because:
+- Accurately describes the operation (unregisters the repo; does not delete files)
+- Avoids confusion with `git rm` (which does affect files)
+- Consistent with the semantic of "linking" repos into a workspace
+
 ### Add / Clone / Restore Modes
 Three ways to register repos:
-1. `git workspace add <path> [-g group]` — register existing local repo; detect URL via `git remote get-url origin`
-2. `git workspace clone <url> [<path>]` — clone remote repo and register it
-3. `git workspace add -r <dir>` — recursive scan + auto-group
+1. `git w repo add <path> [-g group]` — register existing local repo; detect URL via `git remote get-url origin`
+2. `git w repo clone <url> [<path>]` — clone remote repo and register it
+3. `git w repo add -r <dir>` — recursive scan + auto-group
 
 `-r` behavior:
 - Walk directory tree; stop descending when a `.git` dir is found (no nested repos)
@@ -99,7 +121,7 @@ Three ways to register repos:
 
 ### `git w` Short Alias: Symlink at Install Time
 Git requires a `git-w` executable in `$PATH` for `git w` to work.
-Approach: install a `git-w` symlink pointing to `git-workspace` via the Homebrew formula
+Approach: install a `git-w` symlink pointing to `git-w` via the Homebrew formula
 (`bin.install_symlink`). No code changes needed — cobra parses `os.Args[1:]`
 regardless of `os.Args[0]`. For non-Homebrew installs, README documents a manual `ln -s`.
 
@@ -119,9 +141,9 @@ GoReleaser chosen over hand-rolled shell scripts in GitHub Actions:
 - `version` injected at build time via ldflags; surfaced via `rootCmd.Version`
 
 ### CI/CD: GitHub Actions — Three Workflows
-- `ci.yml` — `go vet`, `go test`, `go build` on push/PR to `main`
+- `ci.yml` — lint + test + build on push/PR
 - `release-please.yml` — runs on push to `main`; opens/updates Release PR via Release Please
-- `release.yml` — GoReleaser triggered on `v*` tag push (created by Release Please);
+- `goreleaser.yml` — GoReleaser triggered on `v*` tag push (renamed from `release.yml`);
   requires `GITHUB_TOKEN` (auto) and `TAP_GITHUB_TOKEN` (repo secret for tap writes)
 
 ### Release Trigger: Release Please (Automated)
@@ -133,7 +155,7 @@ Release Please chosen over manual `git tag` push or workflow dispatch:
 - Requires conventional commit discipline (`feat:`, `fix:`, `feat!:`, etc.)
 
 ### Release Gate: Test Before GoReleaser
-`release.yml` runs `go test ./...` before invoking GoReleaser. If tests fail, the
+`goreleaser.yml` runs `go test ./...` before invoking GoReleaser. If tests fail, the
 release is aborted — binaries are never built or published for a broken commit.
 
 ### Release Please + GoReleaser Integration
@@ -145,31 +167,29 @@ Release Please creates a draft GitHub Release with changelog notes; GoReleaser u
 ### Distribution: Homebrew Custom Tap
 Primary install path:
 ```sh
-brew tap <user>/git-workspace
-brew install git-workspace
+brew tap <user>/git-w
+brew install git-w
 ```
-Tap lives in a separate repo `homebrew-git-workspace`. GoReleaser auto-updates the
+Tap lives in a separate repo `homebrew-git-w`. GoReleaser auto-updates the
 formula on release. Formula installs the binary AND the `git-w` symlink.
 
 ### No Freeze Command
-`.gitworkspace` IS the persistent state — always current, committable.
+`.gitw` IS the persistent state — always current, committable.
 
 `restore` replaces the freeze/clone workflow:
-- Reads local `.gitworkspace`
+- Reads local `.gitw`
 - For each repo: clone if path missing (requires `url` field), pull if present
-- `url` is auto-populated by `add` (via `git remote get-url origin`) and `clone`
+- `url` is auto-populated by `repo add` (via `git remote get-url origin`) and `repo clone`
 - Enforces auto-gitignore on each repo after materializing it
 
 ### Testing Library: testify
-
 `github.com/stretchr/testify` (`assert` + `require` packages) used throughout:
 - `require.NoError`, `require.Equal` — fatal assertions in test setup
 - `assert.Equal`, `assert.Contains` — non-fatal value checks in test bodies
 - No other test libraries (no gomock, no ginkgo — keep it simple)
 
 ### Testing Architecture: Parse/Invoke Separation
-
-`internal/repo/status.go` separates subprocess invocation from output parsing.
+`pkg/repo/status.go` separates subprocess invocation from output parsing.
 Parse functions (`parsePorcelainV1`, `parseBranchLine`, `parseStashCount`) take `[]byte`
 and are tested exhaustively with fixture strings — no real git subprocess needed for
 coverage of all status states.
@@ -178,7 +198,6 @@ Thin subprocess wrappers are covered by a single integration smoke test using a 
 git repo created via `testutil.MakeGitRepo` (runs `git init` + initial commit in `t.TempDir()`).
 
 ### Testing: No Mocking Framework
-
 No gomock, no mockery. Instead:
 - Filesystem behaviour: `t.TempDir()` with real files
 - Git behaviour: `testutil.MakeGitRepo` (real `git init` subprocess)
@@ -188,7 +207,7 @@ No gomock, no mockery. Instead:
 On by default; opt-out via `auto_gitignore = false` in `[workspace]`.
 `WorkspaceMeta.AutoGitignore` is `*bool`; nil = true.
 
-Applied on `add`, `clone`, `add -r`, and `restore`.
+Applied on `repo add`, `repo clone`, `repo add -r`, and `restore`.
 
 Check if already ignored:
 1. Run `git check-ignore -q <path>` from workspace root
@@ -196,3 +215,50 @@ Check if already ignored:
    - Exit 1 → not ignored, append to `.gitignore`
    - Error (not a git repo) → fall back to string matching in `.gitignore`
 2. Append path to workspace-root `.gitignore`; create file if absent
+
+### Domain Package Layout: `pkg/` with Register Pattern
+Commands live in three domain packages under `pkg/`: `workspace`, `repo`, and `git`.
+Each package exports a single `Register(root *cobra.Command)` in `register.go` that
+calls private `register<Name>` functions — one per command file.
+
+Benefits over the old flat `cmd/<verb>` sub-package layout:
+- No variable name collisions between commands in the same domain
+- Domain-oriented ownership — clear where new features belong
+- `pkg/cmd/root.go` wires three domains with three `Register` calls — zero per-command imports
+- New commands: add a file, add one line to `register.go`
+
+### `pkg/parallel/` — Generic Concurrency Primitives
+Parallel execution utilities extracted into their own package rather than living in `pkg/git/`:
+- `RunFanOut[T, R]` — ordered generic fan-out over goroutines with semaphore
+- `MaxWorkers` — bounds worker count (falls back to NumCPU, caps at total)
+- `FormatFailureError` — formats a summary error from a list of failure strings
+
+Rationale: `pkg/git/` depends on `pkg/repo`, so if parallel primitives stayed in `pkg/git/`,
+any future package that needs concurrency but not git operations would have to import git.
+`pkg/parallel/` has no internal dependencies — clean leaf package.
+
+No `golang.org/x/sync` dependency — uses native channels and `sync.WaitGroup`.
+
+### `workspace.LoadConfig(cmd)` — Centralized Config Loading
+Config loading is the single canonical entry point for all commands.
+- In `pkg/workspace` commands: call `LoadConfig(cmd)` directly (same package)
+- In `pkg/repo` and `pkg/git` commands: call `workspace.LoadConfig(cmd)`
+- Never inline the flag-reading logic (`cmd.Root().PersistentFlags().GetString("config")`)
+
+`LoadConfig` reads the `--config` flag then delegates to `LoadCWD(override)`.
+
+### `EnsureGitignore` Mutex Protection
+`restore` runs gitignore updates concurrently across repos. The read→check→append
+sequence in `EnsureGitignore` has a TOCTOU race window. Fixed with a package-level
+`sync.Mutex` in `pkg/gitutil/gitutil.go` that serializes all calls process-wide.
+
+### Linting: golangci-lint over `go vet`
+`mage lint` runs `golangci-lint fmt --diff` + `golangci-lint run` instead of bare `go vet`.
+Provides formatting enforcement plus a broader set of static analysis checks.
+CI uses `golangci-lint-action@v7` with version `v2.10.1`.
+
+### `runGitCmd` Shared Helper in `pkg/git/runner.go`
+The predefined git commands (fetch, pull, push, status) all share identical logic:
+load config → filter repos → run parallel → write results → collect errors.
+Extracted to `runGitCmd(cmd, args, gitArgs...)` in `runner.go` to avoid duplicating
+this pipeline across four command definitions.
