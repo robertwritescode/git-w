@@ -206,6 +206,24 @@ strings regardless of terminal type. Required for reliable `Contains` checks and
 Spec documents can contain typos in expected values. Always verify before writing tests.
 Example: Phase 2 plan stated `visualWidth("main ✓") == 7`; actual is 6 (6 runes).
 
+### MarkFlagRequired + pflag state: don't test "missing required flag" via execCmd
+
+`MarkFlagRequired` uses pflag's `Changed()` state. After any `execCmd` call that sets a flag,
+the flag's `Changed` state persists into the next `execCmd` call. Testing "error when required
+flag absent" via `execCmd` is therefore unreliable and should be omitted — it tests cobra's
+built-in enforcement, not application logic.
+
+### Multi-line command output invalidates `strings.Count == 1` assertions
+
+When asserting deduplication (repo ran exactly once), `strings.Count(out, "[repo]") == 1` fails
+if the git command produces multiple prefixed lines. Instead, establish a baseline with a single-repo
+run and assert `strings.Count(dedup_out, "[repo]") == strings.Count(baseline_out, "[repo]")`.
+
+### Never use execCmd to set up group/context state for downstream tests
+
+Same-package global vars (`groupName`) persist between `execCmd` calls. Always write `.gitworkspace`
+and `.gitworkspace.local` directly via `os.WriteFile` for test fixture setup.
+
 ---
 
 ## CI Configuration

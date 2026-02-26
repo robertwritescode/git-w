@@ -86,14 +86,23 @@ Key points:
 ## Phase 4: Groups + Context
 
 **Goal**: Full group management and context-scoped command execution.
+**Plan**: See `phase4-plan.md` for full parallel-stream breakdown, function signatures, and test specs.
 
-### Tasks
-- [ ] `cmd/group.go` — group subcommand tree (add/rm/rename/rmrepo/ls/ll)
-- [ ] `cmd/context.go` — context subcommand (set/auto/none/show)
-- [ ] Repo resolution respects active context when no explicit filter given
-- [ ] `context auto` — find nearest group by comparing CWD to group paths
-- [ ] `cmd/group_test.go` — add/rm/rename/rmrepo/ls/ll subcommands via cobra integration tests
-- [ ] `cmd/context_test.go` — set/auto/none/show; verify `.gitworkspace.local` written correctly
+### Tasks (3 parallel streams — see phase4-plan.md)
+
+**Stream A: group subcommand**
+- [ ] `cmd/group.go` — group subcommand tree (add/rm/rename/rmrepo/list/info); alias `g`
+- [ ] `cmd/group_test.go` — GroupSuite; table-driven for all subcommands
+
+**Stream B: context subcommand**
+- [ ] `cmd/context.go` — context set/auto/none/show; writes `.gitworkspace.local`
+- [ ] `cmd/context_test.go` — ContextSuite; table-driven show/set/auto/clear
+
+**Stream C: context integration**
+- [ ] `cmd/exec.go` — replace `filterRepos` with context-aware + group-name-expanding version
+- [ ] `cmd/exec_test.go` — add tests: active-context scoping, group-name filter, dedup
+- [ ] `cmd/git_cmds_test.go` — add table-driven active-context scoping test
+- [ ] `cmd/info.go` — audit; update if it bypasses filterRepos and needs context awareness
 
 **Exit criteria**: `git workspace group add frontend backend -n web` works;
 `git workspace context web` scopes subsequent commands to that group. All Phase 4 `_test.go` files pass `go test -race ./...`.
@@ -105,9 +114,9 @@ Key points:
 **Goal**: Restore, recursive add, auto-context, custom git flags, shell completion.
 
 ### Tasks
-- [ ] `cmd/clone.go` — `git clone <url> [<path>]`, register in config, auto-gitignore path
+- [ ] `cmd/clone.go` — `git clone <url> [<path>]`, register in config, auto-gitignore path, also support -g / --group for adding to a group
 - [ ] `cmd/restore.go` — for each repo in `.gitworkspace`: clone if missing (requires `url`), pull if present; auto-gitignore each path
-- [ ] `cmd/add.go` — `-r <dir>` flag: walk directory, find `.git` dirs (non-nesting), detect remote URL via `git remote get-url origin`, register each, auto-gitignore, auto-group by parent path
+- [ ] `cmd/add.go` — `-r <dir>` flag: walk directory, find `.git` dirs (non-nesting), detect remote URL via `git remote get-url origin`, register each, auto-gitignore, auto-group by parent path, passing `-r` without an argument should use the current working directory
 - [ ] `internal/config/types.go` — add `URL` to `RepoConfig`; add `AutoGitignore *bool` to `WorkspaceMeta`
 - [ ] `internal/gitignore/` (or helper in `config/`) — `IsIgnored(root, path)` using `git check-ignore -q`; `EnsureIgnored(root, path)` to append if needed
 - [ ] Per-repo `flags` wired into all git subcommand invocations
