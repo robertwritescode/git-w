@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -21,6 +23,7 @@ func changeToDir(t *testing.T, dir string) {
 
 func execCmd(t *testing.T, args ...string) (string, error) {
 	t.Helper()
+	resetCmdFlags(rootCmd)
 	buf := &bytes.Buffer{}
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(&bytes.Buffer{})
@@ -29,6 +32,21 @@ func execCmd(t *testing.T, args ...string) (string, error) {
 	rootCmd.SetArgs(nil)
 	cfgFile = ""
 	return buf.String(), err
+}
+
+// resetCmdFlags resets all flag values on cmd and its subcommands to their
+// defaults. Cobra does not reset flags between Execute calls, so tests that
+// reuse rootCmd must call this to prevent flag state from leaking across cases.
+func resetCmdFlags(cmd *cobra.Command) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Changed {
+			_ = f.Value.Set(f.DefValue)
+			f.Changed = false
+		}
+	})
+	for _, sub := range cmd.Commands() {
+		resetCmdFlags(sub)
+	}
 }
 
 type InitSuite struct {

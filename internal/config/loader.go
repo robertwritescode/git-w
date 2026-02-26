@@ -62,8 +62,18 @@ func mergeLocalConfig(cfg *WorkspaceConfig, localPath string) error {
 }
 
 // Save writes cfg to configPath atomically (write to .tmp, then rename).
+// Only the workspace, repos, and groups sections are written; context lives in .gitworkspace.local.
 func Save(configPath string, cfg *WorkspaceConfig) error {
-	data, err := toml.Marshal(cfg)
+	type diskConfig struct {
+		Workspace WorkspaceMeta          `toml:"workspace"`
+		Repos     map[string]RepoConfig  `toml:"repos,omitempty"`
+		Groups    map[string]GroupConfig `toml:"groups,omitempty"`
+	}
+	data, err := toml.Marshal(diskConfig{
+		Workspace: cfg.Workspace,
+		Repos:     cfg.Repos,
+		Groups:    cfg.Groups,
+	})
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
