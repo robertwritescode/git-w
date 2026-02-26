@@ -159,6 +159,55 @@ func runCmd(t *testing.T, dir string, args ...string) (stdout, stderr string, ex
 
 ---
 
+## Known Pitfalls (learned during implementation)
+
+### SetupTest does NOT run per s.Run sub-test
+
+`SetupTest` fires once per top-level test *method*, not per `s.Run` closure. Table-driven
+sub-tests that need isolated state (clean workspace, fresh CWD) must set up that state
+themselves inside the closure. Pattern used in `cmd/info_test.go`:
+
+```go
+for _, tt := range tests {
+    s.Run(tt.name, func() {
+        // Do NOT rely on SetupTest having prepared a clean workspace.
+        wsDir := s.T().TempDir()
+        s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitworkspace"), ...))
+        changeToDir(s.T(), wsDir)
+        // ... test body
+    })
+}
+```
+
+### Cobra/pflag flag vars persist between Execute() calls
+
+pflag does not reset flag variables to their defaults between `Execute()` calls when the
+flag is absent from args. The `execCmd` helper only resets `cfgFile`; other flag vars
+(e.g. `addGroup`) keep their previous value. A test that calls `add -g mygroup <repo1>`
+then `add <repo2>` in the same workspace will silently register repo2 in mygroup too.
+
+Workaround: avoid relying on flag-driven setup when testing downstream commands. Instead,
+manipulate config directly after registering repos:
+
+```go
+cfg, _ := config.Load(cfgPath)
+cfg.Groups["mygroup"] = config.GroupConfig{Repos: []string{repoName}}
+config.Save(cfgPath, cfg)
+```
+
+### Disable colors in display tests
+
+`color.NoColor = true` in `SetupTest` makes `fatih/color` Sprint calls return plain
+strings regardless of terminal type. Required for reliable `Contains` checks and
+`visualWidth` assertions in `internal/display/` tests.
+
+### Verify plan specs against actual values
+
+Spec documents can contain typos in expected values. Always verify before writing tests.
+Example: Phase 2 plan stated `visualWidth("main ✓") == 7`; actual is 6 (6 runes).
+
+---
+
 ## CI Configuration
 
 Both `ci.yml` (PR gate) and `release.yml` (release gate) run:
