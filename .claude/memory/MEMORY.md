@@ -12,7 +12,8 @@
 - [decisions.md](decisions.md) — Design decisions and their rationale
 - [release.md](release.md) — Build, versioning, CI/CD (GitHub Actions), GoReleaser, Homebrew tap
 - [implementation.md](implementation.md) — Phased implementation plan and progress tracking
-- [testing.md](testing.md) — Testing strategy, per-package patterns, testify usage, CI flags
+- [testing.md](testing.md) — Testing strategy, per-package patterns, testify suite pattern, CI flags
+- [coding-standards.md](coding-standards.md) — Code quality: DRY, complexity, no unnecessary comments, self-review checklist
 
 ## Config File
 - Name: `.gitworkspace` (TOML format)
@@ -33,11 +34,21 @@
 ## Architecture Status
 - [x] Architecture designed (see architecture.md)
 - [ ] User approved architecture
-- [ ] Phase 1: Scaffold + config + basic commands
+- [x] Phase 1: Scaffold + config + basic commands — **COMPLETE** (`go test -race ./...` passes)
 - [ ] Phase 2: Status detection + `info` display
 - [ ] Phase 3: Parallel execution engine
 - [ ] Phase 4: Groups + context
 - [ ] Phase 5: Advanced (freeze/clone, recursive add, auto-context)
+
+## Coding Standards (apply proactively)
+
+- **testify/suite is required** in every test file — embed `suite.Suite`, use `s.Require()` / `s.Assert()`, register with `suite.Run(t, new(XxxSuite))`. Bare `func TestXxx(t *testing.T)` is only used as the `suite.Run` entry point.
+- **Table-driven tests are required** (not optional) for any test with multiple input/output cases — use `[]struct{ name, ... }` + `s.Run(tc.name, func() { ... })`.
+- **Extract to private functions** — public functions should read as high-level steps; complex logic goes in private helpers. Functions over ~20 lines need extraction.
+- **No unnecessary comments** — do not restate what code does; only comment the *why* when non-obvious. Remove AI-generated boilerplate comments.
+- **DRY** — if two functions share 2–3+ lines of identical logic, extract a shared helper.
+
+See [coding-standards.md](coding-standards.md) for detail and examples.
 
 ## User Preferences
 - Minimal dependencies

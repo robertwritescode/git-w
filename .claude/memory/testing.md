@@ -3,15 +3,75 @@
 ## Guiding Principles
 
 - All non-trivial logic must have unit tests
-- Table-driven tests (`[]struct{ name, input, want }`) preferred throughout
-- **testify** (`github.com/stretchr/testify`) used in all test files:
-  - `require.NoError` / `require.Equal` — fatal setup assertions (stop test immediately)
-  - `assert.Equal` / `assert.Contains` — non-fatal value checks
+- **Table-driven tests are required** (not optional) for any test that can be parameterised — any test with multiple input/output scenarios must use `[]struct{ name, input, want }`
+- **testify/suite is required** in all test files — see pattern below
 - No other test libraries (no gomock, no ginkgo)
 - No mocking framework — use `t.TempDir()` and real subprocesses instead
 - Subprocess-heavy code: **separate parsing from invocation** so parsing is purely functional and testable with fixture strings
 - Filesystem tests: `t.TempDir()` for isolated, auto-cleaned directories
 - Real git repos (created via `git init` in `t.TempDir()`) for integration-style unit tests where subprocess behavior must be verified
+
+---
+
+## Required Test Pattern: testify/suite + Table-Driven
+
+Every test file **must** use the testify suite pattern. Bare `func TestXxx(t *testing.T)` functions are only acceptable as the single `suite.Run` entry point per suite.
+
+```go
+package config_test
+
+import (
+    "testing"
+
+    "github.com/stretchr/testify/suite"
+)
+
+type LoaderSuite struct {
+    suite.Suite
+    tmpDir string
+}
+
+// SetupTest runs before each test method — use for per-test isolation
+func (s *LoaderSuite) SetupTest() {
+    s.tmpDir = s.T().TempDir()
+}
+
+// Single-case tests: method on suite, use s.Require() / s.Assert()
+func (s *LoaderSuite) TestLoad_MissingFile() {
+    _, err := Load("/nonexistent/.gitworkspace")
+    s.Require().Error(err)
+}
+
+// Multi-case tests: table-driven inside a suite method, use s.Run()
+func (s *LoaderSuite) TestLoad_ValidToml() {
+    cases := []struct {
+        name  string
+        input string
+        want  string
+    }{
+        {"workspace name", `[workspace]\nname = "foo"`, "foo"},
+        {"empty file", ``, ""},
+    }
+    for _, tc := range cases {
+        s.Run(tc.name, func() {
+            // write tc.input to s.tmpDir, load, assert
+            s.Assert().Equal(tc.want, got.Workspace.Name)
+        })
+    }
+}
+
+// Entry point — one per file
+func TestLoader(t *testing.T) {
+    suite.Run(t, new(LoaderSuite))
+}
+```
+
+**Key rules:**
+- `s.Require()` — fatal assertions (setup steps, preconditions); stops the test immediately on failure
+- `s.Assert()` — non-fatal assertions (value checks); test continues on failure
+- `s.Run(tc.name, func() { ... })` — creates sub-tests within table-driven loops, giving clear failure output
+- `SetupTest` / `TeardownTest` — per-test lifecycle hooks (prefer over `SetupSuite` unless truly shared state)
+- `s.T().TempDir()` — temp directory scoped to the test, auto-cleaned
 
 ---
 

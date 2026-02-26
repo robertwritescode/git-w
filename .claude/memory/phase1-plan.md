@@ -35,7 +35,7 @@ F runs after all A–E complete.
 **Files to create:**
 
 ### `go.mod`
-Run: `go mod init github.com/robertwritescode/git-workspace` in repo root (Go 1.24).
+Run: `go mod init github.com/robertwritescode/git-workspace` in repo root (Go 1.26).
 This creates go.mod; `go mod tidy` later adds go.sum.
 
 ### Directory skeleton
@@ -67,7 +67,7 @@ Tags: `//go:build mage`
 
 ### `.github/workflows/ci.yml`
 Trigger: push/PR to main.
-Steps: checkout → setup-go (1.24) → `go vet ./...` → `go test -race -count=1 ./...` → `go build ./...`
+Steps: checkout → setup-go (1.26) → `go vet ./...` → `go test -race -count=1 ./...` → `go build ./...`
 
 ### `.github/workflows/release-please.yml`
 Trigger: push to main.
