@@ -19,10 +19,8 @@ func TestListSuite(t *testing.T) {
 }
 
 func (s *ListSuite) TestListAll() {
-	repo1Dir := s.T().TempDir()
-	repo2Dir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repo1Dir)
-	testutil.MakeGitRepo(s.T(), repo2Dir)
+	repo1Dir := testutil.MakeGitRepo(s.T(), "")
+	repo2Dir := testutil.MakeGitRepo(s.T(), "")
 
 	_, err := execCmd(s.T(), "add", repo1Dir)
 	s.Require().NoError(err)
@@ -81,8 +79,7 @@ func (s *ListSuite) TestListEdgeCases() {
 			wantContain := ""
 
 			if tt.addRepo {
-				repoDir := s.T().TempDir()
-				testutil.MakeGitRepo(s.T(), repoDir)
+				repoDir := testutil.MakeGitRepo(s.T(), "")
 				_, err := execCmd(s.T(), "add", repoDir)
 				s.Require().NoError(err)
 				args = append(args, filepath.Base(repoDir))

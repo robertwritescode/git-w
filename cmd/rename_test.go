@@ -18,8 +18,7 @@ func TestRenameSuite(t *testing.T) {
 }
 
 func (s *RenameSuite) TestRename() {
-	repoDir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repoDir)
+	repoDir := testutil.MakeGitRepo(s.T(), "")
 	oldName := filepath.Base(repoDir)
 
 	_, err := execCmd(s.T(), "add", repoDir)
@@ -42,8 +41,7 @@ func (s *RenameSuite) TestRename() {
 }
 
 func (s *RenameSuite) TestUpdatesGroups() {
-	repoDir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repoDir)
+	repoDir := testutil.MakeGitRepo(s.T(), "")
 	oldName := filepath.Base(repoDir)
 
 	_, err := execCmd(s.T(), "add", "-g", "mygroup", repoDir)
@@ -64,10 +62,8 @@ func (s *RenameSuite) TestErrorOldNotFound() {
 }
 
 func (s *RenameSuite) TestErrorNewExists() {
-	repo1Dir := s.T().TempDir()
-	repo2Dir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repo1Dir)
-	testutil.MakeGitRepo(s.T(), repo2Dir)
+	repo1Dir := testutil.MakeGitRepo(s.T(), "")
+	repo2Dir := testutil.MakeGitRepo(s.T(), "")
 	name1 := filepath.Base(repo1Dir)
 	name2 := filepath.Base(repo2Dir)
 

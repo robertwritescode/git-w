@@ -38,8 +38,7 @@ func (s *RemoveSuite) TestRemove() {
 		s.Run(tt.name, func() {
 			name := ""
 			if tt.addRepo {
-				repoDir := s.T().TempDir()
-				testutil.MakeGitRepo(s.T(), repoDir)
+				repoDir := testutil.MakeGitRepo(s.T(), "")
 				name = filepath.Base(repoDir)
 				_, err := execCmd(s.T(), "add", repoDir)
 				s.Require().NoError(err)
@@ -66,10 +65,8 @@ func (s *RemoveSuite) TestRemove() {
 }
 
 func (s *RemoveSuite) TestMultiple() {
-	repo1Dir := s.T().TempDir()
-	repo2Dir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repo1Dir)
-	testutil.MakeGitRepo(s.T(), repo2Dir)
+	repo1Dir := testutil.MakeGitRepo(s.T(), "")
+	repo2Dir := testutil.MakeGitRepo(s.T(), "")
 	name1 := filepath.Base(repo1Dir)
 	name2 := filepath.Base(repo2Dir)
 
@@ -87,8 +84,7 @@ func (s *RemoveSuite) TestMultiple() {
 }
 
 func (s *RemoveSuite) TestUpdatesGroups() {
-	repoDir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repoDir)
+	repoDir := testutil.MakeGitRepo(s.T(), "")
 	name := filepath.Base(repoDir)
 
 	_, err := execCmd(s.T(), "add", "-g", "mygroup", repoDir)

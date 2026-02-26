@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -62,8 +61,7 @@ func (s *AddSuite) TestAdd() {
 			))
 			changeToDir(s.T(), wsDir)
 
-			repoDir := s.T().TempDir()
-			testutil.MakeGitRepo(s.T(), repoDir)
+			repoDir := testutil.MakeGitRepo(s.T(), "")
 			name := filepath.Base(repoDir)
 
 			cmdArgs := append(append([]string{"add"}, tt.addFlags...), repoDir)
@@ -96,8 +94,7 @@ func (s *AddSuite) TestErrorNotGitRepo() {
 }
 
 func (s *AddSuite) TestErrorAlreadyRegistered() {
-	repoDir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repoDir)
+	repoDir := testutil.MakeGitRepo(s.T(), "")
 
 	_, err := execCmd(s.T(), "add", repoDir)
 	s.Require().NoError(err)
@@ -108,12 +105,8 @@ func (s *AddSuite) TestErrorAlreadyRegistered() {
 }
 
 func (s *AddSuite) TestDetectsRemoteURL() {
-	repoDir := s.T().TempDir()
-	testutil.MakeGitRepo(s.T(), repoDir)
-
 	fakeURL := "file:///tmp/fake-origin.git"
-	c := exec.Command("git", "-C", repoDir, "remote", "add", "origin", fakeURL)
-	s.Require().NoError(c.Run())
+	repoDir := testutil.MakeGitRepo(s.T(), fakeURL)
 
 	_, err := execCmd(s.T(), "add", repoDir)
 	s.Require().NoError(err)

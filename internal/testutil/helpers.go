@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MakeGitRepo creates an initialized git repo with an initial commit in dir.
-// dir must already exist (e.g. a subdirectory of t.TempDir()).
-// Returns dir for convenience.
-func MakeGitRepo(t *testing.T, dir string) string {
+// MakeGitRepo creates an initialized git repo with an initial commit in a new temp dir.
+// If remoteURL is non-empty, it is added as the "origin" remote. Returns the absolute path.
+func MakeGitRepo(t testing.TB, remoteURL string) string {
 	t.Helper()
+	dir := t.TempDir()
 
 	run := func(args ...string) {
 		t.Helper()
@@ -27,13 +27,24 @@ func MakeGitRepo(t *testing.T, dir string) string {
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "Test User")
 
-	readme := filepath.Join(dir, "README.md")
-	require.NoError(t, os.WriteFile(readme, []byte("# test\n"), 0o644))
-
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("# test\n"), 0o644))
 	run("add", ".")
 	run("commit", "-m", "init")
 
+	if remoteURL != "" {
+		run("remote", "add", "origin", remoteURL)
+	}
+
 	return dir
+}
+
+// GitInitBare creates a bare git repository in dir.
+func GitInitBare(t testing.TB, dir string) {
+	t.Helper()
+	cmd := exec.Command("git", "init", "--bare")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "git init --bare: %s", out)
 }
 
 // MakeWorkspace writes content to a .gitworkspace file in dir and returns

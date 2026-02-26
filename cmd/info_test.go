@@ -40,7 +40,7 @@ func (s *InfoSuite) TestInfo_Output() {
 
 			dirs := make([]string, tt.numRepos)
 			for i := range dirs {
-				dirs[i] = testutil.MakeGitRepo(s.T(), s.T().TempDir())
+				dirs[i] = testutil.MakeGitRepo(s.T(), "")
 				_, err := execCmd(s.T(), "add", dirs[i])
 				s.Require().NoError(err)
 			}
@@ -56,8 +56,8 @@ func (s *InfoSuite) TestInfo_Output() {
 }
 
 func (s *InfoSuite) TestInfo_ByGroup() {
-	repoDir1 := testutil.MakeGitRepo(s.T(), s.T().TempDir())
-	repoDir2 := testutil.MakeGitRepo(s.T(), s.T().TempDir())
+	repoDir1 := testutil.MakeGitRepo(s.T(), "")
+	repoDir2 := testutil.MakeGitRepo(s.T(), "")
 
 	_, err := execCmd(s.T(), "add", repoDir1)
 	s.Require().NoError(err)

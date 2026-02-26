@@ -90,7 +90,7 @@ func (s *StatusSuite) TestParseStashCount() {
 }
 
 func (s *StatusSuite) TestGetStatus_Smoke() {
-	dir := testutil.MakeGitRepo(s.T(), s.T().TempDir())
+	dir := testutil.MakeGitRepo(s.T(), "")
 	status, err := GetStatus(Repo{Name: "x", AbsPath: dir})
 	s.Require().NoError(err)
 	s.Assert().NotEmpty(status.Branch)

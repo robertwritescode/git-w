@@ -97,7 +97,7 @@ func (s *RepoSuite) TestIsGitRepo() {
 	}{
 		{
 			name: "valid git repo",
-			path: func() string { return testutil.MakeGitRepo(s.T(), s.T().TempDir()) },
+			path: func() string { return testutil.MakeGitRepo(s.T(), "") },
 			want: true,
 		},
 		{
