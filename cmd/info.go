@@ -40,26 +40,13 @@ func runInfo(cmd *cobra.Command, args []string) error {
 
 func resolveRepos(cfg *config.WorkspaceConfig, cfgPath string, args []string) ([]repo.Repo, error) {
 	if len(args) == 0 {
-		return repo.FromConfig(cfg, cfgPath), nil
+		return reposForContext(cfg, cfgPath)
 	}
-
-	group, ok := cfg.Groups[args[0]]
+	g, ok := cfg.Groups[args[0]]
 	if !ok {
 		return nil, fmt.Errorf("group %q not found", args[0])
 	}
-
-	subset := &config.WorkspaceConfig{
-		Repos:  make(map[string]config.RepoConfig),
-		Groups: make(map[string]config.GroupConfig),
-	}
-
-	for _, name := range group.Repos {
-		if rc, ok := cfg.Repos[name]; ok {
-			subset.Repos[name] = rc
-		}
-	}
-
-	return repo.FromConfig(subset, cfgPath), nil
+	return groupRepos(cfg, cfgPath, g), nil
 }
 
 func collectStatuses(repos []repo.Repo) []display.TableEntry {

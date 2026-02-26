@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -124,6 +125,39 @@ func (s *GitCmdsSuite) TestPush_RequiresRemote() {
 	changeToDir(s.T(), wsDir)
 	_, err = execCmd(s.T(), "push")
 	s.Require().Error(err)
+}
+
+func (s *GitCmdsSuite) TestGitCmd_ActiveContext_Scopes() {
+	tests := []struct {
+		name    string
+		cmdName string
+	}{
+		{"fetch scopes to context", "fetch"},
+		{"pull scopes to context", "pull"},
+		{"status scopes to context", "status"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			wsDir, names := s.makeWsWithRemoteRepos(2)
+			cfgData, err := os.ReadFile(filepath.Join(wsDir, ".gitworkspace"))
+			s.Require().NoError(err)
+			groupTOML := fmt.Sprintf("\n[groups.web]\nrepos = [%q]\n", names[0])
+			s.Require().NoError(os.WriteFile(
+				filepath.Join(wsDir, ".gitworkspace"),
+				append(cfgData, []byte(groupTOML)...),
+				0o644,
+			))
+			s.Require().NoError(os.WriteFile(
+				filepath.Join(wsDir, ".gitworkspace.local"),
+				[]byte("[context]\nactive = \"web\"\n"),
+				0o644,
+			))
+			changeToDir(s.T(), wsDir)
+			out, err := execCmd(s.T(), tt.cmdName)
+			s.Require().NoError(err)
+			s.Assert().NotContains(out, "["+names[1]+"]")
+		})
+	}
 }
 
 func (s *GitCmdsSuite) TestStatus_AliasWorks() {

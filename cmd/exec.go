@@ -58,22 +58,76 @@ func splitExecArgs(args []string) (repoNames, gitArgs []string) {
 	return nil, args
 }
 
+// filterRepos resolves names as repo and/or group names.
+// With no names: falls back to active context, then all repos.
+// With names: expands group names to their repos, deduplicates by repo name.
 func filterRepos(cfg *config.WorkspaceConfig, cfgPath string, names []string) ([]repo.Repo, error) {
-	all := repo.FromConfig(cfg, cfgPath)
 	if len(names) == 0 {
-		return all, nil
+		return reposForContext(cfg, cfgPath)
+	}
+	return resolveTargets(cfg, cfgPath, names)
+}
+
+// reposForContext returns the active context's repos, or all repos if no context is set.
+func reposForContext(cfg *config.WorkspaceConfig, cfgPath string) ([]repo.Repo, error) {
+	if cfg.Context.Active == "" {
+		return repo.FromConfig(cfg, cfgPath), nil
 	}
 
-	byName := repoIndex(all)
-	result := make([]repo.Repo, 0, len(names))
-	for _, name := range names {
-		r, ok := byName[name]
-		if !ok {
-			return nil, fmt.Errorf("repo %q not found", name)
-		}
-		result = append(result, r)
+	g, ok := cfg.Groups[cfg.Context.Active]
+	if !ok {
+		return nil, fmt.Errorf("active context group %q not found", cfg.Context.Active)
 	}
+
+	return groupRepos(cfg, cfgPath, g), nil
+}
+
+// resolveTargets expands each name as a repo name or group name, deduplicating.
+func resolveTargets(cfg *config.WorkspaceConfig, cfgPath string, names []string) ([]repo.Repo, error) {
+	all := repo.FromConfig(cfg, cfgPath)
+	byRepo := repoIndex(all)
+	seen := make(map[string]bool)
+
+	var result []repo.Repo
+	for _, name := range names {
+		if r, ok := byRepo[name]; ok {
+			if !seen[r.Name] {
+				seen[r.Name] = true
+				result = append(result, r)
+			}
+			continue
+		}
+
+		if g, ok := cfg.Groups[name]; ok {
+			for _, r := range groupRepos(cfg, cfgPath, g) {
+				if !seen[r.Name] {
+					seen[r.Name] = true
+					result = append(result, r)
+				}
+			}
+			continue
+		}
+
+		return nil, fmt.Errorf("%q is not a registered repo or group", name)
+	}
+
 	return result, nil
+}
+
+// groupRepos builds the Repo slice for repos listed in a GroupConfig.
+func groupRepos(cfg *config.WorkspaceConfig, cfgPath string, g config.GroupConfig) []repo.Repo {
+	sub := &config.WorkspaceConfig{
+		Repos:  make(map[string]config.RepoConfig, len(g.Repos)),
+		Groups: make(map[string]config.GroupConfig),
+	}
+
+	for _, name := range g.Repos {
+		if rc, ok := cfg.Repos[name]; ok {
+			sub.Repos[name] = rc
+		}
+	}
+
+	return repo.FromConfig(sub, cfgPath)
 }
 
 // repoIndex builds a name → Repo lookup map.
