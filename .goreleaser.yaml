@@ -1,0 +1,50 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: git-workspace
+    binary: git-workspace
+    main: .
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: git-workspace
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  replace_existing_draft: true
+
+changelog:
+  disable: true
+
+# TODO: Add Homebrew tap release config once we have a tap repo set up.
+# brews:
+#   - name: git-workspace
+#     repository:
+#       owner: robertwritescode
+#       name: homebrew-git-workspace
+#       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+#     homepage: "https://github.com/robertwritescode/git-workspace"
+#     description: "Manage multiple git repos defined in .gitworkspace"
+#     install: |
+#       bin.install "git-workspace"
+#       bin.install_symlink "git-workspace" => "git-w"
+#     test: |
+#       system "#{bin}/git-workspace", "--help"
