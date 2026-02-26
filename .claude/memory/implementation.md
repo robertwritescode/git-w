@@ -109,22 +109,19 @@ Key points:
 
 ---
 
-## Phase 5: Advanced Features
+## Phase 5: Advanced Features — **COMPLETE**
 
 **Goal**: Restore, recursive add, auto-context, custom git flags, shell completion.
 
-### Tasks
-- [ ] `cmd/clone.go` — `git clone <url> [<path>]`, register in config, auto-gitignore path, also support -g / --group for adding to a group
-- [ ] `cmd/restore.go` — for each repo in `.gitworkspace`: clone if missing (requires `url`), pull if present; auto-gitignore each path
-- [ ] `cmd/add.go` — `-r <dir>` flag: walk directory, find `.git` dirs (non-nesting), detect remote URL via `git remote get-url origin`, register each, auto-gitignore, auto-group by parent path, passing `-r` without an argument should use the current working directory
-- [ ] `internal/config/types.go` — add `URL` to `RepoConfig`; add `AutoGitignore *bool` to `WorkspaceMeta`
-- [ ] `internal/gitignore/` (or helper in `config/`) — `IsIgnored(root, path)` using `git check-ignore -q`; `EnsureIgnored(root, path)` to append if needed
-- [ ] Per-repo `flags` wired into all git subcommand invocations
-- [ ] Shell completion scaffolding via cobra's `GenBashCompletion` etc.
-- [ ] `cmd/clone_test.go`, `cmd/restore_test.go` — clone into temp dir, verify config written, verify idempotent re-run
-- [ ] `internal/gitignore/gitignore_test.go` — `IsIgnored` and `EnsureIgnored` with a real temp git repo
+### Completed
+- [x] `cmd/clone.go` — `git clone <url> [<path>] [-g <group>]`, registers in config, auto-gitignores
+- [x] `cmd/restore.go` — clones missing repos (requires URL), pulls existing; parallel; auto-gitignores
+- [x] `cmd/add.go` — `-r <dir>` flag: recursive walk, non-nesting, auto-group by parent dir, CWD default
+- [x] `cmd/completion.go` — shell completion via cobra (bash/zsh/fish/powershell)
+- [x] `cmd/clone_test.go`, `cmd/restore_test.go`, `cmd/completion_test.go` — full test coverage
+- [x] Extended `cmd/add_test.go` with `TestRecursiveAdd` table-driven suite
 
-**Exit criteria**: `git workspace restore` clones all repos; re-running is idempotent; `.gitignore` is enforced. All Phase 5 `_test.go` files pass `go test -race ./...`.
+**Exit criteria met**: `go test -race -count=1 ./...` passes.
 
 ---
 

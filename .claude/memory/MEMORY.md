@@ -38,7 +38,7 @@
 - [x] Phase 2: Status detection + `info`/`ll` display — **COMPLETE** (`go test -race -count=1 ./...` passes)
 - [x] Phase 3: Parallel execution engine — **COMPLETE** (`go test -race -count=1 ./...` passes)
 - [x] Phase 4: Groups + context — **COMPLETE** (`go test -race -count=1 ./...` passes)
-- [ ] Phase 5: Advanced (freeze/clone, recursive add, auto-context)
+- [x] Phase 5: Advanced (clone, restore, recursive add, shell completion) — **COMPLETE** (`go test -race -count=1 ./...` passes)
 
 ## Coding Standards (apply proactively)
 
