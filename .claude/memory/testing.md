@@ -304,7 +304,7 @@ out, err := s.ExecuteCmd("add", "/path/to/repo")
 
 ## CI Configuration
 
-Both `ci.yml` (PR gate) and `goreleaser.yml` (release gate) run:
+Both `ci.yml` (PR gate) and `release.yml` (release gate) run:
 
 ```
 go test -race -count=1 ./...

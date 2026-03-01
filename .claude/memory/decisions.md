@@ -140,11 +140,12 @@ GoReleaser chosen over hand-rolled shell scripts in GitHub Actions:
 - Industry standard for Go open-source CLIs
 - `version` injected at build time via ldflags; surfaced via `rootCmd.Version`
 
-### CI/CD: GitHub Actions — Three Workflows
-- `ci.yml` — lint + test + build on push/PR
-- `release-please.yml` — runs on push to `main`; opens/updates Release PR via Release Please
-- `goreleaser.yml` — GoReleaser triggered on `v*` tag push (renamed from `release.yml`);
-  requires `GITHUB_TOKEN` (auto) and `TAP_GITHUB_TOKEN` (repo secret for tap writes)
+### CI/CD: GitHub Actions — Two Workflows
+- `ci.yml` — lint + test + build on push
+- `release.yml` — Release Please + GoReleaser combined in a single workflow on push to `main`;
+  GoReleaser job is gated on `releases_created` output from the Release Please job.
+  This avoids the GitHub Actions limitation where tags created by `GITHUB_TOKEN` cannot trigger
+  other workflows. Requires `GITHUB_TOKEN` (auto) and `TAP_GITHUB_TOKEN` (tap writes).
 
 ### Release Trigger: Release Please (Automated)
 Release Please chosen over manual `git tag` push or workflow dispatch:
@@ -155,23 +156,27 @@ Release Please chosen over manual `git tag` push or workflow dispatch:
 - Requires conventional commit discipline (`feat:`, `fix:`, `feat!:`, etc.)
 
 ### Release Gate: Test Before GoReleaser
-`goreleaser.yml` runs `go test ./...` before invoking GoReleaser. If tests fail, the
+The GoReleaser job in `release.yml` runs `go test ./...` before invoking GoReleaser. If tests fail, the
 release is aborted — binaries are never built or published for a broken commit.
 
 ### Release Please + GoReleaser Integration
-Release Please creates a draft GitHub Release with changelog notes; GoReleaser uploads binaries to it.
-- `release.replace_existing_draft: true` — GoReleaser finds and updates the draft rather than creating a new release
-- `changelog.disable: true` — GoReleaser skips generating its own notes, preserving Release Please's changelog body
-- Single source of changelog truth: Release Please (conventional commits → grouped notes → `CHANGELOG.md` + GitHub Release body)
+Both run in the same `release.yml` workflow on push to `main`. Release Please runs first and
+exposes `releases_created` and `tag_name` as job outputs; GoReleaser is a dependent job
+gated on `releases_created == 'true'`.
+
+- Combined workflow avoids the GitHub Actions limitation where tags pushed by `GITHUB_TOKEN` cannot trigger downstream workflows
+- `release.replace_existing_draft: true` — GoReleaser finds and updates the draft Release Please created, rather than opening a second release
+- `changelog.disable: true` — GoReleaser skips its own notes, preserving Release Please's changelog body
+- Single source of changelog truth: Release Please (conventional commits → `CHANGELOG.md` + GitHub Release body)
 
 ### Distribution: Homebrew Custom Tap
 Primary install path:
 ```sh
-brew tap <user>/git-w
+brew tap robertwritescode/tap
 brew install git-w
 ```
-Tap lives in a separate repo `homebrew-git-w`. GoReleaser auto-updates the
-formula on release. Formula installs the binary AND the `git-w` symlink.
+Tap lives in a separate repo `github.com/robertwritescode/homebrew-tap`. GoReleaser
+auto-updates the formula on release.
 
 ### No Freeze Command
 `.gitw` IS the persistent state — always current, committable.

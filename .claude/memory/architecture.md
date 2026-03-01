@@ -62,9 +62,8 @@ git-w/
 │
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                  # lint + test + build on push/PR
-│       ├── release-please.yml      # Opens Release PR on push to main
-│       └── goreleaser.yml          # test + GoReleaser on v* tag push
+│       ├── ci.yml                  # lint + test + build on push
+│       └── release.yml             # Release Please + GoReleaser combined (push to main)
 │
 └── pkg/
     ├── cmd/
@@ -416,7 +415,7 @@ All non-trivial logic has unit tests. See `testing.md` for full details.
 - Filesystem tests use `t.TempDir()`; git repo tests use `testutil.MakeGitRepo` (runs `git init` + initial commit)
 - `pkg/` tests use black-box `package <domain>_test`, call via `s.ExecuteCmd()` with captured stdout
 - `display/` tests set `color.NoColor = true` and compare against golden strings
-- CI: `go test -race -count=1 ./...` in both `ci.yml` and `goreleaser.yml`
+- CI: `go test -race -count=1 ./...` in both `ci.yml` and `release.yml`
 
 ---
 

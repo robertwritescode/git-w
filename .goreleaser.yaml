@@ -20,7 +20,8 @@ builds:
 archives:
   - id: git-w
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    format: tar.gz
+    formats:
+      - tar.gz
     files:
       - LICENSE
       - README.md
@@ -29,22 +30,24 @@ checksum:
   name_template: "checksums.txt"
 
 release:
-  replace_existing_draft: true
+  mode: replace
 
 changelog:
   disable: true
 
-# TODO: Add Homebrew tap release config once we have a tap repo set up.
-# brews:
-#   - name: git-w
-#     repository:
-#       owner: robertwritescode
-#       name: homebrew-git-w
-#       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-#     homepage: "https://github.com/robertwritescode/git-w"
-#     description: "Manage multiple git repos defined in .gitw"
-#     install: |
-#       bin.install "git-w"
-#       bin.install_symlink "git-w" => "git-w"
-#     test: |
-#       system "#{bin}/git-w", "--help"
+homebrew_casks:
+  - name: git-w
+    binaries:
+      - git-w
+    repository:
+      owner: robertwritescode
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/robertwritescode/git-w"
+    description: "A Git plugin for managing meta-repo workspaces"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/git-w"]
+          end

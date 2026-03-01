@@ -141,10 +141,11 @@ changelog:
 brews:
   - name: git-w
     repository:
-      owner: <github-user>
-      name: homebrew-git-w
-    homepage: https://github.com/<github-user>/git-w
-    description: "Manage multiple git repos from a single workspace"
+      owner: robertwritescode
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/robertwritescode/git-w
+    description: "A Git plugin for managing meta-repo workspaces"
     install: |
       bin.install "git-w"
       bin.install_symlink bin/"git-w" => "git-w"
@@ -156,15 +157,14 @@ brews:
 
 ## GitHub Actions Workflows
 
-Three workflows in `.github/workflows/`:
+Two workflows in `.github/workflows/`:
 
 ---
 
-**`ci.yml`** — runs on pushes, PRs, and workflow dispatch; gates merges:
+**`ci.yml`** — runs on pushes and workflow dispatch; gates merges:
 ```yaml
 on:
   push:
-  pull_request:
   workflow_dispatch:
 jobs:
   lint:
@@ -188,7 +188,13 @@ jobs:
 
 ---
 
-**`release-please.yml`** — runs on every push to `main`; opens/updates a Release PR:
+**`release.yml`** — runs on every push to `main`; combines Release Please + GoReleaser
+in a single workflow. The GoReleaser job is gated on `releases_created` so it only
+runs when a Release PR is merged (not on every push to main).
+
+This avoids the GitHub Actions limitation where tags created by `GITHUB_TOKEN`
+cannot trigger other workflows.
+
 ```yaml
 on:
   push:
@@ -199,36 +205,29 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
-```
 
-Release Please reads conventional commits since the last release, determines the
-semver bump, updates `CHANGELOG.md`, and opens a PR titled e.g. "chore(main): release v0.2.0".
-Merging that PR creates the tag and a **draft** GitHub Release with generated notes.
-
----
-
-**`goreleaser.yml`** — runs when Release Please pushes a `v*` tag (renamed from `release.yml`):
-```yaml
-on:
-  push:
-    tags: ["v*"]
-permissions:
-  contents: write
-jobs:
   goreleaser:
+    name: GoReleaser
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }  # GoReleaser needs full tag history
+        with: { fetch-depth: 0 }
       - uses: actions/setup-go@v5
         with: { go-version: "1.26" }
-      - name: Test
-        run: go test -race -count=1 ./...
+      - run: go test -race -count=1 ./...
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
@@ -237,6 +236,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
 ```
+
+Release Please reads conventional commits since the last release, determines the
+semver bump, updates `CHANGELOG.md`, and opens a PR titled e.g. "chore(main): release v0.2.0".
+Merging that PR creates the tag and triggers the GoReleaser job in the same workflow.
 
 GoReleaser is configured with `release.replace_existing_draft: true` so it finds
 the draft Release that Release Please created, attaches the compiled binaries and
@@ -250,13 +253,10 @@ archives, and publishes it — rather than creating a second release.
 ```json
 {
   "release-type": "go",
+  "include-component-in-tag": false,
   "packages": {
-    ".": {
-      "changelog-path": "CHANGELOG.md"
-    }
-  },
-  "bump-minor-pre-major": true,
-  "bump-patch-for-minor-pre-major": true
+    ".": {}
+  }
 }
 ```
 
@@ -280,13 +280,12 @@ Release Please updates this file automatically on each release.
 
 2. Merge PR to main
    → ci.yml runs (lint + test + build)
-   → release-please.yml runs; opens/updates Release PR
+   → release.yml runs; Release Please opens/updates Release PR
 
 3. When ready to ship: merge the Release Please PR
-   → Release Please pushes tag (e.g. v0.3.0)
-   → Release Please creates draft GitHub Release with CHANGELOG entries
-
-4. goreleaser.yml fires on the tag:
+   → release.yml runs again on the merge commit
+   → Release Please creates tag (e.g. v0.3.0) and sets releases_created=true
+   → GoReleaser job runs (chained in same workflow, gated on releases_created)
    → go test ./...  (if fails: release aborted)
    → GoReleaser: builds darwin/linux × amd64/arm64, creates archives + checksums,
      attaches to the draft release, publishes it, updates Homebrew tap formula
@@ -304,17 +303,17 @@ Release Please updates this file automatically on each release.
 
 ## Homebrew Tap Repo
 
-Separate repo: `github.com/<user>/homebrew-git-w`
+Separate repo: `github.com/robertwritescode/homebrew-tap`
 
 ```
-homebrew-git-w/
+homebrew-tap/
 └── Formula/
     └── git-w.rb    # auto-updated by GoReleaser on each release
 ```
 
 Install:
 ```sh
-brew tap <user>/git-w
+brew tap robertwritescode/tap
 brew install git-w
 # installs git-w binary
 # → both `git w <cmd>` and `git-w <cmd>` work
