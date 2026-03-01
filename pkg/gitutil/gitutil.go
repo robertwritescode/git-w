@@ -100,13 +100,17 @@ func gitignoreContains(content []byte, entry string) bool {
 	return false
 }
 
-func appendGitignoreEntry(path string, existing []byte, entry string) error {
+func appendGitignoreEntry(path string, existing []byte, entry string) (err error) {
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
 
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
 		if _, err := f.WriteString("\n"); err != nil {
