@@ -1,4 +1,4 @@
-package workspace_test
+package config_test
 
 import (
 	"errors"
@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -40,7 +40,7 @@ repos = ["frontend", "backend"]
 `
 	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
 
-	cfg, err := workspace.Load(s.cfgPath)
+	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
 	s.Assert().Equal("myws", cfg.Workspace.Name)
@@ -53,8 +53,8 @@ repos = ["frontend", "backend"]
 func (s *LoaderSuite) TestLoadErrors() {
 	tests := []struct {
 		name      string
-		content   string // empty = do not create file
-		wantErrIs error  // nil = any error is acceptable
+		content   string
+		wantErrIs error
 	}{
 		{
 			name:      "missing file",
@@ -73,7 +73,7 @@ func (s *LoaderSuite) TestLoadErrors() {
 				s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.content), 0o644))
 			}
 
-			_, err := workspace.Load(cfgPath)
+			_, err := config.Load(cfgPath)
 			s.Require().Error(err)
 
 			if tt.wantErrIs != nil {
@@ -86,7 +86,7 @@ func (s *LoaderSuite) TestLoadErrors() {
 func (s *LoaderSuite) TestLocalFileMerge() {
 	tests := []struct {
 		name         string
-		localContent string // empty = do not create .local file
+		localContent string
 		wantContext  string
 	}{
 		{
@@ -109,7 +109,7 @@ func (s *LoaderSuite) TestLocalFileMerge() {
 				s.Require().NoError(os.WriteFile(cfgPath+".local", []byte(tt.localContent), 0o644))
 			}
 
-			cfg, err := workspace.Load(cfgPath)
+			cfg, err := config.Load(cfgPath)
 			s.Require().NoError(err)
 
 			s.Assert().Equal(tt.wantContext, cfg.Context.Active)
@@ -119,16 +119,17 @@ func (s *LoaderSuite) TestLocalFileMerge() {
 
 func (s *LoaderSuite) TestSaveAtomic() {
 	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"original\"\n"), 0o644))
-	cfg, err := workspace.Load(s.cfgPath)
+
+	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
 	cfg.Workspace.Name = "updated"
-	s.Require().NoError(workspace.Save(s.cfgPath, cfg))
+	s.Require().NoError(config.Save(s.cfgPath, cfg))
 
 	_, err = os.Stat(s.cfgPath + ".tmp")
 	s.Assert().True(errors.Is(err, os.ErrNotExist))
 
-	cfg2, err := workspace.Load(s.cfgPath)
+	cfg2, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
 	s.Assert().Equal("updated", cfg2.Workspace.Name)
@@ -137,8 +138,9 @@ func (s *LoaderSuite) TestSaveAtomic() {
 func (s *LoaderSuite) TestInitializesNilMaps() {
 	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"empty\"\n"), 0o644))
 
-	cfg, err := workspace.Load(s.cfgPath)
+	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
+
 	s.Assert().NotNil(cfg.Repos)
 	s.Assert().NotNil(cfg.Groups)
 	s.Assert().NotNil(cfg.Worktrees)
@@ -158,7 +160,7 @@ test = "infra/test"
 `
 	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
 
-	cfg, err := workspace.Load(s.cfgPath)
+	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
 	s.Require().Contains(cfg.Repos, "infra-dev")
@@ -184,9 +186,9 @@ dev = "infra/dev"
 `
 	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
 
-	cfg, err := workspace.Load(s.cfgPath)
+	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
-	s.Require().NoError(workspace.Save(s.cfgPath, cfg))
+	s.Require().NoError(config.Save(s.cfgPath, cfg))
 
 	data, err := os.ReadFile(s.cfgPath)
 	s.Require().NoError(err)
@@ -244,7 +246,7 @@ dev = "infra/dev"
 			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
 			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
 
-			_, err := workspace.Load(cfgPath)
+			_, err := config.Load(cfgPath)
 			s.Require().Error(err)
 			s.Assert().Contains(err.Error(), tt.wantErr)
 		})
@@ -294,7 +296,7 @@ path = "../outside"
 			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
 			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
 
-			_, err := workspace.Load(cfgPath)
+			_, err := config.Load(cfgPath)
 			s.Require().Error(err)
 			s.Assert().Contains(err.Error(), tt.wantErr)
 		})
@@ -336,7 +338,7 @@ bare_path = "../outside/.bare"
 			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
 			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
 
-			_, err := workspace.Load(cfgPath)
+			_, err := config.Load(cfgPath)
 			s.Require().Error(err)
 			s.Assert().Contains(err.Error(), tt.wantErr)
 		})
@@ -357,7 +359,7 @@ func (s *LoaderSuite) TestResolveRepoPath() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
-			_, err := workspace.ResolveRepoPath(cfgPath, tt.repoPath)
+			_, err := config.ResolveRepoPath(cfgPath, tt.repoPath)
 
 			if tt.wantErr != "" {
 				s.Require().Error(err)

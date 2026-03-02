@@ -6,7 +6,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/worktree"
 )
 
@@ -27,7 +27,7 @@ func (s *WorktreeAddSuite) TestAddBranch() {
 	_, err = s.ExecuteCmd("worktree", "add", "infra", "test")
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(err)
 	s.Assert().Equal("infra/test", cfg.Worktrees["infra"].Branches["test"])
 	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "test")))
@@ -54,7 +54,7 @@ func (s *WorktreeAddSuite) TestAddBranch_CustomPath() {
 	_, err = s.ExecuteCmd("worktree", "add", "infra", "test", customAbs)
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(err)
 	s.Assert().Equal(filepath.Join("custom", "test-tree"), cfg.Worktrees["infra"].Branches["test"])
 	s.Assert().True(repo.IsGitRepo(customAbs))

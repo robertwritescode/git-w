@@ -1,10 +1,10 @@
-package workspace_test
+package config_test
 
 import (
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -14,7 +14,7 @@ type ConfigSuite struct {
 
 type syncPushEnabledCase struct {
 	name string
-	meta workspace.WorkspaceMeta
+	meta config.WorkspaceMeta
 	want bool
 }
 
@@ -22,9 +22,9 @@ var syncPushEnabledCases = func() []syncPushEnabledCase {
 	trueValue := true
 	falseValue := false
 	return []syncPushEnabledCase{
-		{name: "nil defaults true", meta: workspace.WorkspaceMeta{}, want: true},
-		{name: "explicit true", meta: workspace.WorkspaceMeta{SyncPush: &trueValue}, want: true},
-		{name: "explicit false", meta: workspace.WorkspaceMeta{SyncPush: &falseValue}, want: false},
+		{name: "nil defaults true", meta: config.WorkspaceMeta{}, want: true},
+		{name: "explicit true", meta: config.WorkspaceMeta{SyncPush: &trueValue}, want: true},
+		{name: "explicit false", meta: config.WorkspaceMeta{SyncPush: &falseValue}, want: false},
 	}
 }()
 
@@ -35,7 +35,7 @@ func TestConfigSuite(t *testing.T) {
 func (s *ConfigSuite) TestSyncPushEnabled() {
 	for _, tt := range syncPushEnabledCases {
 		s.Run(tt.name, func() {
-			cfg := workspace.WorkspaceConfig{Workspace: tt.meta}
+			cfg := config.WorkspaceConfig{Workspace: tt.meta}
 			s.Equal(tt.want, cfg.SyncPushEnabled())
 		})
 	}

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 )
 
 type RepoSuite struct {
@@ -21,19 +21,19 @@ func (s *RepoSuite) TestFromConfig() {
 
 	tests := []struct {
 		name      string
-		repos     map[string]workspace.RepoConfig
+		repos     map[string]config.RepoConfig
 		wantNames []string
 		wantPaths map[string]string
 		wantFlags map[string][]string
 	}{
 		{
 			name:      "empty config",
-			repos:     map[string]workspace.RepoConfig{},
+			repos:     map[string]config.RepoConfig{},
 			wantNames: []string{},
 		},
 		{
 			name: "single repo",
-			repos: map[string]workspace.RepoConfig{
+			repos: map[string]config.RepoConfig{
 				"myrepo": {Path: "repos/myrepo"},
 			},
 			wantNames: []string{"myrepo"},
@@ -41,7 +41,7 @@ func (s *RepoSuite) TestFromConfig() {
 		},
 		{
 			name: "multiple repos sorted by name",
-			repos: map[string]workspace.RepoConfig{
+			repos: map[string]config.RepoConfig{
 				"zebra":  {Path: "z"},
 				"alpha":  {Path: "a"},
 				"middle": {Path: "m"},
@@ -50,7 +50,7 @@ func (s *RepoSuite) TestFromConfig() {
 		},
 		{
 			name: "with flags",
-			repos: map[string]workspace.RepoConfig{
+			repos: map[string]config.RepoConfig{
 				"bare": {Path: "bare", Flags: []string{"--bare"}},
 			},
 			wantNames: []string{"bare"},
@@ -60,9 +60,9 @@ func (s *RepoSuite) TestFromConfig() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			cfg := &workspace.WorkspaceConfig{
+			cfg := &config.WorkspaceConfig{
 				Repos:  tt.repos,
-				Groups: map[string]workspace.GroupConfig{},
+				Groups: map[string]config.GroupConfig{},
 			}
 			repos := FromConfig(cfg, cfgPath)
 

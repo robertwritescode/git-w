@@ -7,7 +7,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -62,8 +62,8 @@ func runFetch(cmd *cobra.Command, args []string) error {
 	return runGitCmd(cmd, args, "fetch")
 }
 
-func loadInputs(cmd *cobra.Command, args []string) (*workspace.WorkspaceConfig, string, []repo.Repo, error) {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+func loadInputs(cmd *cobra.Command, args []string) (*config.WorkspaceConfig, string, []repo.Repo, error) {
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -88,7 +88,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	return runGitCmd(cmd, args, "status", "-sb")
 }
 
-func singleWorktreeSet(cfg *workspace.WorkspaceConfig, repos []repo.Repo) (string, bool) {
+func singleWorktreeSet(cfg *config.WorkspaceConfig, repos []repo.Repo) (string, bool) {
 	byRepo := worktreeRepoToSet(cfg)
 	setName := ""
 
@@ -111,8 +111,8 @@ func singleWorktreeSet(cfg *workspace.WorkspaceConfig, repos []repo.Repo) (strin
 	return setName, setName != ""
 }
 
-func fetchSetBare(cmd *cobra.Command, cfgPath, setName string, wt workspace.WorktreeConfig) error {
-	bareAbsPath, err := workspace.ResolveRepoPath(cfgPath, wt.BarePath)
+func fetchSetBare(cmd *cobra.Command, cfgPath, setName string, wt config.WorktreeConfig) error {
+	bareAbsPath, err := config.ResolveRepoPath(cfgPath, wt.BarePath)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func fetchSetBare(cmd *cobra.Command, cfgPath, setName string, wt workspace.Work
 	return nil
 }
 
-func fetchWithAllRepoDedup(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath string, repos []repo.Repo) error {
+func fetchWithAllRepoDedup(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, repos []repo.Repo) error {
 	nonWorktree, setToBare, err := collectFetchTargets(cfg, cfgPath, repos)
 	if err != nil {
 		return err
@@ -142,7 +142,7 @@ func fetchWithAllRepoDedup(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, c
 	return fmt.Errorf("%s", strings.Join(failures, "\n"))
 }
 
-func collectFetchTargets(cfg *workspace.WorkspaceConfig, cfgPath string, repos []repo.Repo) ([]repo.Repo, map[string][]string, error) {
+func collectFetchTargets(cfg *config.WorkspaceConfig, cfgPath string, repos []repo.Repo) ([]repo.Repo, map[string][]string, error) {
 	byRepo := worktreeRepoToSet(cfg)
 	nonWorktree := make([]repo.Repo, 0, len(repos))
 	setToBare := make(map[string][]string)
@@ -155,7 +155,7 @@ func collectFetchTargets(cfg *workspace.WorkspaceConfig, cfgPath string, repos [
 		}
 
 		wt := cfg.Worktrees[setName]
-		bareAbsPath, err := workspace.ResolveRepoPath(cfgPath, wt.BarePath)
+		bareAbsPath, err := config.ResolveRepoPath(cfgPath, wt.BarePath)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -184,7 +184,7 @@ func dedupeSetsByBare(setToBare map[string][]string) map[string][]string {
 }
 
 func fetchWorktreeBareTargets(cmd *cobra.Command, bareToSets map[string][]string) []string {
-	bars := workspace.SortedStringKeys(bareToSets)
+	bars := config.SortedStringKeys(bareToSets)
 	failures := make([]string, 0)
 
 	for _, bareAbsPath := range bars {
@@ -223,11 +223,11 @@ func fetchNonWorktreeTargets(cmd *cobra.Command, repos []repo.Repo) []string {
 	return nil
 }
 
-func worktreeRepoToSet(cfg *workspace.WorkspaceConfig) map[string]string {
+func worktreeRepoToSet(cfg *config.WorkspaceConfig) map[string]string {
 	result := make(map[string]string)
 	for setName, wt := range cfg.Worktrees {
-		for _, branch := range workspace.SortedStringKeys(wt.Branches) {
-			result[workspace.WorktreeRepoName(setName, branch)] = setName
+		for _, branch := range config.SortedStringKeys(wt.Branches) {
+			result[config.WorktreeRepoName(setName, branch)] = setName
 		}
 	}
 

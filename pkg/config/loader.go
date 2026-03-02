@@ -1,4 +1,4 @@
-package workspace
+package config
 
 import (
 	"errors"
@@ -199,6 +199,7 @@ func commitTempFile(tmpName, destPath string) error {
 	return nil
 }
 
+// ConfigDir returns the directory containing the config file.
 func ConfigDir(configPath string) string {
 	return filepath.Dir(configPath)
 }

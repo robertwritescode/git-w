@@ -9,7 +9,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/output"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,7 @@ Use -r to recursively find and register all git repos under a directory.`,
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	return runAddSingle(cmd, cfg, cfgPath, args[0], group)
 }
 
-func runAddSingle(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, pathArg, group string) error {
+func runAddSingle(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, pathArg, group string) error {
 	absPath, err := filepath.Abs(pathArg)
 	if err != nil {
 		return fmt.Errorf("resolving path: %w", err)
@@ -69,19 +69,19 @@ func runAddSingle(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, p
 		return err
 	}
 
-	relPath, err := workspace.RelPath(cfgPath, absPath)
+	relPath, err := config.RelPath(cfgPath, absPath)
 	if err != nil {
 		return err
 	}
 
-	cfg.Repos[name] = workspace.RepoConfig{
+	cfg.Repos[name] = config.RepoConfig{
 		Path: relPath,
 		URL:  gitutil.RemoteURL(absPath),
 	}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, group)
 
-	if err := workspace.Save(cfgPath, cfg); err != nil {
+	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
 	}
 
@@ -89,7 +89,7 @@ func runAddSingle(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, p
 	return nil
 }
 
-func runAddRecursive(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, dirArg, group string) error {
+func runAddRecursive(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, dirArg, group string) error {
 	walkDir, err := resolveWalkDir(dirArg)
 	if err != nil {
 		return err
@@ -102,7 +102,7 @@ func runAddRecursive(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath
 
 	count := registerDiscoveredRepos(cmd, cfg, cfgPath, paths, walkDir, group)
 
-	if err := workspace.Save(cfgPath, cfg); err != nil {
+	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
 	}
 
@@ -110,7 +110,7 @@ func runAddRecursive(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath
 	return nil
 }
 
-func registerDiscoveredRepos(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath string, paths []string, walkDir, group string) int {
+func registerDiscoveredRepos(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, paths []string, walkDir, group string) int {
 	count := 0
 	for _, p := range paths {
 		groupName := effectiveGroupName(group, p, walkDir)
@@ -194,7 +194,7 @@ func autoGroupName(repoAbsPath, walkRoot string) string {
 	return parts[0]
 }
 
-func registerSingleRepo(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, absPath, groupName string) (bool, error) {
+func registerSingleRepo(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, absPath, groupName string) (bool, error) {
 	if !IsGitRepo(absPath) {
 		return false, nil
 	}
@@ -204,21 +204,21 @@ func registerSingleRepo(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgP
 		return false, nil // already registered, skip silently
 	}
 
-	relPath, err := workspace.RelPath(cfgPath, absPath)
+	relPath, err := config.RelPath(cfgPath, absPath)
 	if err != nil {
 		return false, err // real error, propagate
 	}
 
-	cfg.Repos[name] = workspace.RepoConfig{Path: relPath, URL: gitutil.RemoteURL(absPath)}
+	cfg.Repos[name] = config.RepoConfig{Path: relPath, URL: gitutil.RemoteURL(absPath)}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, groupName)
 
 	return true, nil
 }
 
-func applyMeta(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, relPath, repoName, groupName string) {
+func applyMeta(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, relPath, repoName, groupName string) {
 	if cfg.AutoGitignoreEnabled() {
-		if err := gitutil.EnsureGitignore(workspace.ConfigDir(cfgPath), relPath); err != nil {
+		if err := gitutil.EnsureGitignore(config.ConfigDir(cfgPath), relPath); err != nil {
 			output.Writef(cmd.ErrOrStderr(), "warning: could not update .gitignore: %v\n", err)
 		}
 	}

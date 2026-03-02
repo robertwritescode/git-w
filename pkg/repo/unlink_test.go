@@ -6,7 +6,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 )
 
 type RemoveSuite struct {
@@ -65,7 +65,7 @@ func (s *RemoveSuite) TestRemove() {
 			}
 			s.Require().NoError(err)
 
-			cfg, err := workspace.Load(filepath.Join(s.wsDir, ".gitw"))
+			cfg, err := config.Load(filepath.Join(s.wsDir, ".gitw"))
 			s.Require().NoError(err)
 
 			_, exists := cfg.Repos[name]
@@ -89,7 +89,7 @@ func (s *RemoveSuite) TestMultiple() {
 	_, err = s.ExecuteCmd("repo", "unlink", name1, name2)
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(s.wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(s.wsDir, ".gitw"))
 	s.Require().NoError(err)
 
 	s.Assert().Empty(cfg.Repos)
@@ -105,7 +105,7 @@ func (s *RemoveSuite) TestUpdatesGroups() {
 	_, err = s.ExecuteCmd("repo", "unlink", name)
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(s.wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(s.wsDir, ".gitw"))
 	s.Require().NoError(err)
 
 	s.Assert().NotContains(cfg.Groups["mygroup"].Repos, name)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 )
 
 type AddSuite struct {
@@ -59,7 +59,7 @@ func (s *AddSuite) TestAdd() {
 			_, err := s.ExecuteCmd(cmdArgs...)
 			s.Require().NoError(err)
 
-			cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(err)
 
 			_, exists := cfg.Repos[name]
@@ -103,7 +103,7 @@ func (s *AddSuite) TestDetectsRemoteURL() {
 	_, err := s.ExecuteCmd("repo", "add", repoDir)
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(s.wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(s.wsDir, ".gitw"))
 	s.Require().NoError(err)
 
 	name := filepath.Base(repoDir)
@@ -187,7 +187,7 @@ func (s *AddSuite) TestRecursiveAdd() {
 			_, err := s.ExecuteCmd(args...)
 			s.Require().NoError(err)
 
-			cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(err)
 
 			for _, name := range tt.wantNames {

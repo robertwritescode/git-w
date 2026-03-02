@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 )
@@ -92,7 +93,7 @@ func (s *ContextSuite) TestContextSet() {
 
 			s.Assert().Contains(out, tc.group)
 
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			s.Assert().Equal(tc.group, cfg.Context.Active)
@@ -106,7 +107,7 @@ func (s *ContextSuite) TestContextSet_WritesLocal() {
 	_, err := s.ExecuteCmd("context", "web")
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(err)
 
 	s.Assert().Equal("web", cfg.Context.Active)
@@ -123,7 +124,7 @@ func (s *ContextSuite) TestContextClear() {
 	_, err := s.ExecuteCmd("context", "none")
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(err)
 
 	s.Assert().Equal("", cfg.Context.Active)
@@ -183,7 +184,7 @@ func (s *ContextSuite) TestContextAuto() {
 
 			s.Assert().Contains(out, tc.wantGroup)
 
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			s.Assert().Equal(tc.wantGroup, cfg.Context.Active)

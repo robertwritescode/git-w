@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 )
@@ -85,7 +86,7 @@ func (s *GroupSuite) TestGroupAdd() {
 
 			s.Require().NoError(err)
 
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			s.Assert().Equal(tc.wantRepos, cfg.Groups["web"].Repos)
@@ -129,7 +130,7 @@ func (s *GroupSuite) TestGroupRm() {
 
 			s.Require().NoError(err)
 
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			_, exists := cfg.Groups["web"]
@@ -180,7 +181,7 @@ func (s *GroupSuite) TestGroupRename() {
 
 			s.Require().NoError(err)
 
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			_, oldExists := cfg.Groups["web"]
@@ -235,7 +236,7 @@ func (s *GroupSuite) TestGroupRmrepo() {
 
 			s.Require().NoError(err)
 
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			s.Assert().Equal(tc.wantRepos, cfg.Groups["web"].Repos)
@@ -394,7 +395,7 @@ func (s *GroupSuite) TestGroupEdit() {
 
 			s.Require().NoError(err)
 
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			s.Assert().Equal(tc.wantPath, cfg.Groups["web"].Path)

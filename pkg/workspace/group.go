@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/spf13/cobra"
 )
@@ -87,7 +88,7 @@ func runGroupAdd(cmd *cobra.Command, args []string) error {
 	name, _ := cmd.Flags().GetString("name")
 	path, _ := cmd.Flags().GetString("path")
 
-	if err := withMutableConfig(cmd, func(cfg *WorkspaceConfig) error {
+	if err := withMutableConfig(cmd, func(cfg *config.WorkspaceConfig) error {
 		if err := validateRegisteredRepos(cfg, args); err != nil {
 			return err
 		}
@@ -110,7 +111,7 @@ func runGroupAdd(cmd *cobra.Command, args []string) error {
 
 func runGroupRm(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	if err := withMutableConfig(cmd, func(cfg *WorkspaceConfig) error {
+	if err := withMutableConfig(cmd, func(cfg *config.WorkspaceConfig) error {
 		if _, ok := cfg.Groups[name]; !ok {
 			return fmt.Errorf("group %q not found", name)
 		}
@@ -127,7 +128,7 @@ func runGroupRm(cmd *cobra.Command, args []string) error {
 
 func runGroupRename(cmd *cobra.Command, args []string) error {
 	oldName, newName := args[0], args[1]
-	if err := withMutableConfig(cmd, func(cfg *WorkspaceConfig) error {
+	if err := withMutableConfig(cmd, func(cfg *config.WorkspaceConfig) error {
 		if _, ok := cfg.Groups[oldName]; !ok {
 			return fmt.Errorf("group %q not found", oldName)
 		}
@@ -149,7 +150,7 @@ func runGroupRename(cmd *cobra.Command, args []string) error {
 
 func runGroupRmrepo(cmd *cobra.Command, args []string) error {
 	name, _ := cmd.Flags().GetString("name")
-	if err := withMutableConfig(cmd, func(cfg *WorkspaceConfig) error {
+	if err := withMutableConfig(cmd, func(cfg *config.WorkspaceConfig) error {
 		if _, ok := cfg.Groups[name]; !ok {
 			return fmt.Errorf("group %q not found", name)
 		}
@@ -167,8 +168,8 @@ func runGroupRmrepo(cmd *cobra.Command, args []string) error {
 }
 
 func runGroupList(cmd *cobra.Command, args []string) error {
-	return withConfigReadOnly(cmd, func(cfg *WorkspaceConfig) error {
-		for _, name := range SortedStringKeys(cfg.Groups) {
+	return withConfigReadOnly(cmd, func(cfg *config.WorkspaceConfig) error {
+		for _, name := range config.SortedStringKeys(cfg.Groups) {
 			output.Writef(cmd.OutOrStdout(), "%s\n", name)
 		}
 
@@ -177,12 +178,12 @@ func runGroupList(cmd *cobra.Command, args []string) error {
 }
 
 func runGroupInfo(cmd *cobra.Command, args []string) error {
-	return withConfigReadOnly(cmd, func(cfg *WorkspaceConfig) error {
+	return withConfigReadOnly(cmd, func(cfg *config.WorkspaceConfig) error {
 		if len(args) == 1 {
 			return printGroupInfo(cmd.OutOrStdout(), cfg, args[0])
 		}
 
-		for _, name := range SortedStringKeys(cfg.Groups) {
+		for _, name := range config.SortedStringKeys(cfg.Groups) {
 			if err := printGroupInfo(cmd.OutOrStdout(), cfg, name); err != nil {
 				return err
 			}
@@ -202,7 +203,7 @@ func runGroupEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := withMutableConfig(cmd, func(cfg *WorkspaceConfig) error {
+	if err := withMutableConfig(cmd, func(cfg *config.WorkspaceConfig) error {
 		g, ok := cfg.Groups[name]
 		if !ok {
 			return fmt.Errorf("group %q not found", name)
@@ -273,7 +274,7 @@ func removeItems(slice, drop []string) []string {
 	})
 }
 
-func printGroupInfo(w io.Writer, cfg *WorkspaceConfig, name string) error {
+func printGroupInfo(w io.Writer, cfg *config.WorkspaceConfig, name string) error {
 	g, ok := cfg.Groups[name]
 	if !ok {
 		return fmt.Errorf("group %q not found", name)
@@ -283,7 +284,7 @@ func printGroupInfo(w io.Writer, cfg *WorkspaceConfig, name string) error {
 	return nil
 }
 
-func validateRegisteredRepos(cfg *WorkspaceConfig, names []string) error {
+func validateRegisteredRepos(cfg *config.WorkspaceConfig, names []string) error {
 	for _, name := range names {
 		if _, ok := cfg.Repos[name]; !ok {
 			return fmt.Errorf("repo %q is not registered", name)

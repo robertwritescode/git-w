@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/worktree"
 )
 
@@ -29,7 +29,7 @@ func (s *WorktreeRmSuite) TestRmCleansManualGroupMembership() {
 	_, err = s.ExecuteCmd("worktree", "rm", "infra-test")
 	s.Require().NoError(err)
 
-	cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(loadErr)
 	s.Assert().NotContains(cfg.Groups["mixed"].Repos, "infra-test")
 }
@@ -110,7 +110,7 @@ func (s *WorktreeRmSuite) TestRmSafetyMatrix() {
 			}
 
 			s.Require().NoError(err)
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 			_, exists := cfg.Worktrees["infra"].Branches["test"]
 			s.Assert().False(exists)

@@ -1,4 +1,4 @@
-package workspace
+package config
 
 import (
 	"fmt"

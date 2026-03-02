@@ -7,7 +7,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/parallel"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +57,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	return syncReportsError(reports)
 }
 
-func resolveSyncPush(cmd *cobra.Command, cfg *workspace.WorkspaceConfig) (bool, error) {
+func resolveSyncPush(cmd *cobra.Command, cfg *config.WorkspaceConfig) (bool, error) {
 	push, _ := cmd.Flags().GetBool("push")
 	noPush, _ := cmd.Flags().GetBool("no-push")
 
@@ -74,14 +74,14 @@ func resolveSyncPush(cmd *cobra.Command, cfg *workspace.WorkspaceConfig) (bool, 
 	return cfg.SyncPushEnabled(), nil
 }
 
-func collectSyncReports(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath string, repos []repo.Repo, doPush bool) []syncReport {
+func collectSyncReports(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, repos []repo.Repo, doPush bool) []syncReport {
 	plain, setRepos := splitSyncTargets(cfg, repos)
 	reports := runSyncReports(plain, doPush, syncPlainRepo)
 	reports = append(reports, runWorktreeSetSync(cmd, cfg, cfgPath, setRepos, doPush)...)
 	return reports
 }
 
-func splitSyncTargets(cfg *workspace.WorkspaceConfig, repos []repo.Repo) ([]repo.Repo, map[string][]repo.Repo) {
+func splitSyncTargets(cfg *config.WorkspaceConfig, repos []repo.Repo) ([]repo.Repo, map[string][]repo.Repo) {
 	byRepo := worktreeRepoToSet(cfg)
 	plain := make([]repo.Repo, 0, len(repos))
 	setRepos := make(map[string][]repo.Repo)
@@ -99,10 +99,10 @@ func splitSyncTargets(cfg *workspace.WorkspaceConfig, repos []repo.Repo) ([]repo
 	return plain, setRepos
 }
 
-func runWorktreeSetSync(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath string, setRepos map[string][]repo.Repo, doPush bool) []syncReport {
+func runWorktreeSetSync(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, setRepos map[string][]repo.Repo, doPush bool) []syncReport {
 	reports := make([]syncReport, 0)
 
-	for _, setName := range workspace.SortedStringKeys(setRepos) {
+	for _, setName := range config.SortedStringKeys(setRepos) {
 		if err := fetchSetBare(cmd, cfgPath, setName, cfg.Worktrees[setName]); err != nil {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[%s] fetch error: %v\n", setName, err)
 			reports = append(reports, failedSetReports(setRepos[setName])...)

@@ -7,7 +7,7 @@ import (
 
 	gitpkg "github.com/robertwritescode/git-w/pkg/git"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 )
 
 type InfoSuite struct {
@@ -47,15 +47,15 @@ func (s *InfoSuite) TestInfo_Output() {
 			// Register repos directly in config rather than using add command.
 			dirs := make([]string, tt.numRepos)
 			if tt.numRepos > 0 {
-				cfg, err := workspace.Load(cfgPath)
+				cfg, err := config.Load(cfgPath)
 				s.Require().NoError(err)
 				for i := range dirs {
 					dirs[i] = s.MakeGitRepo("")
-					relPath, relErr := workspace.RelPath(cfgPath, dirs[i])
+					relPath, relErr := config.RelPath(cfgPath, dirs[i])
 					s.Require().NoError(relErr)
-					cfg.Repos[filepath.Base(dirs[i])] = workspace.RepoConfig{Path: relPath}
+					cfg.Repos[filepath.Base(dirs[i])] = config.RepoConfig{Path: relPath}
 				}
-				s.Require().NoError(workspace.Save(cfgPath, cfg))
+				s.Require().NoError(config.Save(cfgPath, cfg))
 			}
 
 			out, err := s.ExecuteCmd(tt.cmd)
@@ -73,17 +73,17 @@ func (s *InfoSuite) TestInfo_ByGroup() {
 	repoDir2 := s.MakeGitRepo("")
 
 	cfgPath := filepath.Join(s.wsDir, ".gitw")
-	cfg, err := workspace.Load(cfgPath)
+	cfg, err := config.Load(cfgPath)
 	s.Require().NoError(err)
 
-	rel1, err := workspace.RelPath(cfgPath, repoDir1)
+	rel1, err := config.RelPath(cfgPath, repoDir1)
 	s.Require().NoError(err)
-	rel2, err := workspace.RelPath(cfgPath, repoDir2)
+	rel2, err := config.RelPath(cfgPath, repoDir2)
 	s.Require().NoError(err)
-	cfg.Repos[filepath.Base(repoDir1)] = workspace.RepoConfig{Path: rel1}
-	cfg.Repos[filepath.Base(repoDir2)] = workspace.RepoConfig{Path: rel2}
-	cfg.Groups["mygroup"] = workspace.GroupConfig{Repos: []string{filepath.Base(repoDir1)}}
-	s.Require().NoError(workspace.Save(cfgPath, cfg))
+	cfg.Repos[filepath.Base(repoDir1)] = config.RepoConfig{Path: rel1}
+	cfg.Repos[filepath.Base(repoDir2)] = config.RepoConfig{Path: rel2}
+	cfg.Groups["mygroup"] = config.GroupConfig{Repos: []string{filepath.Base(repoDir1)}}
+	s.Require().NoError(config.Save(cfgPath, cfg))
 
 	out, err := s.ExecuteCmd("info", "mygroup")
 	s.Require().NoError(err)

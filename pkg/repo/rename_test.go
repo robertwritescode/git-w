@@ -7,7 +7,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 )
 
 type RenameSuite struct {
@@ -93,7 +93,7 @@ func (s *RenameSuite) TestRename() {
 
 			s.Require().NoError(err)
 
-			cfg, loadErr := workspace.Load(filepath.Join(s.wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(s.wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 
 			_, oldExists := cfg.Repos[oldName]

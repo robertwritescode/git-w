@@ -12,15 +12,15 @@ import (
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/parallel"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 
 // restoreInput pairs a repo name with its config for fan-out processing.
 type restoreInput struct {
 	Name     string
-	Repo     workspace.RepoConfig
-	Worktree workspace.WorktreeConfig
+	Repo     config.RepoConfig
+	Worktree config.WorktreeConfig
 	IsRepo   bool
 	RelPaths []string
 }
@@ -46,7 +46,7 @@ func registerRestore(root *cobra.Command) {
 }
 
 func runRestore(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -57,8 +57,8 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	return restoreAll(cmd, cfg, cfgPath, jobs, timeout)
 }
 
-func restoreAll(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath string, jobs int, timeout time.Duration) error {
-	cfgDir := workspace.ConfigDir(cfgPath)
+func restoreAll(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, jobs int, timeout time.Duration) error {
+	cfgDir := config.ConfigDir(cfgPath)
 	gitignore := cfg.AutoGitignoreEnabled()
 
 	ctx, stop := newRestoreContext(timeout)
@@ -88,16 +88,16 @@ func newRestoreContext(timeout time.Duration) (context.Context, context.CancelFu
 	}
 }
 
-func buildRestoreInputs(cfg *workspace.WorkspaceConfig) []restoreInput {
+func buildRestoreInputs(cfg *config.WorkspaceConfig) []restoreInput {
 	inputs := make([]restoreInput, 0, len(cfg.Repos)+len(cfg.Worktrees))
 
 	synthNames := make(map[string]struct{})
 	for setName, wt := range cfg.Worktrees {
 		for branch := range wt.Branches {
-			synthNames[workspace.WorktreeRepoName(setName, branch)] = struct{}{}
+			synthNames[config.WorktreeRepoName(setName, branch)] = struct{}{}
 		}
 	}
-	for _, name := range workspace.SortedStringKeys(cfg.Repos) {
+	for _, name := range config.SortedStringKeys(cfg.Repos) {
 		if _, isSynth := synthNames[name]; isSynth {
 			continue
 		}
@@ -105,10 +105,10 @@ func buildRestoreInputs(cfg *workspace.WorkspaceConfig) []restoreInput {
 		inputs = append(inputs, restoreInput{Name: name, Repo: rc, IsRepo: true, RelPaths: []string{rc.Path}})
 	}
 
-	for _, setName := range workspace.SortedStringKeys(cfg.Worktrees) {
+	for _, setName := range config.SortedStringKeys(cfg.Worktrees) {
 		wt := cfg.Worktrees[setName]
 		relPaths := make([]string, 0, len(wt.Branches))
-		for _, branch := range workspace.SortedStringKeys(wt.Branches) {
+		for _, branch := range config.SortedStringKeys(wt.Branches) {
 			relPaths = append(relPaths, wt.Branches[branch])
 		}
 
@@ -170,8 +170,8 @@ func processRestore(ctx context.Context, cfgPath string, in restoreInput) (strin
 	return "", fmt.Errorf("invalid restore input")
 }
 
-func processRepoRestore(ctx context.Context, cfgPath string, rc workspace.RepoConfig) (string, error) {
-	absPath, err := workspace.ResolveRepoPath(cfgPath, rc.Path)
+func processRepoRestore(ctx context.Context, cfgPath string, rc config.RepoConfig) (string, error) {
+	absPath, err := config.ResolveRepoPath(cfgPath, rc.Path)
 	if err != nil {
 		return "", err
 	}
@@ -179,7 +179,7 @@ func processRepoRestore(ctx context.Context, cfgPath string, rc workspace.RepoCo
 	return restoreRepo(ctx, rc, absPath)
 }
 
-func restoreRepo(ctx context.Context, rc workspace.RepoConfig, absPath string) (string, error) {
+func restoreRepo(ctx context.Context, rc config.RepoConfig, absPath string) (string, error) {
 	if IsGitRepo(absPath) {
 		return gitutil.Pull(ctx, absPath)
 	}
@@ -195,8 +195,8 @@ func restoreRepo(ctx context.Context, rc workspace.RepoConfig, absPath string) (
 	return "cloned", nil
 }
 
-func processWorktreeRestore(ctx context.Context, cfgPath string, wt workspace.WorktreeConfig) (string, error) {
-	bareAbsPath, err := workspace.ResolveRepoPath(cfgPath, wt.BarePath)
+func processWorktreeRestore(ctx context.Context, cfgPath string, wt config.WorktreeConfig) (string, error) {
+	bareAbsPath, err := config.ResolveRepoPath(cfgPath, wt.BarePath)
 	if err != nil {
 		return "", err
 	}
@@ -220,11 +220,11 @@ func processWorktreeRestore(ctx context.Context, cfgPath string, wt workspace.Wo
 // restoreWorktreeBranches restores branches sequentially within a single
 // worktree set. Inter-set parallelism is handled by the RunFanOut caller.
 // Intra-set parallelism is not needed for typical 2-5 branches per set.
-func restoreWorktreeBranches(ctx context.Context, cfgPath, bareAbsPath string, wt workspace.WorktreeConfig) (int, int, error) {
+func restoreWorktreeBranches(ctx context.Context, cfgPath, bareAbsPath string, wt config.WorktreeConfig) (int, int, error) {
 	added := 0
 	pulled := 0
 
-	for _, branch := range workspace.SortedStringKeys(wt.Branches) {
+	for _, branch := range config.SortedStringKeys(wt.Branches) {
 		addedOne, pulledOne, err := restoreWorktreeBranch(ctx, cfgPath, bareAbsPath, branch, wt.Branches[branch])
 		if err != nil {
 			return 0, 0, err
@@ -242,7 +242,7 @@ func restoreWorktreeBranches(ctx context.Context, cfgPath, bareAbsPath string, w
 	return added, pulled, nil
 }
 
-func ensureBareForWorktree(ctx context.Context, wt workspace.WorktreeConfig, bareAbsPath string) (bool, error) {
+func ensureBareForWorktree(ctx context.Context, wt config.WorktreeConfig, bareAbsPath string) (bool, error) {
 	if _, err := os.Stat(bareAbsPath); err == nil {
 		return false, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -261,7 +261,7 @@ func ensureBareForWorktree(ctx context.Context, wt workspace.WorktreeConfig, bar
 }
 
 func restoreWorktreeBranch(ctx context.Context, cfgPath, bareAbsPath, branch, branchPath string) (bool, bool, error) {
-	absPath, err := workspace.ResolveRepoPath(cfgPath, branchPath)
+	absPath, err := config.ResolveRepoPath(cfgPath, branchPath)
 	if err != nil {
 		return false, false, err
 	}

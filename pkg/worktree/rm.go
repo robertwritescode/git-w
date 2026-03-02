@@ -7,13 +7,13 @@ import (
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 
 type rmOperation struct {
 	target    branchTarget
-	wt        workspace.WorktreeConfig
+	wt        config.WorktreeConfig
 	branchAbs string
 	bareAbs   string
 	force     bool
@@ -31,7 +31,7 @@ func registerRm(root *cobra.Command) {
 }
 
 func runRm(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -53,14 +53,14 @@ func runRm(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prepareRmOperation(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, name string) (rmOperation, error) {
+func prepareRmOperation(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, name string) (rmOperation, error) {
 	target, wt, err := findRmTarget(cfg, name)
 	if err != nil {
 		return rmOperation{}, err
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
-	branchAbs, err := workspace.ResolveRepoPath(cfgPath, target.RelPath)
+	branchAbs, err := config.ResolveRepoPath(cfgPath, target.RelPath)
 	if err != nil {
 		return rmOperation{}, err
 	}
@@ -81,15 +81,15 @@ func executeRmOperation(op rmOperation) error {
 	return removeOneWorktree(op.bareAbs, op.branchAbs, op.force)
 }
 
-func findRmTarget(cfg *workspace.WorkspaceConfig, name string) (branchTarget, workspace.WorktreeConfig, error) {
+func findRmTarget(cfg *config.WorkspaceConfig, name string) (branchTarget, config.WorktreeConfig, error) {
 	target, ok := findByRepoName(cfg, name)
 	if !ok {
-		return branchTarget{}, workspace.WorktreeConfig{}, fmt.Errorf("%q is not a worktree repo name", name)
+		return branchTarget{}, config.WorktreeConfig{}, fmt.Errorf("%q is not a worktree repo name", name)
 	}
 
 	wt := cfg.Worktrees[target.SetName]
 	if len(wt.Branches) <= 1 {
-		return branchTarget{}, workspace.WorktreeConfig{}, fmt.Errorf("cannot remove last worktree — use `git w worktree drop %s`", target.SetName)
+		return branchTarget{}, config.WorktreeConfig{}, fmt.Errorf("cannot remove last worktree — use `git w worktree drop %s`", target.SetName)
 	}
 
 	return target, wt, nil
@@ -112,11 +112,11 @@ func validateRmSafety(force bool, target branchTarget, branchAbs string) error {
 	return fmt.Errorf("refusing to remove %q: %s", target.RepoName, strings.Join(violations, "; "))
 }
 
-func persistRm(cfg *workspace.WorkspaceConfig, cfgPath string, target branchTarget, wt workspace.WorktreeConfig) error {
+func persistRm(cfg *config.WorkspaceConfig, cfgPath string, target branchTarget, wt config.WorktreeConfig) error {
 	cfg.RemoveRepoFromManualGroups(target.RepoName)
 	delete(wt.Branches, target.Branch)
 	cfg.Worktrees[target.SetName] = wt
-	return workspace.Save(cfgPath, cfg)
+	return config.Save(cfgPath, cfg)
 }
 
 func removeOneWorktree(bareAbs, branchAbs string, force bool) error {
