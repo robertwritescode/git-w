@@ -87,3 +87,5 @@ jobs:
           git add Casks/git-w.rb
           git commit -m "chore(cask): auto-fix style for ${{ needs.release-please.outputs.tag_name }}"
           git push "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/robertwritescode/homebrew-tap.git" main
+
+          brew developer off || true
