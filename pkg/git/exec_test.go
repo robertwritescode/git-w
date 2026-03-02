@@ -6,19 +6,16 @@ import (
 
 	gitpkg "github.com/robertwritescode/git-w/pkg/git"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type ExecSuite struct {
 	testutil.CmdSuite
 }
 
-func (s *ExecSuite) SetupTest() {
-	s.SetRoot(gitpkg.Register)
-}
-
 func TestExecSuite(t *testing.T) {
-	suite.Run(t, new(ExecSuite))
+	s := new(ExecSuite)
+	s.InitRoot(gitpkg.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *ExecSuite) TestExec_RunsInAllRepos() {

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/robertwritescode/git-w/pkg/gitutil"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -36,10 +37,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := gitutil.EnsureGitignore(cwd, ".gitw.local"); err != nil {
-		writef(cmd.ErrOrStderr(), "warning: could not update .gitignore: %v\n", err)
+		output.Writef(cmd.ErrOrStderr(), "warning: could not update .gitignore: %v\n", err)
 	}
 
-	writef(cmd.OutOrStdout(), "Initialized workspace %q in %s\n", name, cwd)
+	output.Writef(cmd.OutOrStdout(), "Initialized workspace %q in %s\n", name, cwd)
 	return nil
 }
 

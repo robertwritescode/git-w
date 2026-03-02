@@ -28,7 +28,7 @@ auto_gitignore = true       # Add repo paths to .gitignore on add/clone/restore 
 [repos.frontend]
 path = "apps/frontend"      # Relative to .gitw location
 url  = "https://github.com/org/frontend"   # Set by clone/add; used by restore
-flags = []                  # Optional custom git flags (e.g., bare repo worktrees)
+flags = []                  # Optional custom git flags
 
 [repos.backend]
 path = "services/backend"
@@ -40,7 +40,19 @@ path  = "apps"              # Optional: used for auto-context detection
 
 [groups.ops]
 repos = ["infra"]
+
+# Worktree sets: repos sharing a bare clone (one git object store, multiple branch folders)
+[worktrees.infra]
+url       = "https://github.com/org/infra"
+bare_path = "infra/.bare"
+
+[worktrees.infra.branches]
+dev  = "infra/dev"
+test = "infra/test"
+prod = "infra/prod"
 ```
+
+Worktree sets synthesize repos named `<set>-<branch>` (e.g., `infra-dev`) and a group `<set>` at load time. Synthesized entries participate in all filter/execution logic but are NOT written back to `.gitw`.
 
 ```toml
 # .gitw.local  (gitignored, per-developer)
@@ -67,15 +79,16 @@ git-w/
 │
 └── pkg/
     ├── cmd/
-    │   ├── root.go             # Root cmd, global --config flag, wires 3 domain Register funcs
+    │   ├── root.go             # Root cmd, global --config flag, wires 4 domain Register funcs
     │   ├── completion.go       # Shell completion (bash/zsh/fish/powershell) — registerCompletion
     │   └── completion_test.go
     │
     ├── workspace/              # domain: workspace definition, state, and commands
-    │   ├── config.go           # WorkspaceConfig, RepoConfig, GroupConfig, ContextConfig
-    │   ├── loader.go           # TOML load/save, atomic writes, LoadCWD, LoadConfig(cmd)
+    │   ├── config.go           # WorkspaceConfig, RepoConfig, GroupConfig, ContextConfig, WorktreeConfig
+    │   ├── loader.go           # TOML load/save, atomic writes, LoadCWD, LoadConfig(cmd); synthesizeWorktreeTargets
     │   ├── discovery.go        # Walk-up .gitw search, Discover()
     │   ├── register.go         # Register(root) → registerInit + registerContext + registerGroup
+    │   ├── cmd_config.go       # Shared config-flag helpers for worktree commands
     │   ├── init.go             # Create new .gitw + .gitignore setup
     │   ├── context.go          # Context show/set/clear/auto
     │   ├── group.go            # Group subcommand tree (add/rm/rename/rmrepo/list/info/edit)
@@ -104,9 +117,24 @@ git-w/
     │   ├── info.go             # Status table for all or group repos (alias: ll)
     │   └── *_test.go
     │
+    ├── worktree/               # domain: git worktree set management commands
+    │   ├── register.go         # Register(root): creates "worktree" subcommand (aliases: tree, t)
+    │   ├── common.go           # Shared worktree helpers
+    │   ├── clone.go            # clone: bare clone + create worktrees; register in .gitw
+    │   ├── add.go              # add: add branch worktree to existing set
+    │   ├── rm.go               # rm: remove individual worktree; safety checks + --force
+    │   ├── drop.go             # drop: destroy entire set (all worktrees + bare repo); safety checks
+    │   ├── list.go             # list (alias: ls): list sets or branches of a set
+    │   ├── safety.go           # Safety check logic: dirty and local-ahead detection
+    │   └── *_test.go
+    │
     ├── gitutil/                # shared utility: low-level git subprocess wrappers
-    │   ├── gitutil.go          # Clone, CloneContext, RemoteURL, EnsureGitignore (mutex-protected)
+    │   ├── gitutil.go          # Clone, CloneContext, CloneBare, AddWorktree, RemoveWorktree, RemoveWorktreeForce, FetchBare, RemoteURL, EnsureGitignore (mutex-protected)
     │   └── gitutil_test.go
+    │
+    ├── output/                 # shared utility: standardized command output helpers
+    │   ├── write.go
+    │   └── write_test.go
     │
     ├── parallel/               # shared utility: generic concurrency primitives
     │   ├── parallel.go         # RunFanOut[T,R], MaxWorkers, FormatFailureError
@@ -118,7 +146,7 @@ git-w/
     │   └── *_test.go
     │
     └── testutil/               # shared utility: test infrastructure
-        ├── helpers.go          # MakeGitRepo, MakeWorkspace, InitBareGitRepo, ChangeToDir, etc.
+        ├── helpers.go          # MakeGitRepo, MakeWorkspace, MakeBareGitRepo, AddWorktreeToRepo, ChangeToDir, etc.
         ├── cmd.go              # CmdSuite type: SetRoot, ExecuteCmd for integration tests
         └── suite.go            # CmdSuite method delegates (all helpers available as suite methods)
 ```
@@ -129,6 +157,8 @@ workspace  → gitutil
 repo       → workspace, gitutil
 display    → repo
 git        → repo, workspace, display, parallel
+worktree   → workspace, repo, gitutil, parallel
+output     → (none)
 parallel   → (none)
 gitutil    → (none)
 testutil   → (none)
@@ -143,16 +173,26 @@ testutil   → (none)
 ```go
 // config.go — merged from .gitw + .gitw.local at load time
 type WorkspaceConfig struct {
-    Workspace WorkspaceMeta          `toml:"workspace"`
-    Context   ContextConfig          `toml:"context"`  // from .local
-    Repos     map[string]RepoConfig  `toml:"repos"`
-    Groups    map[string]GroupConfig `toml:"groups"`
+    Workspace WorkspaceMeta             `toml:"workspace"`
+    Context   ContextConfig             `toml:"context"`  // from .local
+    Repos     map[string]RepoConfig     `toml:"repos"`
+    Groups    map[string]GroupConfig    `toml:"groups"`
+    Worktrees map[string]WorktreeConfig `toml:"worktrees"`
+}
+
+type WorktreeConfig struct {
+    URL      string            `toml:"url"`
+    BarePath string            `toml:"bare_path"`
+    Branches map[string]string `toml:"branches"` // branch name → relative path
 }
 
 // Methods on WorkspaceConfig:
 func (c *WorkspaceConfig) AutoGitignoreEnabled() bool  // nil → true
 func (c *WorkspaceConfig) AddRepoToGroup(group, name string)
 func (c *WorkspaceConfig) RepoName(absPath string) (string, error)
+func (c *WorkspaceConfig) WorktreeRepoName(setName, branch string) string  // "<set>-<branch>"
+func (c *WorkspaceConfig) RemoveRepoFromManualGroups(repoName string)
+func (c *WorkspaceConfig) SortedWorktreeBranchNames(setName string) []string
 
 type WorkspaceMeta struct {
     Name          string `toml:"name"`
@@ -290,6 +330,11 @@ func RenderTable(w io.Writer, entries []TableEntry)
 ```go
 func Clone(url, destPath string) error
 func CloneContext(ctx context.Context, url, destPath string) error
+func CloneBare(ctx context.Context, url, dest string) error
+func AddWorktree(ctx context.Context, barePath, treePath, branch string) error
+func RemoveWorktree(barePath, treePath string) error
+func RemoveWorktreeForce(barePath, treePath string) error
+func FetchBare(barePath string) error
 func RemoteURL(repoPath string) string
 func EnsureGitignore(dir, entry string) error  // mutex-protected for concurrent use
 ```
@@ -328,6 +373,23 @@ func EnsureGitignore(dir, entry string) error  // mutex-protected for concurrent
 | `git w group rmrepo <repos> -n <name>` | Remove repos from group |
 | `git w group list` (alias: `ls`) | List group names |
 | `git w group info [name]` (alias: `ll`) | List groups with their repos |
+
+### Worktree Set Management (`git w worktree` / `git w tree` / `git w t`)
+
+| Command | Description |
+|---|---|
+| `git w worktree clone <url> <base-path> <branch> [branch...]` | Bare clone + create a worktree per branch; register set in `.gitw` |
+| `git w worktree add <set-name> <branch> [path]` | Add a new branch worktree to an existing set |
+| `git w worktree rm <name>` | Remove individual worktree (e.g., `infra-dev`); safety checks; `--force` override |
+| `git w worktree drop <set-name>` | Destroy all worktrees + bare repo for a set; safety checks; `--force` override |
+| `git w worktree list [set-name]` (alias: `ls`) | List all sets, or branches of a specific set |
+
+Safety checks for `rm` and `drop`: refuses if working tree is dirty or has unpushed commits unless `--force`.
+`rm` also refuses if it would remove the last worktree in a set (use `drop` instead).
+
+**`restore`** handles worktrees: bare-clones if missing, runs `git worktree add` per branch if path missing, else `git pull`. Concurrent with regular repo restore.
+
+**`fetch` deduplication**: fetching a worktree set fetches once via `git -C <bare-path> fetch`. All-repo fetch deduplicates worktrees sharing a bare path.
 
 ### Context
 

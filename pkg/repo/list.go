@@ -2,9 +2,8 @@ package repo
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
@@ -45,13 +44,13 @@ func printRepoPath(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath s
 		return fmt.Errorf("resolving path for repo %q: %w", name, err)
 	}
 
-	writef(cmd.OutOrStdout(), "%s\n", absPath)
+	output.Writef(cmd.OutOrStdout(), "%s\n", absPath)
 	return nil
 }
 
 func printRepoNames(cmd *cobra.Command, cfg *workspace.WorkspaceConfig) error {
-	for _, name := range slices.Sorted(maps.Keys(cfg.Repos)) {
-		writef(cmd.OutOrStdout(), "%s\n", name)
+	for _, name := range workspace.SortedStringKeys(cfg.Repos) {
+		output.Writef(cmd.OutOrStdout(), "%s\n", name)
 	}
 
 	return nil

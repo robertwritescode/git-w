@@ -8,7 +8,6 @@ import (
 	gitpkg "github.com/robertwritescode/git-w/pkg/git"
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type InfoSuite struct {
@@ -17,12 +16,14 @@ type InfoSuite struct {
 }
 
 func (s *InfoSuite) SetupTest() {
-	s.SetRoot(gitpkg.Register)
+	s.CmdSuite.SetupTest()
 	s.wsDir = s.SetupWorkspaceDir()
 }
 
 func TestInfoSuite(t *testing.T) {
-	suite.Run(t, new(InfoSuite))
+	s := new(InfoSuite)
+	s.InitRoot(gitpkg.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *InfoSuite) TestInfo_Output() {

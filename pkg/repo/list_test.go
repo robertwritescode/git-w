@@ -8,7 +8,6 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type ListSuite struct {
@@ -17,12 +16,14 @@ type ListSuite struct {
 }
 
 func (s *ListSuite) SetupTest() {
-	s.SetRoot(repo.Register)
+	s.CmdSuite.SetupTest()
 	s.wsDir = s.SetupWorkspaceDir()
 }
 
 func TestListSuite(t *testing.T) {
-	suite.Run(t, new(ListSuite))
+	s := new(ListSuite)
+	s.InitRoot(repo.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *ListSuite) TestListAll() {

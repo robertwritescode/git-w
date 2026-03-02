@@ -8,19 +8,16 @@ import (
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type CloneSuite struct {
 	testutil.CmdSuite
 }
 
-func (s *CloneSuite) SetupTest() {
-	s.SetRoot(repo.Register)
-}
-
 func TestCloneSuite(t *testing.T) {
-	suite.Run(t, new(CloneSuite))
+	s := new(CloneSuite)
+	s.InitRoot(repo.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *CloneSuite) TestClone() {
@@ -40,13 +37,7 @@ func (s *CloneSuite) TestClone() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			wsDir := s.T().TempDir()
-			s.Require().NoError(os.WriteFile(
-				filepath.Join(wsDir, ".gitw"),
-				[]byte("[workspace]\nname = \"testws\"\n"), 0o644,
-			))
-
-			s.ChangeToDir(wsDir)
+			wsDir := s.SetupWorkspaceDir()
 
 			absDir, fileURL := s.CreateBareRepo()
 

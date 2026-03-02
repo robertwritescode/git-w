@@ -10,7 +10,6 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type ParallelSuite struct {
@@ -19,7 +18,7 @@ type ParallelSuite struct {
 }
 
 func TestParallel(t *testing.T) {
-	suite.Run(t, new(ParallelSuite))
+	testutil.RunSuite(t, new(ParallelSuite))
 }
 
 func (s *ParallelSuite) SetupTest() {

@@ -164,3 +164,70 @@ func pushToRemote(t *testing.T, repoDir string) {
 		t.Fatal(err)
 	}
 }
+
+// makeBareGitRepo clones a bare repository from sourceURL into a new temp dir
+// and returns the absolute bare repo path.
+func makeBareGitRepo(t testing.TB, sourceURL string) string {
+	t.Helper()
+	dir := t.TempDir()
+	b := exec.Command("git", "clone", "--bare", sourceURL, dir)
+
+	out, err := b.CombinedOutput()
+	require.NoError(t, err, "git clone --bare: %s", out)
+
+	return dir
+}
+
+// addWorktreeToRepo runs `git -C barePath worktree add treePath branch`.
+func addWorktreeToRepo(t testing.TB, barePath, treePath, branch string) {
+	t.Helper()
+	cmd := exec.Command("git", "-C", barePath, "worktree", "add", treePath, branch)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "git worktree add: %s", out)
+}
+
+// RunGit executes `git <args...>` in dir and fails the test on error.
+// Pass an empty dir to run without changing the command directory.
+func RunGit(t testing.TB, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "git %v: %s", args, out)
+}
+
+// makeRemoteWithBranches creates a bare remote and pushes HEAD plus branches.
+// Returns the remote URL as file://<path>.
+func makeRemoteWithBranches(t testing.TB, branches []string) string {
+	t.Helper()
+
+	bareDir := t.TempDir()
+	RunGit(t, "", "init", "--bare", bareDir)
+
+	localDir := t.TempDir()
+	RunGit(t, localDir, "init")
+	RunGit(t, localDir, "config", "user.email", "test@example.com")
+	RunGit(t, localDir, "config", "user.name", "Test User")
+	require.NoError(t, os.WriteFile(filepath.Join(localDir, "README.md"), []byte("# test\n"), 0o644))
+	RunGit(t, localDir, "add", ".")
+	RunGit(t, localDir, "commit", "-m", "init")
+	RunGit(t, localDir, "remote", "add", "origin", "file://"+bareDir)
+	RunGit(t, localDir, "push", "-u", "origin", "HEAD")
+
+	for _, branch := range branches {
+		RunGit(t, localDir, "checkout", "-b", branch)
+		RunGit(t, localDir, "push", "-u", "origin", branch)
+	}
+
+	return "file://" + bareDir
+}
+
+// relPath returns target relative to base and fails the test on error.
+func relPath(t testing.TB, base, target string) string {
+	t.Helper()
+	rel, err := filepath.Rel(base, target)
+	require.NoError(t, err)
+	return rel
+}

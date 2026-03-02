@@ -37,6 +37,24 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 		return nil, fmt.Errorf("parsing config %s: %w", configPath, err)
 	}
 
+	ensureWorkspaceMaps(cfg)
+
+	if err := validateWorktreePaths(configPath, cfg); err != nil {
+		return nil, err
+	}
+
+	if err := synthesizeWorktreeTargets(cfg); err != nil {
+		return nil, err
+	}
+
+	if err := validateRepoPaths(configPath, cfg); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+func ensureWorkspaceMaps(cfg *WorkspaceConfig) {
 	if cfg.Repos == nil {
 		cfg.Repos = make(map[string]RepoConfig)
 	}
@@ -45,11 +63,9 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 		cfg.Groups = make(map[string]GroupConfig)
 	}
 
-	if err := validateRepoPaths(configPath, cfg); err != nil {
-		return nil, err
+	if cfg.Worktrees == nil {
+		cfg.Worktrees = make(map[string]WorktreeConfig)
 	}
-
-	return cfg, nil
 }
 
 func mergeLocalConfig(cfg *WorkspaceConfig, localPath string) error {
@@ -82,15 +98,20 @@ func Save(configPath string, cfg *WorkspaceConfig) error {
 	}
 
 	type diskConfig struct {
-		Workspace WorkspaceMeta          `toml:"workspace"`
-		Repos     map[string]RepoConfig  `toml:"repos,omitempty"`
-		Groups    map[string]GroupConfig `toml:"groups,omitempty"`
+		Workspace WorkspaceMeta             `toml:"workspace"`
+		Repos     map[string]RepoConfig     `toml:"repos,omitempty"`
+		Groups    map[string]GroupConfig    `toml:"groups,omitempty"`
+		Worktrees map[string]WorktreeConfig `toml:"worktrees,omitempty"`
 	}
+
+	repos := withoutSynthesizedRepos(cfg.Repos, cfg.Worktrees)
+	groups := withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees)
 
 	data, err := toml.Marshal(diskConfig{
 		Workspace: cfg.Workspace,
-		Repos:     cfg.Repos,
-		Groups:    cfg.Groups,
+		Repos:     repos,
+		Groups:    groups,
+		Worktrees: cfg.Worktrees,
 	})
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
@@ -138,14 +159,10 @@ func createTempFile(dir string, data []byte) (string, error) {
 }
 
 func writeSyncClose(f *os.File, data []byte) (err error) {
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
+	defer closeWithError(f, &err)
 
-	if _, err := f.Write(data); err != nil {
-		return fmt.Errorf("writing temp file: %w", err)
+	if err := writeTempFileData(f, data); err != nil {
+		return err
 	}
 
 	if err := f.Chmod(0o600); err != nil {
@@ -154,6 +171,20 @@ func writeSyncClose(f *os.File, data []byte) (err error) {
 
 	if err := f.Sync(); err != nil {
 		return fmt.Errorf("syncing temp file: %w", err)
+	}
+
+	return nil
+}
+
+func closeWithError(f *os.File, err *error) {
+	if closeErr := f.Close(); closeErr != nil && *err == nil {
+		*err = closeErr
+	}
+}
+
+func writeTempFileData(f *os.File, data []byte) error {
+	if _, err := f.Write(data); err != nil {
+		return fmt.Errorf("writing temp file: %w", err)
 	}
 
 	return nil
@@ -179,6 +210,18 @@ func validateRepoPaths(cfgPath string, cfg *WorkspaceConfig) error {
 		}
 	}
 
+	return nil
+}
+
+func validateWorktreePaths(cfgPath string, cfg *WorkspaceConfig) error {
+	for name, wt := range cfg.Worktrees {
+		if wt.BarePath == "" {
+			continue // empty is allowed; will produce clear error at operation time
+		}
+		if _, err := ResolveRepoPath(cfgPath, wt.BarePath); err != nil {
+			return fmt.Errorf("invalid bare_path for worktree set %q: %w", name, err)
+		}
+	}
 	return nil
 }
 
@@ -271,4 +314,84 @@ func LoadConfig(cmd *cobra.Command) (*WorkspaceConfig, string, error) {
 	}
 
 	return LoadCWD(override)
+}
+
+func synthesizeWorktreeTargets(cfg *WorkspaceConfig) error {
+	for _, setName := range SortedStringKeys(cfg.Worktrees) {
+		if err := synthesizeWorktreeSet(cfg, setName); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func synthesizeWorktreeSet(cfg *WorkspaceConfig, setName string) error {
+	setCfg := cfg.Worktrees[setName]
+	if setCfg.Branches == nil {
+		setCfg.Branches = make(map[string]string)
+		cfg.Worktrees[setName] = setCfg
+	}
+
+	if _, exists := cfg.Groups[setName]; exists {
+		return fmt.Errorf("worktree set %q conflicts with existing group %q", setName, setName)
+	}
+
+	repoNames, err := synthesizeWorktreeRepos(cfg, setName, setCfg)
+	if err != nil {
+		return err
+	}
+
+	cfg.Groups[setName] = GroupConfig{Repos: repoNames}
+	return nil
+}
+
+func synthesizeWorktreeRepos(cfg *WorkspaceConfig, setName string, setCfg WorktreeConfig) ([]string, error) {
+	repoNames := make([]string, 0, len(setCfg.Branches))
+
+	for _, branch := range SortedWorktreeBranchNames(setCfg.Branches) {
+		repoName := WorktreeRepoName(setName, branch)
+		if _, exists := cfg.Repos[repoName]; exists {
+			return nil, fmt.Errorf("worktree branch %q in set %q conflicts with existing repo %q", branch, setName, repoName)
+		}
+
+		cfg.Repos[repoName] = RepoConfig{
+			Path: setCfg.Branches[branch],
+			URL:  setCfg.URL,
+		}
+		repoNames = append(repoNames, repoName)
+	}
+
+	return repoNames, nil
+}
+
+func withoutSynthesizedRepos(repos map[string]RepoConfig, worktrees map[string]WorktreeConfig) map[string]RepoConfig {
+	synth := make(map[string]struct{})
+	for setName, wt := range worktrees {
+		for branch := range wt.Branches {
+			synth[WorktreeRepoName(setName, branch)] = struct{}{}
+		}
+	}
+
+	result := make(map[string]RepoConfig)
+	for name, rc := range repos {
+		if _, isSynth := synth[name]; isSynth {
+			continue
+		}
+		result[name] = rc
+	}
+
+	return result
+}
+
+func withoutSynthesizedGroups(groups map[string]GroupConfig, worktrees map[string]WorktreeConfig) map[string]GroupConfig {
+	result := make(map[string]GroupConfig)
+	for name, group := range groups {
+		if _, isWorktreeSet := worktrees[name]; isWorktreeSet {
+			continue
+		}
+		result[name] = group
+	}
+
+	return result
 }

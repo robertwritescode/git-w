@@ -3,13 +3,12 @@ package repo_test
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type RestoreSuite struct {
@@ -17,12 +16,14 @@ type RestoreSuite struct {
 }
 
 func (s *RestoreSuite) SetupTest() {
-	s.SetRoot(repo.Register)
+	s.CmdSuite.SetupTest()
 	s.SetupWorkspaceDir()
 }
 
 func TestRestoreSuite(t *testing.T) {
-	suite.Run(t, new(RestoreSuite))
+	s := new(RestoreSuite)
+	s.InitRoot(repo.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *RestoreSuite) TestRestore() {
@@ -74,8 +75,7 @@ func (s *RestoreSuite) TestRestore() {
 
 			if tt.repoExists {
 				dest := filepath.Join(wsDir, "myrepo")
-				out, err := exec.Command("git", "clone", url, dest).CombinedOutput()
-				s.Require().NoError(err, "pre-clone: %s", out)
+				s.RunGit("", "clone", url, dest)
 			}
 
 			s.Require().NoError(os.WriteFile(
@@ -167,6 +167,118 @@ func (s *RestoreSuite) TestRestorePartialFailure() {
 	s.Assert().Contains(err.Error(), "1 of 2")
 
 	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "validrepo")))
+}
+
+func (s *RestoreSuite) TestRestore_WorktreeMaterializationPaths() {
+	wsDir := s.T().TempDir()
+	s.ChangeToDir(wsDir)
+
+	remoteURL := s.MakeRemoteWithBranches([]string{"dev", "test"})
+
+	bareRel := filepath.Join("infra", ".bare")
+	devRel := filepath.Join("infra", "dev")
+	testRel := filepath.Join("infra", "test")
+
+	toml := fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n", remoteURL, bareRel, devRel, testRel)
+	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
+
+	out, err := s.ExecuteCmd("restore")
+	s.Require().NoError(err)
+	s.Assert().Contains(out, "[infra]")
+
+	s.Assert().DirExists(filepath.Join(wsDir, "infra", ".bare"))
+	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "dev")))
+	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "test")))
+
+	_, err = os.Stat(filepath.Join(wsDir, ".gitignore"))
+	s.Require().NoError(err)
+}
+
+func (s *RestoreSuite) TestRestore_WorktreeExistingBareMissingOneTree() {
+	wsDir := s.T().TempDir()
+	s.ChangeToDir(wsDir)
+
+	remoteURL := s.MakeRemoteWithBranches([]string{"dev", "test"})
+
+	bareAbs := filepath.Join(wsDir, "infra", ".bare")
+	s.RunGit("", "clone", "--bare", remoteURL, bareAbs)
+
+	devAbs := filepath.Join(wsDir, "infra", "dev")
+	s.RunGit("", "-C", bareAbs, "worktree", "add", devAbs, "dev")
+
+	// Create a marker file and commit it so the pull path has something new.
+	s.Require().NoError(os.WriteFile(filepath.Join(devAbs, "marker.txt"), []byte("before-restore\n"), 0o644))
+	s.RunGit(devAbs, "add", ".")
+	s.RunGit(devAbs, "commit", "-m", "marker commit")
+
+	toml := fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n", remoteURL, filepath.Join("infra", ".bare"), filepath.Join("infra", "dev"), filepath.Join("infra", "test"))
+	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
+
+	out, err := s.ExecuteCmd("restore")
+	s.Require().NoError(err)
+	s.Assert().Contains(out, "pulled 1", "existing dev worktree should have been pulled")
+	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "dev")))
+	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "test")))
+}
+
+func (s *RestoreSuite) TestRestore_MixedWorkspace() {
+	wsDir := s.T().TempDir()
+	s.ChangeToDir(wsDir)
+
+	// Regular repo remote.
+	repoSource := s.MakeGitRepo("")
+	repoURL := "file://" + repoSource
+
+	// Worktree remote with dev and test branches.
+	wtURL := s.MakeRemoteWithBranches([]string{"dev", "test"})
+
+	toml := fmt.Sprintf(
+		"[workspace]\nname = \"testws\"\n\n"+
+			"[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n\n"+
+			"[worktrees.infra]\nurl = %q\nbare_path = %q\n\n"+
+			"[worktrees.infra.branches]\ndev = %q\ntest = %q\n",
+		repoURL,
+		wtURL,
+		filepath.Join("infra", ".bare"),
+		filepath.Join("infra", "dev"),
+		filepath.Join("infra", "test"),
+	)
+	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
+
+	out, err := s.ExecuteCmd("restore")
+	s.Require().NoError(err)
+
+	// Each logical entry must appear exactly once.
+	s.Assert().Equal(1, strings.Count(out, "[myrepo]"), "expected exactly one [myrepo] line in output")
+	s.Assert().Equal(1, strings.Count(out, "[infra]"), "expected exactly one [infra] line in output")
+
+	// Synthesized repo names must NOT appear as separate restore targets.
+	s.Assert().False(strings.Contains(out, "[infra-dev]"), "output must not contain synthesized [infra-dev]")
+	s.Assert().False(strings.Contains(out, "[infra-test]"), "output must not contain synthesized [infra-test]")
+
+	// Regular repo cloned correctly.
+	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "myrepo")))
+
+	// Worktree branches materialized correctly.
+	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "dev")))
+	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "test")))
+}
+
+func (s *RestoreSuite) TestRestore_WorktreeNoURL() {
+	wsDir := s.T().TempDir()
+	s.ChangeToDir(wsDir)
+
+	toml := "[workspace]\nname = \"testws\"\n\n" +
+		"[worktrees.infra]\n" +
+		"bare_path = \"infra/.bare\"\n\n" +
+		"[worktrees.infra.branches]\n" +
+		"dev = \"infra/dev\"\n"
+	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
+
+	out, err := s.ExecuteCmd("restore")
+	s.Require().NoError(err)
+	s.Assert().Contains(out, "skipped")
+	s.Assert().Contains(out, "[infra]")
 }
 
 func buildRestoreConfig(url string, hasURL bool) string {

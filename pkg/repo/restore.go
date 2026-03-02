@@ -2,15 +2,15 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"os/signal"
-	"slices"
 	"syscall"
 	"time"
 
 	"github.com/robertwritescode/git-w/pkg/gitutil"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/parallel"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
@@ -18,16 +18,18 @@ import (
 
 // restoreInput pairs a repo name with its config for fan-out processing.
 type restoreInput struct {
-	Name string
-	RC   workspace.RepoConfig
+	Name     string
+	Repo     *workspace.RepoConfig
+	Worktree *workspace.WorktreeConfig
+	RelPaths []string
 }
 
 // restoreResult captures the outcome of restoring a single repo.
 type restoreResult struct {
-	Name    string
-	RelPath string
-	Msg     string
-	Err     error
+	Name     string
+	RelPaths []string
+	Msg      string
+	Err      error
 }
 
 func registerRestore(root *cobra.Command) {
@@ -58,31 +60,62 @@ func restoreAll(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath stri
 	cfgDir := workspace.ConfigDir(cfgPath)
 	gitignore := cfg.AutoGitignoreEnabled()
 
-	// Cancel all in-flight clones/pulls on SIGINT or SIGTERM.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := newRestoreContext(timeout)
 	defer stop()
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
 
 	inputs := buildRestoreInputs(cfg)
 	workers := parallel.MaxWorkers(jobs, len(inputs))
 
 	results := parallel.RunFanOut(inputs, workers, func(in restoreInput) restoreResult {
-		msg, err := processRestore(ctx, cfgPath, in.RC)
-		return restoreResult{Name: in.Name, RelPath: in.RC.Path, Msg: msg, Err: err}
+		msg, err := processRestore(ctx, cfgPath, in)
+		return restoreResult{Name: in.Name, RelPaths: in.RelPaths, Msg: msg, Err: err}
 	})
 
 	return reportRestoreResults(cmd, results, cfgDir, gitignore)
 }
 
-func buildRestoreInputs(cfg *workspace.WorkspaceConfig) []restoreInput {
-	inputs := make([]restoreInput, 0, len(cfg.Repos))
+func newRestoreContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	if timeout <= 0 {
+		return ctx, stop
+	}
 
-	for _, name := range slices.Sorted(maps.Keys(cfg.Repos)) {
-		inputs = append(inputs, restoreInput{Name: name, RC: cfg.Repos[name]})
+	ctxWithTimeout, cancelTimeout := context.WithTimeout(ctx, timeout)
+	return ctxWithTimeout, func() {
+		cancelTimeout()
+		stop()
+	}
+}
+
+func buildRestoreInputs(cfg *workspace.WorkspaceConfig) []restoreInput {
+	inputs := make([]restoreInput, 0, len(cfg.Repos)+len(cfg.Worktrees))
+
+	synthNames := make(map[string]struct{})
+	for setName, wt := range cfg.Worktrees {
+		for branch := range wt.Branches {
+			synthNames[workspace.WorktreeRepoName(setName, branch)] = struct{}{}
+		}
+	}
+	for _, name := range workspace.SortedStringKeys(cfg.Repos) {
+		if _, isSynth := synthNames[name]; isSynth {
+			continue
+		}
+		rc := cfg.Repos[name]
+		inputs = append(inputs, restoreInput{Name: name, Repo: &rc, RelPaths: []string{rc.Path}})
+	}
+
+	for _, setName := range workspace.SortedStringKeys(cfg.Worktrees) {
+		wt := cfg.Worktrees[setName]
+		relPaths := make([]string, 0, len(wt.Branches))
+		for _, branch := range workspace.SortedStringKeys(wt.Branches) {
+			relPaths = append(relPaths, wt.Branches[branch])
+		}
+
+		inputs = append(inputs, restoreInput{
+			Name:     setName,
+			Worktree: &wt,
+			RelPaths: relPaths,
+		})
 	}
 
 	return inputs
@@ -92,24 +125,51 @@ func reportRestoreResults(cmd *cobra.Command, results []restoreResult, cfgDir st
 	var failures []string
 	for _, r := range results {
 		if r.Err != nil {
+			reportRestoreError(cmd, r)
 			failures = append(failures, fmt.Sprintf("  [%s]: %v", r.Name, r.Err))
-			writef(cmd.ErrOrStderr(), "[%s] error: %v\n", r.Name, r.Err)
 			continue
 		}
 
-		writef(cmd.OutOrStdout(), "[%s] %s\n", r.Name, r.Msg)
-
-		if gitignore {
-			if giErr := gitutil.EnsureGitignore(cfgDir, r.RelPath); giErr != nil {
-				writef(cmd.ErrOrStderr(), "[%s] warning: .gitignore: %v\n", r.Name, giErr)
-			}
-		}
+		reportRestoreSuccess(cmd, r)
+		applyRestoreGitignore(cmd, cfgDir, gitignore, r)
 	}
 
 	return parallel.FormatFailureError(failures, len(results))
 }
 
-func processRestore(ctx context.Context, cfgPath string, rc workspace.RepoConfig) (string, error) {
+func reportRestoreError(cmd *cobra.Command, r restoreResult) {
+	output.Writef(cmd.ErrOrStderr(), "[%s] error: %v\n", r.Name, r.Err)
+}
+
+func reportRestoreSuccess(cmd *cobra.Command, r restoreResult) {
+	output.Writef(cmd.OutOrStdout(), "[%s] %s\n", r.Name, r.Msg)
+}
+
+func applyRestoreGitignore(cmd *cobra.Command, cfgDir string, gitignore bool, r restoreResult) {
+	if !gitignore {
+		return
+	}
+
+	for _, relPath := range r.RelPaths {
+		if giErr := gitutil.EnsureGitignore(cfgDir, relPath); giErr != nil {
+			output.Writef(cmd.ErrOrStderr(), "[%s] warning: .gitignore (%s): %v\n", r.Name, relPath, giErr)
+		}
+	}
+}
+
+func processRestore(ctx context.Context, cfgPath string, in restoreInput) (string, error) {
+	if in.Repo != nil {
+		return processRepoRestore(ctx, cfgPath, *in.Repo)
+	}
+
+	if in.Worktree != nil {
+		return processWorktreeRestore(ctx, cfgPath, *in.Worktree)
+	}
+
+	return "", fmt.Errorf("invalid restore input")
+}
+
+func processRepoRestore(ctx context.Context, cfgPath string, rc workspace.RepoConfig) (string, error) {
 	absPath, err := workspace.ResolveRepoPath(cfgPath, rc.Path)
 	if err != nil {
 		return "", err
@@ -132,4 +192,89 @@ func restoreRepo(ctx context.Context, rc workspace.RepoConfig, absPath string) (
 	}
 
 	return "cloned", nil
+}
+
+func processWorktreeRestore(ctx context.Context, cfgPath string, wt workspace.WorktreeConfig) (string, error) {
+	bareAbsPath, err := workspace.ResolveRepoPath(cfgPath, wt.BarePath)
+	if err != nil {
+		return "", err
+	}
+
+	skipped, err := ensureBareForWorktree(ctx, wt, bareAbsPath)
+	if err != nil {
+		return "", err
+	}
+	if skipped {
+		return "skipped: no URL configured", nil
+	}
+
+	added, pulled, err := restoreWorktreeBranches(ctx, cfgPath, bareAbsPath, wt)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("worktrees: added %d, pulled %d", added, pulled), nil
+}
+
+// restoreWorktreeBranches restores branches sequentially within a single
+// worktree set. Inter-set parallelism is handled by the RunFanOut caller.
+// Intra-set parallelism is not needed for typical 2-5 branches per set.
+func restoreWorktreeBranches(ctx context.Context, cfgPath, bareAbsPath string, wt workspace.WorktreeConfig) (int, int, error) {
+	added := 0
+	pulled := 0
+
+	for _, branch := range workspace.SortedStringKeys(wt.Branches) {
+		addedOne, pulledOne, err := restoreWorktreeBranch(ctx, cfgPath, bareAbsPath, branch, wt.Branches[branch])
+		if err != nil {
+			return 0, 0, err
+		}
+
+		if addedOne {
+			added++
+		}
+
+		if pulledOne {
+			pulled++
+		}
+	}
+
+	return added, pulled, nil
+}
+
+func ensureBareForWorktree(ctx context.Context, wt workspace.WorktreeConfig, bareAbsPath string) (bool, error) {
+	if _, err := os.Stat(bareAbsPath); err == nil {
+		return false, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+
+	if wt.URL == "" {
+		return true, nil
+	}
+
+	if err := gitutil.CloneBare(ctx, wt.URL, bareAbsPath); err != nil {
+		return false, err
+	}
+
+	return false, nil
+}
+
+func restoreWorktreeBranch(ctx context.Context, cfgPath, bareAbsPath, branch, branchPath string) (bool, bool, error) {
+	absPath, err := workspace.ResolveRepoPath(cfgPath, branchPath)
+	if err != nil {
+		return false, false, err
+	}
+
+	if IsGitRepo(absPath) {
+		if _, err := gitutil.Pull(ctx, absPath); err != nil {
+			return false, false, err
+		}
+		return false, true, nil
+	}
+
+	if err := gitutil.AddWorktree(ctx, bareAbsPath, absPath, branch); err != nil {
+		return false, false, err
+	}
+
+	return true, false, nil
 }

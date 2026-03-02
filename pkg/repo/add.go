@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/gitutil"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
@@ -84,7 +85,7 @@ func runAddSingle(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, p
 		return err
 	}
 
-	writef(cmd.OutOrStdout(), "Added repo %q (%s)\n", name, relPath)
+	output.Writef(cmd.OutOrStdout(), "Added repo %q (%s)\n", name, relPath)
 	return nil
 }
 
@@ -105,7 +106,7 @@ func runAddRecursive(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath
 		return err
 	}
 
-	writef(cmd.OutOrStdout(), "Added %d repo(s)\n", count)
+	output.Writef(cmd.OutOrStdout(), "Added %d repo(s)\n", count)
 	return nil
 }
 
@@ -115,7 +116,7 @@ func registerDiscoveredRepos(cmd *cobra.Command, cfg *workspace.WorkspaceConfig,
 		groupName := effectiveGroupName(group, p, walkDir)
 		ok, err := registerSingleRepo(cmd, cfg, cfgPath, p, groupName)
 		if err != nil {
-			writef(cmd.ErrOrStderr(), "warning: skipping %s: %v\n", p, err)
+			output.Writef(cmd.ErrOrStderr(), "warning: skipping %s: %v\n", p, err)
 			continue
 		}
 
@@ -218,7 +219,7 @@ func registerSingleRepo(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgP
 func applyMeta(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, relPath, repoName, groupName string) {
 	if cfg.AutoGitignoreEnabled() {
 		if err := gitutil.EnsureGitignore(workspace.ConfigDir(cfgPath), relPath); err != nil {
-			writef(cmd.ErrOrStderr(), "warning: could not update .gitignore: %v\n", err)
+			output.Writef(cmd.ErrOrStderr(), "warning: could not update .gitignore: %v\n", err)
 		}
 	}
 

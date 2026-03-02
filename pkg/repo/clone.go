@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/gitutil"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
@@ -46,7 +47,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	writef(cmd.OutOrStdout(), "Cloned %q (%s)\n", name, relPath)
+	output.Writef(cmd.OutOrStdout(), "Cloned %q (%s)\n", name, relPath)
 	return nil
 }
 

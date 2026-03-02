@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type StatusSuite struct {
@@ -12,7 +11,7 @@ type StatusSuite struct {
 }
 
 func TestStatusSuite(t *testing.T) {
-	suite.Run(t, new(StatusSuite))
+	testutil.RunSuite(t, new(StatusSuite))
 }
 
 func (s *StatusSuite) TestParsePorcelainV1() {

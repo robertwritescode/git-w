@@ -3,6 +3,7 @@ package repo
 import (
 	"fmt"
 
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +34,7 @@ func runRename(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	writef(cmd.OutOrStdout(), "Renamed repo %q → %q\nNOTE: Only the workspace key was renamed. The repo directory on disk has not moved.\n", oldName, newName)
+	output.Writef(cmd.OutOrStdout(), "Renamed repo %q → %q\nNOTE: Only the workspace key was renamed. The repo directory on disk has not moved.\n", oldName, newName)
 	return nil
 }
 

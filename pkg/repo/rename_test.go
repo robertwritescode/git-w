@@ -8,7 +8,6 @@ import (
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type RenameSuite struct {
@@ -17,12 +16,14 @@ type RenameSuite struct {
 }
 
 func (s *RenameSuite) SetupTest() {
-	s.SetRoot(repo.Register)
+	s.CmdSuite.SetupTest()
 	s.wsDir = s.SetupWorkspaceDir()
 }
 
 func TestRenameSuite(t *testing.T) {
-	suite.Run(t, new(RenameSuite))
+	s := new(RenameSuite)
+	s.InitRoot(repo.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *RenameSuite) TestRename() {

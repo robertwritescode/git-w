@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type CompletionSuite struct {
@@ -13,12 +12,14 @@ type CompletionSuite struct {
 }
 
 func (s *CompletionSuite) SetupTest() {
-	s.SetRoot(registerCompletion)
+	s.CmdSuite.SetupTest()
 	s.wsDir = s.SetupWorkspaceDir()
 }
 
 func TestCompletionSuite(t *testing.T) {
-	suite.Run(t, new(CompletionSuite))
+	s := new(CompletionSuite)
+	s.InitRoot(registerCompletion)
+	testutil.RunSuite(t, s)
 }
 
 func (s *CompletionSuite) TestCompletion() {

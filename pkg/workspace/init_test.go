@@ -8,7 +8,6 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type InitSuite struct {
@@ -16,12 +15,14 @@ type InitSuite struct {
 }
 
 func (s *InitSuite) SetupTest() {
-	s.SetRoot(workspace.Register)
+	s.CmdSuite.SetupTest()
 	s.ChangeToDir(s.T().TempDir())
 }
 
 func TestInitSuite(t *testing.T) {
-	suite.Run(t, new(InitSuite))
+	s := new(InitSuite)
+	s.InitRoot(workspace.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *InitSuite) TestWorkspaceCreation() {

@@ -34,14 +34,16 @@
 
 ## pkg/ Domain Layout
 ```
-pkg/cmd/             — root cobra cmd, Execute(), completion (wires 3 domain Register funcs)
+pkg/cmd/             — root cobra cmd, Execute(), completion (wires 4 domain Register funcs)
 pkg/workspace/       — config types, loader, discovery, init/context/group commands
 pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands
 pkg/git/             — executor, result, fetch/pull/push/status/exec/info commands
-pkg/gitutil/         — low-level git subprocess wrappers (Clone, RemoteURL, EnsureGitignore)
+pkg/worktree/        — worktree set commands: clone/add/rm/drop/list; safety checks
+pkg/gitutil/         — low-level git subprocess wrappers (Clone, CloneBare, AddWorktree, RemoveWorktree, FetchBare, EnsureGitignore)
 pkg/parallel/        — generic concurrency primitives (RunFanOut, MaxWorkers, FormatFailureError)
 pkg/display/         — terminal output formatting (RenderTable, ANSI colors)
-pkg/testutil/        — shared test infrastructure (CmdSuite, MakeGitRepo, etc.)
+pkg/output/          — standardized command output helpers
+pkg/testutil/        — shared test infrastructure (CmdSuite, MakeGitRepo, MakeBareGitRepo, AddWorktreeToRepo, etc.)
 ```
 
 Dependency graph (cycle-free):
@@ -50,6 +52,8 @@ workspace  → gitutil
 repo       → workspace, gitutil
 display    → repo
 git        → repo, workspace, display, parallel
+worktree   → workspace, repo, gitutil, parallel
+output     → (none)
 gitutil    → (none)
 parallel   → (none)
 testutil   → (none)
