@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 

@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	gitpkg "github.com/robertwritescode/git-w/pkg/git"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/config"
 )
 
 type InfoSuite struct {

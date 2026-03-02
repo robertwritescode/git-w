@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/config"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/spf13/cobra"
 )
 

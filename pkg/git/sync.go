@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/parallel"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 

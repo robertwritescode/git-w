@@ -1,8 +1,8 @@
 package git
 
 import (
-	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/config"
+	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/spf13/cobra"
 )
 

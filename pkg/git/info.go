@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/display"
 	"github.com/robertwritescode/git-w/pkg/parallel"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/spf13/cobra"
 )
 
