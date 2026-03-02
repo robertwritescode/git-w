@@ -2,7 +2,9 @@ package worktree_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/repo"
@@ -33,6 +35,21 @@ func (s *WorktreeCloneSuite) TestCloneAndList() {
 
 	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "dev")))
 	s.Assert().True(repo.IsGitRepo(filepath.Join(wsDir, "infra", "test")))
+
+	for _, branch := range []string{"dev", "test"} {
+		dir := filepath.Join(wsDir, "infra", branch)
+		cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+		cmd.Dir = dir
+		out, cmdErr := cmd.CombinedOutput()
+		s.Require().NoError(cmdErr, string(out))
+		s.Assert().Equal("origin/"+branch, strings.TrimSpace(string(out)))
+	}
+
+	gitignoreData, readErr := os.ReadFile(filepath.Join(wsDir, ".gitignore"))
+	s.Require().NoError(readErr)
+	s.Assert().Contains(string(gitignoreData), "infra/.bare")
+	s.Assert().Contains(string(gitignoreData), "infra/dev")
+	s.Assert().Contains(string(gitignoreData), "infra/test")
 
 	listOut, err := s.ExecuteCmd("worktree", "list")
 	s.Require().NoError(err)

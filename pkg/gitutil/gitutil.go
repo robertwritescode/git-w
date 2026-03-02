@@ -57,11 +57,35 @@ func CloneBare(ctx context.Context, url, dest string) error {
 	return nil
 }
 
+// ConfigureBareOriginTracking ensures origin fetches branch heads into
+// refs/remotes/origin/* and fetches the latest refs.
+func ConfigureBareOriginTracking(ctx context.Context, barePath string) error {
+	if out, err := exec.CommandContext(ctx, "git", "-C", barePath, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*").CombinedOutput(); err != nil {
+		return fmt.Errorf("git config remote.origin.fetch: %w\n%s", err, out)
+	}
+
+	if out, err := exec.CommandContext(ctx, "git", "-C", barePath, "fetch", "origin").CombinedOutput(); err != nil {
+		return fmt.Errorf("git fetch origin: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
 // AddWorktree runs `git -C <barePath> worktree add <treePath> <branch>` with context support for cancellation.
 func AddWorktree(ctx context.Context, barePath, treePath, branch string) error {
 	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "worktree", "add", treePath, branch).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree add: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// SetBranchTrackingToOrigin sets branch upstream to origin/<branch> in treePath.
+func SetBranchTrackingToOrigin(ctx context.Context, treePath, branch string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", treePath, "branch", "--set-upstream-to=origin/"+branch, branch).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git branch --set-upstream-to: %w\n%s", err, out)
 	}
 
 	return nil

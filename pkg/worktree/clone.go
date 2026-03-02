@@ -87,6 +87,8 @@ func executeCloneOperation(cmd *cobra.Command, cfgPath string, gitignore bool, o
 		return err
 	}
 
+	writeGitignoreWarning(cmd, cfgPath, op.wt.BarePath, gitignore)
+
 	return nil
 }
 
@@ -150,6 +152,10 @@ func createWorktreeSet(url, baseAbs, bareAbs string) error {
 		return err
 	}
 
+	if err := gitutil.ConfigureBareOriginTracking(context.Background(), bareAbs); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -168,12 +174,18 @@ func initWorktreeConfig(cfgPath, url, bareAbs string) (workspace.WorktreeConfig,
 
 func addCloneBranches(cmd *cobra.Command, cfgPath string, gitignore bool, wt *workspace.WorktreeConfig, bareAbs, baseAbs string, branches []string) error {
 	for _, branch := range branches {
-		relPath, err := addBranchWorktree(cfgPath, bareAbs, filepath.Join(baseAbs, branch), branch)
+		branchAbs := filepath.Join(baseAbs, branch)
+		relPath, err := addBranchWorktree(cfgPath, bareAbs, branchAbs, branch)
 		if err != nil {
 			return err
 		}
 
 		wt.Branches[branch] = relPath
+
+		if err := gitutil.SetBranchTrackingToOrigin(context.Background(), branchAbs, branch); err != nil {
+			return err
+		}
+
 		writeGitignoreWarning(cmd, cfgPath, relPath, gitignore)
 	}
 
