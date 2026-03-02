@@ -260,6 +260,27 @@ mage
 mage cover
 ```
 
+## Release pipeline (maintainers)
+
+Releases are automated from `.github/workflows/release.yml` using Release Please + GoReleaser on pushes to `main`.
+
+Required repository secret:
+
+- `TAP_GITHUB_TOKEN` — a PAT with access to `robertwritescode/homebrew-tap` (at minimum, Contents: Read and write) so GoReleaser can update the tap cask.
+
+Required repository setting:
+
+- In GitHub, go to **Settings → Actions → General** and enable **Allow GitHub Actions to create and approve pull requests** (required for Release Please PR automation).
+
+Release trigger:
+
+- To publish a release, merge the open Release Please PR (for example, `chore(main): release 1.2.3`) into `main`; this is what creates the tag and runs the GoReleaser job.
+- To postpone/cancel a pending release, close that Release Please PR without merging and remove its `autorelease: pending` label; Release Please will open or update a new one after subsequent conventional commits land on `main`.
+
+Troubleshooting:
+
+- If the release job fails with `resource not accessible by integration`, the token used for the target repo is missing required permissions; verify `TAP_GITHUB_TOKEN` can write contents to `robertwritescode/homebrew-tap`.
+
 ## Similar projects & inspiration
 
 `git-w` was directly inspired by [gita](https://github.com/nosarthur/gita), a Python tool for managing multiple git repos side-by-side. `gita` introduced the core ideas of grouping repos and running git commands across them in parallel — `git-w` extends these ideas with a portable, single-binary implementation and a richer feature set.

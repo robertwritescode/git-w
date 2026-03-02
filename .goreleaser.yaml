@@ -30,7 +30,7 @@ checksum:
   name_template: "checksums.txt"
 
 release:
-  mode: replace
+  mode: keep-existing
 
 changelog:
   disable: true
