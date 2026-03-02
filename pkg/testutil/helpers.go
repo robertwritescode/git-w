@@ -11,6 +11,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func withTestGitIdentity(cmd *exec.Cmd) {
+	env := os.Environ()
+	env = append(env,
+		"GIT_AUTHOR_NAME=Test User",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test User",
+		"GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	cmd.Env = env
+}
+
 // makeGitRepo creates an initialized git repo with an initial commit in a new temp dir.
 // If remoteURL is non-empty, it is added as the "origin" remote. Returns the absolute path.
 func makeGitRepo(t testing.TB, remoteURL string) string {
@@ -191,6 +202,7 @@ func addWorktreeToRepo(t testing.TB, barePath, treePath, branch string) {
 func RunGit(t testing.TB, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
+	withTestGitIdentity(cmd)
 	if dir != "" {
 		cmd.Dir = dir
 	}
