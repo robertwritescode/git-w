@@ -142,6 +142,12 @@ func collectDropViolations(cfgPath, setName string, wt workspace.WorktreeConfig)
 			return nil, err
 		}
 
+		if _, statErr := os.Stat(absPath); errors.Is(statErr, os.ErrNotExist) {
+			continue
+		} else if statErr != nil {
+			return nil, statErr
+		}
+
 		r := repo.Repo{Name: workspace.WorktreeRepoName(setName, branch), AbsPath: absPath}
 		msgs, err := safetyViolations(r)
 		if err != nil {

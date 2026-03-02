@@ -60,6 +60,10 @@ func prepareCloneOperation(cfg *workspace.WorkspaceConfig, cfgPath string, args 
 		return cloneOperation{}, err
 	}
 
+	if err := validateCloneBasePath(cfgPath, baseAbs); err != nil {
+		return cloneOperation{}, err
+	}
+
 	if err := ensureCloneTarget(cfg, setName, baseAbs); err != nil {
 		return cloneOperation{}, err
 	}
@@ -107,6 +111,19 @@ func parseCloneArgs(args []string) (string, string, string, error) {
 	}
 
 	return url, baseAbs, filepath.Base(baseAbs), nil
+}
+
+func validateCloneBasePath(cfgPath, baseAbs string) error {
+	baseRel, err := workspace.RelPath(cfgPath, baseAbs)
+	if err != nil {
+		return err
+	}
+
+	if _, err := workspace.ResolveRepoPath(cfgPath, baseRel); err != nil {
+		return fmt.Errorf("base path must be inside workspace root")
+	}
+
+	return nil
 }
 
 func ensureCloneTarget(cfg *workspace.WorkspaceConfig, setName, baseAbs string) error {

@@ -19,8 +19,9 @@ import (
 // restoreInput pairs a repo name with its config for fan-out processing.
 type restoreInput struct {
 	Name     string
-	Repo     *workspace.RepoConfig
-	Worktree *workspace.WorktreeConfig
+	Repo     workspace.RepoConfig
+	Worktree workspace.WorktreeConfig
+	IsRepo   bool
 	RelPaths []string
 }
 
@@ -101,7 +102,7 @@ func buildRestoreInputs(cfg *workspace.WorkspaceConfig) []restoreInput {
 			continue
 		}
 		rc := cfg.Repos[name]
-		inputs = append(inputs, restoreInput{Name: name, Repo: &rc, RelPaths: []string{rc.Path}})
+		inputs = append(inputs, restoreInput{Name: name, Repo: rc, IsRepo: true, RelPaths: []string{rc.Path}})
 	}
 
 	for _, setName := range workspace.SortedStringKeys(cfg.Worktrees) {
@@ -113,7 +114,7 @@ func buildRestoreInputs(cfg *workspace.WorkspaceConfig) []restoreInput {
 
 		inputs = append(inputs, restoreInput{
 			Name:     setName,
-			Worktree: &wt,
+			Worktree: wt,
 			RelPaths: relPaths,
 		})
 	}
@@ -158,12 +159,12 @@ func applyRestoreGitignore(cmd *cobra.Command, cfgDir string, gitignore bool, r 
 }
 
 func processRestore(ctx context.Context, cfgPath string, in restoreInput) (string, error) {
-	if in.Repo != nil {
-		return processRepoRestore(ctx, cfgPath, *in.Repo)
+	if in.IsRepo {
+		return processRepoRestore(ctx, cfgPath, in.Repo)
 	}
 
-	if in.Worktree != nil {
-		return processWorktreeRestore(ctx, cfgPath, *in.Worktree)
+	if in.Worktree.BarePath != "" {
+		return processWorktreeRestore(ctx, cfgPath, in.Worktree)
 	}
 
 	return "", fmt.Errorf("invalid restore input")

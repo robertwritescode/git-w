@@ -68,12 +68,25 @@ func (s *WorktreeCloneSuite) TestCloneErrors() {
 			},
 			wantErr: "already exists",
 		},
+		{
+			name: "base path outside workspace",
+			prepare: func() string {
+				s.SetupWorkspaceDir()
+				return s.MakeRemoteWithBranches([]string{"dev"})
+			},
+			wantErr: "inside workspace root",
+		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			remoteURL := tt.prepare()
-			_, err := s.ExecuteCmd("worktree", "clone", remoteURL, "infra", "dev")
+			basePath := "infra"
+			if tt.name == "base path outside workspace" {
+				basePath = s.T().TempDir()
+			}
+
+			_, err := s.ExecuteCmd("worktree", "clone", remoteURL, basePath, "dev")
 			s.Require().Error(err)
 			s.Assert().Contains(err.Error(), tt.wantErr)
 		})

@@ -110,3 +110,19 @@ func (s *WorktreeDropSuite) TestDropSafetyMatrix() {
 		})
 	}
 }
+
+func (s *WorktreeDropSuite) TestDropSkipsMissingBranchPathInSafetyCheck() {
+	wsDir, _, err := setupClonedWorktreeSet(s.T(), s, "infra", []string{"dev", "test"}, []string{"dev", "test"})
+	s.Require().NoError(err)
+
+	s.Require().NoError(os.RemoveAll(filepath.Join(wsDir, "infra", "dev")))
+
+	_, err = s.ExecuteCmd("worktree", "drop", "infra")
+	s.Require().NoError(err)
+
+	cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	s.Require().NoError(loadErr)
+	_, exists := cfg.Worktrees["infra"]
+	s.Assert().False(exists)
+	s.Assert().NoDirExists(filepath.Join(wsDir, "infra", "test"))
+}
