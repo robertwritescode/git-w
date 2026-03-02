@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/robertwritescode/git-w/compare/v1.1.1...v1.1.2) (2026-03-02)
+
+
+### Bug Fixes
+
+* **release:** avoid duplicate GitHub auth header in tap cask autofix step ([eea4055](https://github.com/robertwritescode/git-w/commit/eea4055ad6f16ac1e3b733524d2e6a134020e4f5))
+
 ## [1.1.1](https://github.com/robertwritescode/git-w/compare/v1.1.0...v1.1.1) (2026-03-02)
 
 
