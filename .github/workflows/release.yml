@@ -57,3 +57,36 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cask: false
+          core: false
+
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: robertwritescode/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          ref: main
+          path: homebrew-tap
+
+      # Maintainer note: this post-GoReleaser cask normalization is documented in
+      # README.md -> "Release pipeline (maintainers)" -> "Troubleshooting".
+      - name: Auto-fix cask style and push
+        working-directory: homebrew-tap
+        run: |
+          brew style --fix Casks/git-w.rb
+
+          if git diff --quiet -- Casks/git-w.rb; then
+            echo "No cask style changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/git-w.rb
+          git commit -m "chore(cask): auto-fix style for ${{ needs.release-please.outputs.tag_name }}"
+          git push origin main

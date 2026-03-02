@@ -44,7 +44,7 @@ homebrew_casks:
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/robertwritescode/git-w"
-    description: "A Git plugin for managing meta-repo workspaces"
+    description: "Git plugin for managing meta-repo workspaces"
     hooks:
       post:
         install: |

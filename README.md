@@ -280,6 +280,7 @@ Release trigger:
 Troubleshooting:
 
 - If the release job fails with `resource not accessible by integration`, the token used for the target repo is missing required permissions; verify `TAP_GITHUB_TOKEN` can write contents to `robertwritescode/homebrew-tap`.
+- The release workflow runs `brew style --fix` on `Casks/git-w.rb` in `robertwritescode/homebrew-tap` after GoReleaser publishes the cask. This is intentional: current GoReleaser output can fail Homebrew's latest cask style cops, so CI auto-normalizes stanza ordering/format before final push.
 
 ## Similar projects & inspiration
 
