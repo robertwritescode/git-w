@@ -21,6 +21,7 @@ type WorkspaceConfig struct {
 type WorkspaceMeta struct {
 	Name          string `toml:"name"`
 	AutoGitignore *bool  `toml:"auto_gitignore"` // nil means true (default on)
+	SyncPush      *bool  `toml:"sync_push"`      // nil means true (default on)
 }
 
 // RepoConfig represents one tracked repository.
@@ -51,6 +52,11 @@ type ContextConfig struct {
 // AutoGitignoreEnabled reports whether auto-gitignore is on (nil means default true).
 func (c WorkspaceConfig) AutoGitignoreEnabled() bool {
 	return c.Workspace.AutoGitignore == nil || *c.Workspace.AutoGitignore
+}
+
+// SyncPushEnabled reports whether sync runs push by default (nil means true).
+func (c WorkspaceConfig) SyncPushEnabled() bool {
+	return c.Workspace.SyncPush == nil || *c.Workspace.SyncPush
 }
 
 // AddRepoToGroup appends name to the named group, creating the group if absent.

@@ -42,7 +42,7 @@ func registerGit(root *cobra.Command) {
 }
 
 func runFetch(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, repos, err := loadFetchInputs(cmd, args)
+	cfg, cfgPath, repos, err := loadInputs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func runFetch(cmd *cobra.Command, args []string) error {
 	return runGitCmd(cmd, args, "fetch")
 }
 
-func loadFetchInputs(cmd *cobra.Command, args []string) (*workspace.WorkspaceConfig, string, []repo.Repo, error) {
+func loadInputs(cmd *cobra.Command, args []string) (*workspace.WorkspaceConfig, string, []repo.Repo, error) {
 	cfg, cfgPath, err := workspace.LoadConfig(cmd)
 	if err != nil {
 		return nil, "", nil, err
