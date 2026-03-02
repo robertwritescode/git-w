@@ -29,7 +29,8 @@ It uses a config file that can be committed to version control to share your met
 
 - Declare and track multiple repos in a single `.gitw` config file (TOML)
 - Clone missing repos and pull existing ones with one `restore` command
-- Run `fetch`, `pull`, `push`, and `status` across all repos (or a filtered subset) in parallel
+- Run `fetch`, `pull`, `push`, `sync`, and `status` across all repos (or a filtered subset) in parallel
+- Sync an entire workspace in one command (`sync`): fetch → pull → push, in order, per repo
 - Execute any arbitrary git command across repos with `exec`
 - Organize repos into named groups
 - Set an active context to scope all commands to a group without specifying it each time
@@ -92,6 +93,7 @@ Example `.gitw`:
 [workspace]
 name = "my-workspace"
 # auto_gitignore = true  # default: automatically adds cloned repo paths to .gitignore
+# sync_push = true       # default: push is included in `git w sync`; set false to skip push on this machine
 
 [repos.repo-a]
 path = "repos/repo-a"
@@ -143,6 +145,7 @@ All git commands accept an optional list of repo names to filter targets. With n
 | `git w fetch [repos...]` | Run `git fetch` in repos. Alias: `f` |
 | `git w pull [repos...]` | Run `git pull` in repos. Alias: `pl` |
 | `git w push [repos...]` | Run `git push` in repos. Alias: `ps` |
+| `git w sync [repos...]` | Fetch, pull, and push in order. Stops per-repo on first failure. Alias: `s` |
 | `git w status [repos...]` | Run `git status -sb` in repos. Alias: `st` |
 | `git w exec [repos...] -- <git-args>` | Run any git command across repos concurrently. Output is prefixed with `[repo-name]`. Aliases: `x`, `run` |
 
@@ -154,6 +157,12 @@ git w fetch
 
 # Pull only two specific repos
 git w pull repo-a repo-b
+
+# Sync the entire workspace (fetch + pull + push)
+git w sync
+
+# Sync without pushing
+git w sync --no-push
 
 # Run an arbitrary git command across all repos
 git w exec -- log --oneline -5

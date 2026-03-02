@@ -24,6 +24,7 @@ Both files are TOML. The loader reads both and merges them; `.local` values take
 [workspace]
 name = "my-workspace"
 auto_gitignore = true       # Add repo paths to .gitignore on add/clone/restore (default: true)
+sync_push = true            # Push as part of `git w sync` (default: true; set false on read-only boxes)
 
 [repos.frontend]
 path = "apps/frontend"      # Relative to .gitw location
@@ -113,11 +114,12 @@ git-w/
     ├── git/                    # domain: cross-repo git execution and commands
     │   ├── executor.go         # RunParallel: goroutine pool using pkg/parallel
     │   ├── result.go           # ExecResult, WriteResults, ExecErrors
-    │   ├── register.go         # Register(root) → registerGit + registerExec + registerInfo
-    │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root)
+    │   ├── register.go         # Register(root) → registerGit + registerSync + registerExec + registerInfo
+    │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root); loadInputs helper
     │   ├── runner.go           # Shared runGitCmd helper for git subcommands
     │   ├── exec.go             # Execute arbitrary git commands across repos
     │   ├── info.go             # Status table for all or group repos (alias: ll)
+    │   ├── sync.go             # sync: fetch→pull→push pipeline per repo (alias: s); worktree-set aware
     │   └── *_test.go
     │
     ├── worktree/               # domain: git worktree set management commands
@@ -192,6 +194,7 @@ type WorktreeConfig struct {
 
 // Methods on WorkspaceConfig:
 func (c WorkspaceConfig) AutoGitignoreEnabled() bool  // nil → true
+func (c WorkspaceConfig) SyncPushEnabled() bool       // nil → true
 func (c *WorkspaceConfig) AddRepoToGroup(group, name string)
 func (c *WorkspaceConfig) RepoName(absPath string) (string, error)
 func (c *WorkspaceConfig) WorktreeRepoName(setName, branch string) string  // "<set>-<branch>"
@@ -416,6 +419,7 @@ When no filter: uses active context if set, otherwise all repos.
 | `git w pull [repos]` | `pl` | yes | `git pull` |
 | `git w push [repos]` | `ps` | yes | `git push` |
 | `git w status [repos]` | `st` | yes | `git status -sb` |
+| `git w sync [repos]` | `s` | yes | Fetch → pull → push pipeline per repo; stop-on-error per repo; deduplicates bare fetch for worktree sets; `--push`/`--no-push` flags; config: `[workspace].sync_push` (default true) |
 | `git w exec [repos] -- <git-args>` | — | yes* | Any git command |
 | `git w info [group]` | `ll` | — | Status table for all or group repos |
 

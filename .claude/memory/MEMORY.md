@@ -38,7 +38,7 @@ pkg/cmd/             — root cobra cmd, Execute(), completion (wires 4 domain R
 pkg/config/          — config types (WorkspaceConfig etc.), loader, discovery
 pkg/workspace/       — init/context/group commands; cmd_config helpers
 pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands
-pkg/git/             — executor, result, fetch/pull/push/status/exec/info commands
+pkg/git/             — executor, result, fetch/pull/push/status/exec/info/sync commands
 pkg/worktree/        — worktree set commands: clone/add/rm/drop/list; safety checks
 pkg/gitutil/         — low-level git subprocess wrappers (Clone, CloneBare, AddWorktree, RemoveWorktree, FetchBare, EnsureGitignore)
 pkg/parallel/        — generic concurrency primitives (RunFanOut, MaxWorkers, FormatFailureError)
