@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/robertwritescode/git-w/compare/v1.1.0...v1.1.1) (2026-03-02)
+
+
+### Bug Fixes
+
+* **release:** auto-fix Homebrew cask style after GoReleaser publish ([34d7195](https://github.com/robertwritescode/git-w/commit/34d719579cb6ace3a86a5b52de04d6c853719b61))
+
 ## [1.1.0](https://github.com/robertwritescode/git-w/compare/v1.0.0...v1.1.0) (2026-03-02)
 
 
