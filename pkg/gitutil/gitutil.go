@@ -47,6 +47,80 @@ func Pull(ctx context.Context, repoPath string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// CloneBare runs `git clone --bare <url> <dest>` with context support for cancellation.
+func CloneBare(ctx context.Context, url, dest string) error {
+	out, err := exec.CommandContext(ctx, "git", "clone", "--bare", url, dest).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git clone --bare: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// ConfigureBareOriginTracking ensures origin fetches branch heads into
+// refs/remotes/origin/* and fetches the latest refs.
+func ConfigureBareOriginTracking(ctx context.Context, barePath string) error {
+	if out, err := exec.CommandContext(ctx, "git", "-C", barePath, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*").CombinedOutput(); err != nil {
+		return fmt.Errorf("git config remote.origin.fetch: %w\n%s", err, out)
+	}
+
+	if out, err := exec.CommandContext(ctx, "git", "-C", barePath, "fetch", "origin").CombinedOutput(); err != nil {
+		return fmt.Errorf("git fetch origin: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// AddWorktree runs `git -C <barePath> worktree add <treePath> <branch>` with context support for cancellation.
+func AddWorktree(ctx context.Context, barePath, treePath, branch string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "worktree", "add", treePath, branch).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree add: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// SetBranchTrackingToOrigin sets branch upstream to origin/<branch> in treePath.
+func SetBranchTrackingToOrigin(ctx context.Context, treePath, branch string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", treePath, "branch", "--set-upstream-to=origin/"+branch, branch).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git branch --set-upstream-to: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// RemoveWorktree runs `git -C <barePath> worktree remove <treePath>`.
+func RemoveWorktree(barePath, treePath string) error {
+	out, err := exec.Command("git", "-C", barePath, "worktree", "remove", treePath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree remove: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// RemoveWorktreeForce runs `git -C <barePath> worktree remove --force <treePath>`.
+func RemoveWorktreeForce(barePath, treePath string) error {
+	out, err := exec.Command("git", "-C", barePath, "worktree", "remove", "--force", treePath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree remove --force: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// FetchBare runs `git -C <barePath> fetch`.
+func FetchBare(barePath string) error {
+	out, err := exec.Command("git", "-C", barePath, "fetch").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git fetch (bare): %w\n%s", err, out)
+	}
+
+	return nil
+}
+
 // RemoteURL returns the origin remote URL of the repo at repoPath, or the
 // empty string if no origin remote is configured.
 func RemoteURL(repoPath string) string {
@@ -112,12 +186,19 @@ func appendGitignoreEntry(path string, existing []byte, entry string) (err error
 		}
 	}()
 
-	if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
-		if _, err := f.WriteString("\n"); err != nil {
-			return err
-		}
+	if err := ensureTrailingNewline(f, existing); err != nil {
+		return err
 	}
 
 	_, err = fmt.Fprintln(f, entry)
+	return err
+}
+
+func ensureTrailingNewline(f *os.File, existing []byte) error {
+	if len(existing) == 0 || strings.HasSuffix(string(existing), "\n") {
+		return nil
+	}
+
+	_, err := f.WriteString("\n")
 	return err
 }

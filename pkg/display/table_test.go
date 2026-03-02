@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/robertwritescode/git-w/pkg/repo"
+	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -15,7 +16,7 @@ type TableSuite struct {
 }
 
 func TestTableSuite(t *testing.T) {
-	suite.Run(t, new(TableSuite))
+	testutil.RunSuite(t, new(TableSuite))
 }
 
 func (s *TableSuite) SetupTest() {

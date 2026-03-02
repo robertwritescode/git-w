@@ -1,9 +1,6 @@
 package repo
 
 import (
-	"fmt"
-	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,7 +20,7 @@ type Repo struct {
 func FromConfig(cfg *workspace.WorkspaceConfig, cfgPath string) []Repo {
 	repos := make([]Repo, 0, len(cfg.Repos))
 
-	for _, name := range slices.Sorted(maps.Keys(cfg.Repos)) {
+	for _, name := range workspace.SortedStringKeys(cfg.Repos) {
 		if r, ok := resolveRepo(name, cfg.Repos[name], cfgPath); ok {
 			repos = append(repos, r)
 		}
@@ -69,10 +66,4 @@ func resolveRepo(name string, rc workspace.RepoConfig, cfgPath string) (Repo, bo
 func IsGitRepo(path string) bool {
 	_, err := os.Stat(filepath.Join(path, ".git"))
 	return err == nil
-}
-
-// writef writes formatted output, discarding write errors
-// (appropriate for terminal I/O where write failures are unrecoverable).
-func writef(w io.Writer, format string, a ...any) {
-	_, _ = fmt.Fprintf(w, format, a...)
 }

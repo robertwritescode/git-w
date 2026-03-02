@@ -5,7 +5,6 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type RepoSuite struct {
@@ -13,7 +12,7 @@ type RepoSuite struct {
 }
 
 func TestRepoSuite(t *testing.T) {
-	suite.Run(t, new(RepoSuite))
+	testutil.RunSuite(t, new(RepoSuite))
 }
 
 func (s *RepoSuite) TestFromConfig() {

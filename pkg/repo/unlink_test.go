@@ -7,7 +7,6 @@ import (
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type RemoveSuite struct {
@@ -16,12 +15,14 @@ type RemoveSuite struct {
 }
 
 func (s *RemoveSuite) SetupTest() {
-	s.SetRoot(repo.Register)
+	s.CmdSuite.SetupTest()
 	s.wsDir = s.SetupWorkspaceDir()
 }
 
 func TestRemoveSuite(t *testing.T) {
-	suite.Run(t, new(RemoveSuite))
+	s := new(RemoveSuite)
+	s.InitRoot(repo.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *RemoveSuite) TestRemove() {

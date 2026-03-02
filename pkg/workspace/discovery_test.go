@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/stretchr/testify/suite"
 )
@@ -22,7 +23,7 @@ func (s *DiscoverySuite) SetupTest() {
 }
 
 func TestDiscoverySuite(t *testing.T) {
-	suite.Run(t, new(DiscoverySuite))
+	testutil.RunSuite(t, new(DiscoverySuite))
 }
 
 func (s *DiscoverySuite) TestWalksUp() {

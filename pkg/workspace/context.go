@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -41,11 +42,11 @@ func runContextShow(cmd *cobra.Command) error {
 	}
 
 	if cfg.Context.Active == "" {
-		writef(cmd.OutOrStdout(), "(none)\n")
+		output.Writef(cmd.OutOrStdout(), "(none)\n")
 		return nil
 	}
 
-	writef(cmd.OutOrStdout(), "%s\n", cfg.Context.Active)
+	output.Writef(cmd.OutOrStdout(), "%s\n", cfg.Context.Active)
 	return nil
 }
 
@@ -63,7 +64,7 @@ func runContextSet(cmd *cobra.Command, group string) error {
 		return err
 	}
 
-	writef(cmd.OutOrStdout(), "Active context: %q\n", group)
+	output.Writef(cmd.OutOrStdout(), "Active context: %q\n", group)
 	return nil
 }
 
@@ -77,7 +78,7 @@ func runContextClear(cmd *cobra.Command) error {
 		return err
 	}
 
-	writef(cmd.OutOrStdout(), "Context cleared\n")
+	output.Writef(cmd.OutOrStdout(), "Context cleared\n")
 	return nil
 }
 
@@ -96,7 +97,7 @@ func runContextAuto(cmd *cobra.Command) error {
 		return err
 	}
 
-	writef(cmd.OutOrStdout(), "Active context: %q\n", group)
+	output.Writef(cmd.OutOrStdout(), "Active context: %q\n", group)
 	return nil
 }
 

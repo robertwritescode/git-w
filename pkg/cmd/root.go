@@ -7,6 +7,7 @@ import (
 	gitpkg "github.com/robertwritescode/git-w/pkg/git"
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,7 @@ Invoke as 'git w <cmd>' via git's plugin system (git-w must be in $PATH).`,
 
 	workspace.Register(root)
 	repo.Register(root)
+	worktree.Register(root)
 	gitpkg.Register(root)
 	registerCompletion(root)
 

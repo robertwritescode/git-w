@@ -1,10 +1,10 @@
 package display
 
 import (
-	"fmt"
 	"io"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/repo"
 )
 
@@ -30,12 +30,6 @@ func RenderTable(w io.Writer, entries []TableEntry) {
 	for _, r := range rendered {
 		writeRow(w, r, widths)
 	}
-}
-
-// writef writes formatted output, discarding write errors
-// (appropriate for terminal I/O where write failures are unrecoverable).
-func writef(w io.Writer, format string, a ...any) {
-	_, _ = fmt.Fprintf(w, format, a...)
 }
 
 type renderedEntry struct {
@@ -81,7 +75,7 @@ func columnWidths(rendered []renderedEntry) [4]int {
 }
 
 func writeHeader(w io.Writer, widths [4]int) {
-	writef(w, "%s  %s  %s  %s\n",
+	output.Writef(w, "%s  %s  %s  %s\n",
 		padTo("REPO", widths[0]),
 		padTo("BRANCH", widths[1]),
 		padTo("STATUS", widths[2]),
@@ -90,7 +84,7 @@ func writeHeader(w io.Writer, widths [4]int) {
 }
 
 func writeRow(w io.Writer, r renderedEntry, widths [4]int) {
-	writef(w, "%s  %s  %s  %s\n",
+	output.Writef(w, "%s  %s  %s  %s\n",
 		padTo(r.name, widths[0]),
 		padTo(r.branch, widths[1]),
 		padTo(r.status, widths[2]),

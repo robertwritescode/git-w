@@ -3,14 +3,15 @@ package gitutil_test
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	gitutil "github.com/robertwritescode/git-w/pkg/gitutil"
+	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type GitutilSuite struct {
@@ -18,7 +19,7 @@ type GitutilSuite struct {
 }
 
 func TestGitutilSuite(t *testing.T) {
-	suite.Run(t, new(GitutilSuite))
+	testutil.RunSuite(t, new(GitutilSuite))
 }
 
 func (s *GitutilSuite) TestRemoteURL_NoRemote() {
@@ -147,4 +148,39 @@ func (s *GitutilSuite) TestClone_Cancelled() {
 
 	err := gitutil.Clone(ctx, sourceURL, destDir)
 	s.Assert().Error(err, "clone with cancelled context should return an error")
+}
+
+func (s *GitutilSuite) TestCloneBare_AddRemoveWorktree() {
+	remoteURL := s.MakeRemoteWithBranches([]string{"dev"})
+
+	bareDir := filepath.Join(s.T().TempDir(), "infra-bare")
+	s.Require().NoError(gitutil.CloneBare(context.Background(), remoteURL, bareDir))
+	s.DirExists(bareDir)
+
+	worktreeDir := filepath.Join(s.T().TempDir(), "infra-dev")
+	s.Require().NoError(gitutil.AddWorktree(context.Background(), bareDir, worktreeDir, "dev"))
+	s.True(repo.IsGitRepo(worktreeDir))
+
+	s.Require().NoError(gitutil.RemoveWorktree(bareDir, worktreeDir))
+	s.NoDirExists(worktreeDir)
+}
+
+func (s *GitutilSuite) TestFetchBare() {
+	remoteURL := s.MakeRemoteWithBranches([]string{"dev"})
+	bareDir := filepath.Join(s.T().TempDir(), "infra-bare")
+	s.Require().NoError(gitutil.CloneBare(context.Background(), remoteURL, bareDir))
+
+	localDir := s.T().TempDir()
+	s.RunGit("", "clone", remoteURL, localDir)
+	s.RunGit(localDir, "checkout", "dev")
+	s.RunGit(localDir, "config", "user.email", "test@example.com")
+	s.RunGit(localDir, "config", "user.name", "Test User")
+	s.Require().NoError(os.WriteFile(filepath.Join(localDir, "fetch.txt"), []byte("x"), 0o644))
+	s.RunGit(localDir, "add", ".")
+	s.RunGit(localDir, "commit", "-m", "fetch-update")
+	s.RunGit(localDir, "push", "origin", "dev")
+
+	s.Require().NoError(gitutil.FetchBare(bareDir))
+	out, err := exec.Command("git", "-C", bareDir, "show-ref").CombinedOutput()
+	s.Require().NoError(err, string(out))
 }

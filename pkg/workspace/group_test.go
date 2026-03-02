@@ -7,19 +7,16 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type GroupSuite struct {
 	testutil.CmdSuite
 }
 
-func (s *GroupSuite) SetupTest() {
-	s.SetRoot(workspace.Register)
-}
-
 func TestGroupSuite(t *testing.T) {
-	suite.Run(t, new(GroupSuite))
+	s := new(GroupSuite)
+	s.InitRoot(workspace.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *GroupSuite) TestGroupAdd() {

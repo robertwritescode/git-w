@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/repo"
+	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/stretchr/testify/suite"
 )
@@ -14,7 +15,7 @@ type FilterSuite struct {
 }
 
 func TestFilter(t *testing.T) {
-	suite.Run(t, new(FilterSuite))
+	testutil.RunSuite(t, new(FilterSuite))
 }
 
 // makeConfig builds a minimal WorkspaceConfig and returns it with a temp cfgPath.

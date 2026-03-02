@@ -9,19 +9,16 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type ContextSuite struct {
 	testutil.CmdSuite
 }
 
-func (s *ContextSuite) SetupTest() {
-	s.SetRoot(workspace.Register)
-}
-
 func TestContextSuite(t *testing.T) {
-	suite.Run(t, new(ContextSuite))
+	s := new(ContextSuite)
+	s.InitRoot(workspace.Register)
+	testutil.RunSuite(t, s)
 }
 
 // makeContextWs creates a workspace with the given repos and groups via

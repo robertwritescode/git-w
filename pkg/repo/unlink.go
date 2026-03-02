@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +30,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		writef(cmd.OutOrStdout(), "Removed repo %q\n", name)
+		output.Writef(cmd.OutOrStdout(), "Removed repo %q\n", name)
 	}
 
 	return workspace.Save(cfgPath, cfg)

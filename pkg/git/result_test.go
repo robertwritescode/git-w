@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -13,7 +14,7 @@ type ResultSuite struct {
 }
 
 func TestResult(t *testing.T) {
-	suite.Run(t, new(ResultSuite))
+	testutil.RunSuite(t, new(ResultSuite))
 }
 
 func (s *ResultSuite) TestPrefixLines() {

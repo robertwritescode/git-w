@@ -9,7 +9,6 @@ import (
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
 	"github.com/robertwritescode/git-w/pkg/workspace"
-	"github.com/stretchr/testify/suite"
 )
 
 type AddSuite struct {
@@ -18,12 +17,14 @@ type AddSuite struct {
 }
 
 func (s *AddSuite) SetupTest() {
-	s.SetRoot(repo.Register)
+	s.CmdSuite.SetupTest()
 	s.wsDir = s.SetupWorkspaceDir()
 }
 
 func TestAddSuite(t *testing.T) {
-	suite.Run(t, new(AddSuite))
+	s := new(AddSuite)
+	s.InitRoot(repo.Register)
+	testutil.RunSuite(t, s)
 }
 
 func (s *AddSuite) TestAdd() {

@@ -1,18 +1,41 @@
 package testutil
 
 import (
+	"testing"
+
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/suite"
 )
 
 type CmdSuite struct {
 	suite.Suite
-	Root *cobra.Command
+	Root       *cobra.Command
+	registerFn func(*cobra.Command)
+}
+
+// RunSuite runs a testify suite in a consistent way.
+func RunSuite(t *testing.T, testSuite suite.TestingSuite) {
+	t.Helper()
+	suite.Run(t, testSuite)
 }
 
 // SetRoot initialises s.Root from the given Register function.
 func (s *CmdSuite) SetRoot(register func(*cobra.Command)) {
 	s.Root = newCmdRootWith(register)
+}
+
+// InitRoot stores the package Register function used by SetupTest.
+func (s *CmdSuite) InitRoot(register func(*cobra.Command)) {
+	s.registerFn = register
+}
+
+// SetupTest rebuilds the root command when InitRoot has been configured.
+func (s *CmdSuite) SetupTest() {
+	if s.registerFn == nil {
+		return
+	}
+
+	s.Root = newCmdRootWith(s.registerFn)
 }
 
 // ExecuteCmd runs s.Root with args and returns the combined output and any error.
@@ -76,6 +99,31 @@ func (s *CmdSuite) CreateBareRepo() (string, string) {
 // PushToRemote runs "git push -u origin HEAD" in repoDir.
 func (s *CmdSuite) PushToRemote(repoDir string) {
 	pushToRemote(s.T(), repoDir)
+}
+
+// MakeBareGitRepo clones a bare repository from sourceURL into a new temp dir.
+func (s *CmdSuite) MakeBareGitRepo(sourceURL string) string {
+	return makeBareGitRepo(s.T(), sourceURL)
+}
+
+// AddWorktreeToRepo runs `git -C barePath worktree add treePath branch`.
+func (s *CmdSuite) AddWorktreeToRepo(barePath, treePath, branch string) {
+	addWorktreeToRepo(s.T(), barePath, treePath, branch)
+}
+
+// RunGit executes `git <args...>` in dir and fails the test on error.
+func (s *CmdSuite) RunGit(dir string, args ...string) {
+	RunGit(s.T(), dir, args...)
+}
+
+// MakeRemoteWithBranches creates a bare remote and pushes HEAD plus branches.
+func (s *CmdSuite) MakeRemoteWithBranches(branches []string) string {
+	return makeRemoteWithBranches(s.T(), branches)
+}
+
+// RelPath returns target relative to base and fails the test on error.
+func (s *CmdSuite) RelPath(base, target string) string {
+	return relPath(s.T(), base, target)
 }
 
 // MakeWorkspaceWithRepos creates a temp dir with a .gitw config and one
