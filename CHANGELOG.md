@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/robertwritescode/git-w/compare/v1.2.0...v1.3.0) (2026-03-03)
+
+
+### Features
+
+* Atomic branch creation with `git w branch create` ([#19](https://github.com/robertwritescode/git-w/issues/19)) ([c135ad4](https://github.com/robertwritescode/git-w/commit/c135ad40a9190378911dc4293fc10149c0dc3198))
+
 ## [1.2.0](https://github.com/robertwritescode/git-w/compare/v1.1.2...v1.2.0) (2026-03-03)
 
 
