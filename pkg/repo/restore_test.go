@@ -281,6 +281,29 @@ func (s *RestoreSuite) TestRestore_WorktreeNoURL() {
 	s.Assert().Contains(out, "[infra]")
 }
 
+func (s *RestoreSuite) TestRestore_WorktreeSetsUpstreamTracking() {
+	wsDir := s.T().TempDir()
+	s.ChangeToDir(wsDir)
+
+	remoteURL := s.MakeRemoteWithBranches([]string{"dev", "test"})
+
+	toml := fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n",
+		remoteURL,
+		filepath.Join("infra", ".bare"),
+		filepath.Join("infra", "dev"),
+		filepath.Join("infra", "test"),
+	)
+	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
+
+	_, err := s.ExecuteCmd("restore")
+	s.Require().NoError(err)
+
+	for _, branch := range []string{"dev", "test"} {
+		branchPath := filepath.Join(wsDir, "infra", branch)
+		s.RunGit(branchPath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	}
+}
+
 func buildRestoreConfig(url string, hasURL bool) string {
 	if hasURL {
 		return fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n", url)
