@@ -3,6 +3,7 @@ package branch
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/gitutil"
@@ -334,7 +335,13 @@ func runWorktreeReports(ctx context.Context, unit branchUnit, branchName string,
 			return []branchReport{missingWorktreeBranchReport(r)}
 		}
 
-		return []branchReport{createInWorktree(ctx, r, branchName, branch, flags)}
+		folderName, ok := extractWorktreeFolderName(unit.setName, r.Name)
+		if !ok {
+			return []branchReport{missingWorktreeBranchReport(r)}
+		}
+
+		finalBranchName := fmt.Sprintf("%s-%s", folderName, branchName)
+		return []branchReport{createInWorktree(ctx, r, finalBranchName, branch, flags)}
 	}
 
 	workers := parallel.MaxWorkers(0, len(repos))
@@ -344,7 +351,13 @@ func runWorktreeReports(ctx context.Context, unit branchUnit, branchName string,
 			return missingWorktreeBranchReport(r)
 		}
 
-		return createInWorktree(ctx, r, branchName, branch, flags)
+		folderName, ok := extractWorktreeFolderName(unit.setName, r.Name)
+		if !ok {
+			return missingWorktreeBranchReport(r)
+		}
+
+		finalBranchName := fmt.Sprintf("%s-%s", folderName, branchName)
+		return createInWorktree(ctx, r, finalBranchName, branch, flags)
 	})
 }
 
@@ -392,6 +405,14 @@ func fetchBareRepo(ctx context.Context, cfgPath string, wt config.WorktreeConfig
 func worktreeBranchForRepo(unit branchUnit, repoName string) (string, bool) {
 	branch, ok := unit.branches[repoName]
 	return branch, ok
+}
+
+func extractWorktreeFolderName(setName, repoName string) (string, bool) {
+	prefix := setName + "-"
+	if !strings.HasPrefix(repoName, prefix) {
+		return "", false
+	}
+	return strings.TrimPrefix(repoName, prefix), true
 }
 
 func missingWorktreeBranchReport(r repo.Repo) branchReport {

@@ -287,8 +287,8 @@ func (s *BranchCreateSuite) TestCreate_WorktreeSet_CreatesInEachWorktree() {
 	out, err := s.runBranchCreate(wsDir, "feature")
 	s.Require().NoError(err, out)
 
-	s.Assert().True(s.branchExists(filepath.Join(wsDir, "infra", "dev"), "feature"))
-	s.Assert().True(s.branchExists(filepath.Join(wsDir, "infra", "test"), "feature"))
+	s.Assert().True(s.branchExists(filepath.Join(wsDir, "infra", "dev"), "dev-feature"))
+	s.Assert().True(s.branchExists(filepath.Join(wsDir, "infra", "test"), "test-feature"))
 }
 
 func (s *BranchCreateSuite) TestCreate_WorktreeSet_SyncFetchesBareOnce() {
@@ -343,7 +343,7 @@ func (s *BranchCreateSuite) TestCreate_WorktreeSet_PartialWorktreeFailure() {
 	s.Require().Error(err)
 
 	s.Contains(out, "branch create complete: 1 ok, 1 failed")
-	s.Assert().True(s.branchExists(filepath.Join(wsDir, "infra", "test"), "feature"))
+	s.Assert().True(s.branchExists(filepath.Join(wsDir, "infra", "test"), "test-feature"))
 }
 
 func (s *BranchCreateSuite) TestCreate_PartialFailureReturnsError() {
