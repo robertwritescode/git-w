@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -76,7 +77,7 @@ func runAddSingle(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, path
 
 	cfg.Repos[name] = config.RepoConfig{
 		Path: relPath,
-		URL:  gitutil.RemoteURL(absPath),
+		URL:  gitutil.RemoteURL(cmd.Context(), absPath),
 	}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, group)
@@ -114,7 +115,7 @@ func registerDiscoveredRepos(cmd *cobra.Command, cfg *config.WorkspaceConfig, cf
 	count := 0
 	for _, p := range paths {
 		groupName := effectiveGroupName(group, p, walkDir)
-		ok, err := registerSingleRepo(cmd, cfg, cfgPath, p, groupName)
+		ok, err := registerSingleRepo(cmd.Context(), cmd, cfg, cfgPath, p, groupName)
 		if err != nil {
 			output.Writef(cmd.ErrOrStderr(), "warning: skipping %s: %v\n", p, err)
 			continue
@@ -194,7 +195,7 @@ func autoGroupName(repoAbsPath, walkRoot string) string {
 	return parts[0]
 }
 
-func registerSingleRepo(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, absPath, groupName string) (bool, error) {
+func registerSingleRepo(ctx context.Context, cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, absPath, groupName string) (bool, error) {
 	if !IsGitRepo(absPath) {
 		return false, nil
 	}
@@ -209,7 +210,7 @@ func registerSingleRepo(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath
 		return false, err // real error, propagate
 	}
 
-	cfg.Repos[name] = config.RepoConfig{Path: relPath, URL: gitutil.RemoteURL(absPath)}
+	cfg.Repos[name] = config.RepoConfig{Path: relPath, URL: gitutil.RemoteURL(ctx, absPath)}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, groupName)
 

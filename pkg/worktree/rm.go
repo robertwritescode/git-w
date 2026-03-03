@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -41,7 +42,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := executeRmOperation(op); err != nil {
+	if err := executeRmOperation(cmd.Context(), op); err != nil {
 		return err
 	}
 
@@ -73,12 +74,12 @@ func prepareRmOperation(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath
 	return rmOperation{target: target, wt: wt, branchAbs: branchAbs, bareAbs: bareAbs, force: force}, nil
 }
 
-func executeRmOperation(op rmOperation) error {
-	if err := validateRmSafety(op.force, op.target, op.branchAbs); err != nil {
+func executeRmOperation(ctx context.Context, op rmOperation) error {
+	if err := validateRmSafety(ctx, op.force, op.target, op.branchAbs); err != nil {
 		return err
 	}
 
-	return removeOneWorktree(op.bareAbs, op.branchAbs, op.force)
+	return removeOneWorktree(ctx, op.bareAbs, op.branchAbs, op.force)
 }
 
 func findRmTarget(cfg *config.WorkspaceConfig, name string) (branchTarget, config.WorktreeConfig, error) {
@@ -95,12 +96,12 @@ func findRmTarget(cfg *config.WorkspaceConfig, name string) (branchTarget, confi
 	return target, wt, nil
 }
 
-func validateRmSafety(force bool, target branchTarget, branchAbs string) error {
+func validateRmSafety(ctx context.Context, force bool, target branchTarget, branchAbs string) error {
 	if force {
 		return nil
 	}
 
-	violations, err := safetyViolations(repo.Repo{Name: target.RepoName, AbsPath: branchAbs})
+	violations, err := safetyViolations(ctx, repo.Repo{Name: target.RepoName, AbsPath: branchAbs})
 	if err != nil {
 		return err
 	}
@@ -119,10 +120,10 @@ func persistRm(cfg *config.WorkspaceConfig, cfgPath string, target branchTarget,
 	return config.Save(cfgPath, cfg)
 }
 
-func removeOneWorktree(bareAbs, branchAbs string, force bool) error {
+func removeOneWorktree(ctx context.Context, bareAbs, branchAbs string, force bool) error {
 	if force {
-		return gitutil.RemoveWorktreeForce(bareAbs, branchAbs)
+		return gitutil.RemoveWorktreeForce(ctx, bareAbs, branchAbs)
 	}
 
-	return gitutil.RemoveWorktree(bareAbs, branchAbs)
+	return gitutil.RemoveWorktree(ctx, bareAbs, branchAbs)
 }

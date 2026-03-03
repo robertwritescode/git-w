@@ -59,7 +59,19 @@ func writeInitialConfig(configPath, name string) error {
 		return err
 	}
 
-	content := fmt.Sprintf("[workspace]\nname = %q\n", name)
+	content := fmt.Sprintf(`[workspace]
+name = %q
+
+# Optional workspace-level defaults (uncomment to override)
+# auto_gitignore = true         # Automatically add repo paths to .gitignore
+# sync_push = true              # Include push in 'git w sync' command
+# default_branch = "main"       # Default source branch for new branches
+
+# Optional branch creation defaults (uncomment to override)
+# branch_sync_source = true     # Pull source branch before creating new branch
+# branch_set_upstream = true    # Set upstream tracking for new branches
+# branch_push = true            # Push new branches to remote after creation
+`, name)
 	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("creating .gitw: %w", err)
 	}

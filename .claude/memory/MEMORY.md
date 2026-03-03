@@ -25,7 +25,7 @@
 
 ## Tech Stack
 - CLI: `github.com/spf13/cobra`
-- Config parsing: `github.com/pelletier/go-toml/v2`
+- Config parsing: `github.com/pelletier/go-toml/v2` (wrapped in `pkg/toml` for comment preservation)
 - Colors: `github.com/fatih/color`
 - Concurrency: native goroutines + channels/WaitGroup (in `pkg/parallel`)
 - Testing: `github.com/stretchr/testify` (`assert` + `require`) — required in all test files
@@ -34,13 +34,15 @@
 
 ## pkg/ Domain Layout
 ```
-pkg/cmd/             — root cobra cmd, Execute(), completion (wires 4 domain Register funcs)
-pkg/config/          — config types (WorkspaceConfig etc.), loader, discovery
+pkg/cmd/             — root cobra cmd, Execute(), completion (wires 5 domain Register funcs)
+pkg/config/          — ALL config types (WorkspaceConfig etc.), loader, discovery
+pkg/toml/            — TOML parsing wrapper with comment preservation (wraps go-toml/v2)
 pkg/workspace/       — init/context/group commands; cmd_config helpers
 pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands
 pkg/git/             — executor, result, fetch/pull/push/status/exec/info/sync commands
+pkg/branch/          — branch create (and future branch subcommands); register.go + create.go
 pkg/worktree/        — worktree set commands: clone/add/rm/drop/list; safety checks
-pkg/gitutil/         — low-level git subprocess wrappers (Clone, CloneBare, AddWorktree, RemoveWorktree, FetchBare, EnsureGitignore)
+pkg/gitutil/         — low-level git subprocess wrappers; ALL functions take context.Context
 pkg/parallel/        — generic concurrency primitives (RunFanOut, MaxWorkers, FormatFailureError)
 pkg/display/         — terminal output formatting (RenderTable, ANSI colors)
 pkg/output/          — standardized command output helpers
@@ -54,6 +56,7 @@ workspace  → config, gitutil
 repo       → config, gitutil
 display    → repo
 git        → repo, config, display, parallel
+branch     → config, repo, gitutil, parallel, output
 worktree   → config, repo, gitutil, parallel
 output     → (none)
 gitutil    → (none)
@@ -73,7 +76,7 @@ testutil   → (none)
 
 ## How to Add a New Command
 
-Choose the appropriate domain package (`pkg/workspace`, `pkg/repo`, or `pkg/git`).
+Choose the appropriate domain package (`pkg/workspace`, `pkg/repo`, `pkg/git`, or `pkg/branch`).
 
 1. **Add file**: `pkg/<domain>/<name>.go` with `package <domain>`
 2. **Define command and private register function**:

@@ -15,8 +15,8 @@ var gitignoreMu sync.Mutex
 
 // Output runs a git command in repoPath and returns its stdout.
 // On failure it returns stderr (if available) alongside the error.
-func Output(repoPath string, args ...string) ([]byte, error) {
-	out, err := exec.Command("git", append([]string{"-C", repoPath}, args...)...).Output()
+func Output(ctx context.Context, repoPath string, args ...string) ([]byte, error) {
+	out, err := exec.CommandContext(ctx, "git", append([]string{"-C", repoPath}, args...)...).Output()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -45,6 +45,77 @@ func Pull(ctx context.Context, repoPath string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(out)), nil
+}
+
+// CheckoutBranch runs `git checkout <branch>` in repoPath.
+func CheckoutBranch(ctx context.Context, repoPath, branch string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "checkout", branch).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git checkout: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// FetchOrigin runs `git fetch origin` in repoPath.
+func FetchOrigin(ctx context.Context, repoPath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "fetch", "origin").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git fetch origin: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// PullBranch runs `git pull origin <branch>` in repoPath.
+func PullBranch(ctx context.Context, repoPath, branch string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "pull", "origin", branch).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git pull origin %s: %w\n%s", branch, err, out)
+	}
+
+	return nil
+}
+
+// BranchExists reports whether branchName exists locally in repoPath.
+func BranchExists(ctx context.Context, repoPath, branchName string) (bool, error) {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--list", branchName).CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("git branch --list: %w\n%s", err, out)
+	}
+
+	return strings.TrimSpace(string(out)) != "", nil
+}
+
+// CreateBranch runs `git branch <branchName> <sourceBranch>` in repoPath.
+func CreateBranch(ctx context.Context, repoPath, branchName, sourceBranch string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", branchName, sourceBranch).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git branch %s %s: %w\n%s", branchName, sourceBranch, err, out)
+	}
+
+	return nil
+}
+
+// PushBranchUpstream runs `git push -u <remote> <branchName>`.
+func PushBranchUpstream(ctx context.Context, repoPath, remote, branchName string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "push", "-u", remote, branchName).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git push -u %s %s: %w\n%s", remote, branchName, err, out)
+	}
+
+	return nil
+}
+
+// SetBranchUpstream runs `git branch --set-upstream-to=<remote>/<branchName>`.
+func SetBranchUpstream(ctx context.Context, repoPath, branchName, remote string) error {
+	upstream := remote + "/" + branchName
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--set-upstream-to="+upstream, branchName).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git branch --set-upstream-to: %w\n%s", err, out)
+	}
+
+	return nil
 }
 
 // CloneBare runs `git clone --bare <url> <dest>` with context support for cancellation.
@@ -92,8 +163,8 @@ func SetBranchTrackingToOrigin(ctx context.Context, treePath, branch string) err
 }
 
 // RemoveWorktree runs `git -C <barePath> worktree remove <treePath>`.
-func RemoveWorktree(barePath, treePath string) error {
-	out, err := exec.Command("git", "-C", barePath, "worktree", "remove", treePath).CombinedOutput()
+func RemoveWorktree(ctx context.Context, barePath, treePath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "worktree", "remove", treePath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree remove: %w\n%s", err, out)
 	}
@@ -102,8 +173,8 @@ func RemoveWorktree(barePath, treePath string) error {
 }
 
 // RemoveWorktreeForce runs `git -C <barePath> worktree remove --force <treePath>`.
-func RemoveWorktreeForce(barePath, treePath string) error {
-	out, err := exec.Command("git", "-C", barePath, "worktree", "remove", "--force", treePath).CombinedOutput()
+func RemoveWorktreeForce(ctx context.Context, barePath, treePath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "worktree", "remove", "--force", treePath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree remove --force: %w\n%s", err, out)
 	}
@@ -112,8 +183,8 @@ func RemoveWorktreeForce(barePath, treePath string) error {
 }
 
 // FetchBare runs `git -C <barePath> fetch`.
-func FetchBare(barePath string) error {
-	out, err := exec.Command("git", "-C", barePath, "fetch").CombinedOutput()
+func FetchBare(ctx context.Context, barePath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "fetch").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git fetch (bare): %w\n%s", err, out)
 	}
@@ -123,8 +194,8 @@ func FetchBare(barePath string) error {
 
 // RemoteURL returns the origin remote URL of the repo at repoPath, or the
 // empty string if no origin remote is configured.
-func RemoteURL(repoPath string) string {
-	out, err := exec.Command("git", "-C", repoPath, "remote", "get-url", "origin").Output()
+func RemoteURL(ctx context.Context, repoPath string) string {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "remote", "get-url", "origin").Output()
 	if err != nil {
 		return ""
 	}
