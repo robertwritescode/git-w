@@ -35,6 +35,7 @@ type branchUnit struct {
 	isWorktree   bool
 	plain        *repo.Repo
 	sourceBranch string
+	branches     map[string]string
 	setName      string
 	setRepos     []repo.Repo
 	setConfig    config.WorktreeConfig
@@ -225,10 +226,19 @@ func worktreeUnits(cfg *config.WorkspaceConfig, sets map[string][]repo.Repo) []b
 	units := make([]branchUnit, 0, len(sets))
 
 	for _, setName := range config.SortedStringKeys(sets) {
+		repos := sets[setName]
+		branches := make(map[string]string, len(repos))
+		for _, r := range repos {
+			if branch, ok := cfg.WorktreeBranchForRepo(r.Name); ok {
+				branches[r.Name] = branch
+			}
+		}
+
 		units = append(units, branchUnit{
 			isWorktree: true,
 			setName:    setName,
-			setRepos:   sets[setName],
+			setRepos:   repos,
+			branches:   branches,
 			setConfig:  cfg.Worktrees[setName],
 		})
 	}
@@ -319,12 +329,22 @@ func runWorktreeReports(ctx context.Context, unit branchUnit, branchName string,
 
 	if len(repos) == 1 {
 		r := repos[0]
-		return []branchReport{createInWorktree(ctx, r, branchName, worktreeBranchForRepo(unit, r.Name), flags)}
+		branch, ok := worktreeBranchForRepo(unit, r.Name)
+		if !ok {
+			return []branchReport{missingWorktreeBranchReport(r)}
+		}
+
+		return []branchReport{createInWorktree(ctx, r, branchName, branch, flags)}
 	}
 
 	workers := parallel.MaxWorkers(0, len(repos))
 	return parallel.RunFanOut(repos, workers, func(r repo.Repo) branchReport {
-		return createInWorktree(ctx, r, branchName, worktreeBranchForRepo(unit, r.Name), flags)
+		branch, ok := worktreeBranchForRepo(unit, r.Name)
+		if !ok {
+			return missingWorktreeBranchReport(r)
+		}
+
+		return createInWorktree(ctx, r, branchName, branch, flags)
 	})
 }
 
@@ -359,14 +379,15 @@ func fetchBareRepo(ctx context.Context, cfgPath string, wt config.WorktreeConfig
 	return gitutil.FetchBare(ctx, bareAbsPath)
 }
 
-func worktreeBranchForRepo(unit branchUnit, repoName string) string {
-	for branch := range unit.setConfig.Branches {
-		if config.WorktreeRepoName(unit.setName, branch) == repoName {
-			return branch
-		}
-	}
+func worktreeBranchForRepo(unit branchUnit, repoName string) (string, bool) {
+	branch, ok := unit.branches[repoName]
+	return branch, ok
+}
 
-	return ""
+func missingWorktreeBranchReport(r repo.Repo) branchReport {
+	report := branchReport{RepoName: r.Name, Failed: true}
+	recordStep(&report, "branch", fmt.Errorf("worktree branch not found for %s", r.Name), false)
+	return report
 }
 
 func failedSetReports(repos []repo.Repo, stepName string, err error) []branchReport {
