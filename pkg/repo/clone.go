@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/output"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +25,7 @@ func registerClone(root *cobra.Command) {
 }
 
 func runClone(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func resolveCloneTarget(cfg *workspace.WorkspaceConfig, args []string, cfgPath string) (string, string, error) {
+func resolveCloneTarget(cfg *config.WorkspaceConfig, args []string, cfgPath string) (string, string, error) {
 	destPath, err := resolveCloneDest(args, cfgPath)
 	if err != nil {
 		return "", "", err
@@ -65,17 +65,17 @@ func resolveCloneTarget(cfg *workspace.WorkspaceConfig, args []string, cfgPath s
 	return destPath, name, nil
 }
 
-func registerClonedRepo(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, destPath, name, url, group string) (string, error) {
-	relPath, err := workspace.RelPath(cfgPath, destPath)
+func registerClonedRepo(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, destPath, name, url, group string) (string, error) {
+	relPath, err := config.RelPath(cfgPath, destPath)
 	if err != nil {
 		return "", err
 	}
 
-	cfg.Repos[name] = workspace.RepoConfig{Path: relPath, URL: url}
+	cfg.Repos[name] = config.RepoConfig{Path: relPath, URL: url}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, group)
 
-	if err := workspace.Save(cfgPath, cfg); err != nil {
+	if err := config.Save(cfgPath, cfg); err != nil {
 		return "", err
 	}
 
@@ -87,7 +87,7 @@ func resolveCloneDest(args []string, cfgPath string) (string, error) {
 		return filepath.Abs(args[1])
 	}
 
-	return filepath.Join(workspace.ConfigDir(cfgPath), deriveClonePath(args[0])), nil
+	return filepath.Join(config.ConfigDir(cfgPath), deriveClonePath(args[0])), nil
 }
 
 func deriveClonePath(rawURL string) string {

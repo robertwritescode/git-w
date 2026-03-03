@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/robertwritescode/git-w/pkg/worktree"
 )
 
@@ -27,7 +27,7 @@ func (s *WorktreeCloneSuite) TestCloneAndList() {
 	wsDir, _, err := setupClonedWorktreeSet(s.T(), s, "infra", []string{"dev", "test"}, []string{"dev", "test"})
 	s.Require().NoError(err)
 
-	cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(err)
 	s.Require().Contains(cfg.Worktrees, "infra")
 	s.Require().Contains(cfg.Worktrees["infra"].Branches, "dev")

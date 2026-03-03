@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/robertwritescode/git-w/pkg/workspace"
+	"github.com/robertwritescode/git-w/pkg/config"
 )
 
 // Repo is a resolved, ready-to-use repository with an absolute path.
@@ -17,10 +17,10 @@ type Repo struct {
 
 // FromConfig returns a slice of Repos resolved from cfg, using cfgPath as the
 // base for relative path resolution. Repos are returned in sorted name order.
-func FromConfig(cfg *workspace.WorkspaceConfig, cfgPath string) []Repo {
+func FromConfig(cfg *config.WorkspaceConfig, cfgPath string) []Repo {
 	repos := make([]Repo, 0, len(cfg.Repos))
 
-	for _, name := range workspace.SortedStringKeys(cfg.Repos) {
+	for _, name := range config.SortedStringKeys(cfg.Repos) {
 		if r, ok := resolveRepo(name, cfg.Repos[name], cfgPath); ok {
 			repos = append(repos, r)
 		}
@@ -32,7 +32,7 @@ func FromConfig(cfg *workspace.WorkspaceConfig, cfgPath string) []Repo {
 // FromNames returns Repos for the given names, looked up in cfg.
 // Names not found in cfg.Repos are silently skipped.
 // Results are in sorted name order.
-func FromNames(cfg *workspace.WorkspaceConfig, cfgPath string, names []string) []Repo {
+func FromNames(cfg *config.WorkspaceConfig, cfgPath string, names []string) []Repo {
 	sorted := make([]string, len(names))
 	copy(sorted, names)
 	slices.Sort(sorted)
@@ -53,8 +53,8 @@ func FromNames(cfg *workspace.WorkspaceConfig, cfgPath string, names []string) [
 
 // resolveRepo converts a config entry into a Repo with an absolute path.
 // Returns false if the path cannot be resolved.
-func resolveRepo(name string, rc workspace.RepoConfig, cfgPath string) (Repo, bool) {
-	absPath, err := workspace.ResolveRepoPath(cfgPath, rc.Path)
+func resolveRepo(name string, rc config.RepoConfig, cfgPath string) (Repo, bool) {
+	absPath, err := config.ResolveRepoPath(cfgPath, rc.Path)
 	if err != nil {
 		return Repo{}, false
 	}

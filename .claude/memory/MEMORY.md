@@ -35,9 +35,10 @@
 ## pkg/ Domain Layout
 ```
 pkg/cmd/             — root cobra cmd, Execute(), completion (wires 4 domain Register funcs)
-pkg/workspace/       — config types, loader, discovery, init/context/group commands
+pkg/config/          — config types (WorkspaceConfig etc.), loader, discovery
+pkg/workspace/       — init/context/group commands; cmd_config helpers
 pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands
-pkg/git/             — executor, result, fetch/pull/push/status/exec/info commands
+pkg/git/             — executor, result, fetch/pull/push/status/exec/info/sync commands
 pkg/worktree/        — worktree set commands: clone/add/rm/drop/list; safety checks
 pkg/gitutil/         — low-level git subprocess wrappers (Clone, CloneBare, AddWorktree, RemoveWorktree, FetchBare, EnsureGitignore)
 pkg/parallel/        — generic concurrency primitives (RunFanOut, MaxWorkers, FormatFailureError)
@@ -48,11 +49,12 @@ pkg/testutil/        — shared test infrastructure (CmdSuite, MakeGitRepo, Make
 
 Dependency graph (cycle-free):
 ```
-workspace  → gitutil
-repo       → workspace, gitutil
+config     → (none)
+workspace  → config, gitutil
+repo       → config, gitutil
 display    → repo
-git        → repo, workspace, display, parallel
-worktree   → workspace, repo, gitutil, parallel
+git        → repo, config, display, parallel
+worktree   → config, repo, gitutil, parallel
 output     → (none)
 gitutil    → (none)
 parallel   → (none)
@@ -62,7 +64,7 @@ testutil   → (none)
 ### Key architectural patterns
 - Each domain package exports a single `Register(root *cobra.Command)` that calls private `register<Name>` functions
 - **Repo lifecycle commands** live under a `repo` subcommand (alias `r`): `git w repo add/clone/unlink/rename/list`; `restore` is directly on root
-- Config loaded via `workspace.LoadConfig(cmd)` (reads `--config` flag, calls `workspace.LoadCWD`)
+- Config loaded via `config.LoadConfig(cmd)` (reads `--config` flag, calls `config.LoadCWD`)
 - Repo filtering cascade: `repo.Filter` → `repo.ForContext` → `repo.ForGroup` in `pkg/repo/filter.go`
 - `display.TableEntry.RemoteState` uses `repo.RemoteState` (single canonical enum, no duplication)
 - `gitutil.Clone` / `gitutil.CloneContext` / `gitutil.EnsureGitignore` in `pkg/gitutil`; `EnsureGitignore` is mutex-protected for concurrent calls
@@ -91,8 +93,7 @@ Choose the appropriate domain package (`pkg/workspace`, `pkg/repo`, or `pkg/git`
    }
 
    func runName(cmd *cobra.Command, args []string) error {
-       cfg, cfgPath, err := LoadConfig(cmd)  // same-package call in workspace
-       // or: cfg, cfgPath, err := workspace.LoadConfig(cmd)  // in repo or git
+       cfg, cfgPath, err := config.LoadConfig(cmd)  // pkg/config in all packages
        if err != nil {
            return err
        }

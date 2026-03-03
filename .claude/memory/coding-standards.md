@@ -169,7 +169,7 @@ func Register(root *cobra.Command) {
 - Prefer inline `&cobra.Command{...}` over package-level `var xxxCmd` for leaf commands (avoids pflag state bleed between test runs); use named vars only when needed for flag attachment or subcommand trees
 - Flag variables prefixed with command name if generic (e.g., `addRecursive`, `groupName`)
 - Test files use `testutil.CmdSuite` and `s.SetRoot(<domain>.Register)` + `s.ExecuteCmd(args...)`
-- `nolint:errcheck` applied to intentional stdout writes (`fmt.Fprintf(cmd.OutOrStdout(), ...)`)
+- **Use `output.Writef()` for terminal output** — prefer `output.Writef(cmd.OutOrStdout(), ...)` over `fmt.Fprintf(...)` for consistency. The `output` package provides best-effort terminal writes that intentionally ignore errors.
 
 **Note on `pkg/repo` subcommand structure:**
 `repo.Register` creates a `repo` parent command (alias `r`) and adds most lifecycle commands under it. `restore` is added directly to root. When testing repo commands, `s.SetRoot(repo.Register)` registers everything including the `repo` subcommand — use `s.ExecuteCmd("repo", "add", ...)` accordingly.

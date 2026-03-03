@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/output"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
 type addOperation struct {
 	setName   string
 	branch    string
-	wt        workspace.WorktreeConfig
+	wt        config.WorktreeConfig
 	branchAbs string
 	relPath   string
 }
@@ -29,7 +29,7 @@ func registerAdd(root *cobra.Command) {
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prepareAddOperation(cfg *workspace.WorkspaceConfig, cfgPath string, args []string) (addOperation, error) {
+func prepareAddOperation(cfg *config.WorkspaceConfig, cfgPath string, args []string) (addOperation, error) {
 	setName, branch := args[0], args[1]
 	wt, err := lookupAddWorktreeSet(cfg, setName, branch)
 	if err != nil {
@@ -71,7 +71,7 @@ func executeAddOperation(cfgPath string, op *addOperation) error {
 		return err
 	}
 
-	relPath, err := workspace.RelPath(cfgPath, op.branchAbs)
+	relPath, err := config.RelPath(cfgPath, op.branchAbs)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func executeAddOperation(cfgPath string, op *addOperation) error {
 	return nil
 }
 
-func finalizeAddOperation(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath string, op addOperation) error {
+func finalizeAddOperation(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, op addOperation) error {
 	if err := persistAddedWorktree(cfg, cfgPath, op.setName, op.branch, op.wt, op.relPath); err != nil {
 		return err
 	}
@@ -89,20 +89,20 @@ func finalizeAddOperation(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cf
 	return nil
 }
 
-func lookupAddWorktreeSet(cfg *workspace.WorkspaceConfig, setName, branch string) (workspace.WorktreeConfig, error) {
+func lookupAddWorktreeSet(cfg *config.WorkspaceConfig, setName, branch string) (config.WorktreeConfig, error) {
 	wt, exists := cfg.Worktrees[setName]
 	if !exists {
-		return workspace.WorktreeConfig{}, fmt.Errorf("worktree set %q not found", setName)
+		return config.WorktreeConfig{}, fmt.Errorf("worktree set %q not found", setName)
 	}
 
 	if _, exists := wt.Branches[branch]; exists {
-		return workspace.WorktreeConfig{}, fmt.Errorf("branch %q is already registered in set %q", branch, setName)
+		return config.WorktreeConfig{}, fmt.Errorf("branch %q is already registered in set %q", branch, setName)
 	}
 
 	return wt, nil
 }
 
-func resolveAddBranchPath(cfgPath string, wt workspace.WorktreeConfig, args []string) (string, error) {
+func resolveAddBranchPath(cfgPath string, wt config.WorktreeConfig, args []string) (string, error) {
 	if len(args) == 3 {
 		branchAbs, err := filepath.Abs(args[2])
 		if err != nil {
@@ -114,7 +114,7 @@ func resolveAddBranchPath(cfgPath string, wt workspace.WorktreeConfig, args []st
 	return defaultBranchAbsPath(cfgPath, wt, args[1])
 }
 
-func materializeAddedWorktree(cfgPath string, wt workspace.WorktreeConfig, branchAbs, branch string) error {
+func materializeAddedWorktree(cfgPath string, wt config.WorktreeConfig, branchAbs, branch string) error {
 	bareAbs, err := bareAbsPath(cfgPath, wt)
 	if err != nil {
 		return err
@@ -123,8 +123,8 @@ func materializeAddedWorktree(cfgPath string, wt workspace.WorktreeConfig, branc
 	return gitutil.AddWorktree(context.Background(), bareAbs, branchAbs, branch)
 }
 
-func persistAddedWorktree(cfg *workspace.WorkspaceConfig, cfgPath, setName, branch string, wt workspace.WorktreeConfig, relPath string) error {
+func persistAddedWorktree(cfg *config.WorkspaceConfig, cfgPath, setName, branch string, wt config.WorktreeConfig, relPath string) error {
 	wt.Branches[branch] = relPath
 	cfg.Worktrees[setName] = wt
-	return workspace.Save(cfgPath, cfg)
+	return config.Save(cfgPath, cfg)
 }

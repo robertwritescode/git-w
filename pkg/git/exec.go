@@ -3,8 +3,8 @@ package git
 import (
 	"fmt"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no git command specified; use: exec [repos...] -- <git-args>")
 	}
 
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}

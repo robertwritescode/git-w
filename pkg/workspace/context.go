@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +37,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 }
 
 func runContextShow(cmd *cobra.Command) error {
-	cfg, _, err := LoadConfig(cmd)
+	cfg, _, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func runContextShow(cmd *cobra.Command) error {
 }
 
 func runContextSet(cmd *cobra.Command, group string) error {
-	cfg, cfgPath, err := LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -60,7 +61,7 @@ func runContextSet(cmd *cobra.Command, group string) error {
 		return fmt.Errorf("group %q not found in workspace config", group)
 	}
 
-	if err := SaveLocal(cfgPath, ContextConfig{Active: group}); err != nil {
+	if err := config.SaveLocal(cfgPath, config.ContextConfig{Active: group}); err != nil {
 		return err
 	}
 
@@ -69,12 +70,12 @@ func runContextSet(cmd *cobra.Command, group string) error {
 }
 
 func runContextClear(cmd *cobra.Command) error {
-	_, cfgPath, err := LoadConfig(cmd)
+	_, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
 
-	if err := SaveLocal(cfgPath, ContextConfig{}); err != nil {
+	if err := config.SaveLocal(cfgPath, config.ContextConfig{}); err != nil {
 		return err
 	}
 
@@ -83,17 +84,17 @@ func runContextClear(cmd *cobra.Command) error {
 }
 
 func runContextAuto(cmd *cobra.Command) error {
-	cfg, cfgPath, err := LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
 
-	group, err := detectContextFromCWD(cfg, ConfigDir(cfgPath))
+	group, err := detectContextFromCWD(cfg, config.ConfigDir(cfgPath))
 	if err != nil {
 		return err
 	}
 
-	if err := SaveLocal(cfgPath, ContextConfig{Active: group}); err != nil {
+	if err := config.SaveLocal(cfgPath, config.ContextConfig{Active: group}); err != nil {
 		return err
 	}
 
@@ -103,7 +104,7 @@ func runContextAuto(cmd *cobra.Command) error {
 
 // detectContextFromCWD finds the deepest group whose Path contains the current
 // working directory. Groups with no Path are skipped.
-func detectContextFromCWD(cfg *WorkspaceConfig, cfgRoot string) (string, error) {
+func detectContextFromCWD(cfg *config.WorkspaceConfig, cfgRoot string) (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("getting working directory: %w", err)
@@ -117,7 +118,7 @@ func detectContextFromCWD(cfg *WorkspaceConfig, cfgRoot string) (string, error) 
 	return bestGroup, nil
 }
 
-func findDeepestMatchingGroup(cfg *WorkspaceConfig, cfgRoot, cwd string) (string, bool) {
+func findDeepestMatchingGroup(cfg *config.WorkspaceConfig, cfgRoot, cwd string) (string, bool) {
 	bestGroup := ""
 	bestDepth := -1
 
@@ -136,7 +137,7 @@ func findDeepestMatchingGroup(cfg *WorkspaceConfig, cfgRoot, cwd string) (string
 	return bestGroup, bestGroup != ""
 }
 
-func groupMatchDepth(g GroupConfig, cfgRoot, cwd string) (int, bool) {
+func groupMatchDepth(g config.GroupConfig, cfgRoot, cwd string) (int, bool) {
 	if g.Path == "" {
 		return 0, false
 	}

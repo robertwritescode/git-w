@@ -1,12 +1,12 @@
-package workspace_test
+package config_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -44,7 +44,7 @@ func (s *DiscoverySuite) TestWalksUp() {
 				s.Require().NoError(os.MkdirAll(startDir, 0o755))
 			}
 
-			found, err := workspace.Discover(startDir)
+			found, err := config.Discover(startDir)
 			s.Require().NoError(err)
 			s.Assert().Equal(s.cfgPath, found)
 		})
@@ -53,15 +53,15 @@ func (s *DiscoverySuite) TestWalksUp() {
 
 func (s *DiscoverySuite) TestNotFound() {
 	dir := s.T().TempDir()
-	_, err := workspace.Discover(dir)
+	_, err := config.Discover(dir)
 	s.Require().Error(err)
-	s.Assert().ErrorIs(err, workspace.ErrNotFound)
+	s.Assert().ErrorIs(err, config.ErrNotFound)
 }
 
 func (s *DiscoverySuite) TestEnvVarOverride() {
 	s.T().Setenv("GIT_W_CONFIG", "/custom/path/.gitw")
 
-	found, err := workspace.Discover(s.root)
+	found, err := config.Discover(s.root)
 	s.Require().NoError(err)
 	s.Assert().Equal("/custom/path/.gitw", found)
 }

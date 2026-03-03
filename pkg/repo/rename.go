@@ -3,8 +3,8 @@ package repo
 import (
 	"fmt"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/output"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ func registerRename(root *cobra.Command) {
 func runRename(cmd *cobra.Command, args []string) error {
 	oldName, newName := args[0], args[1]
 
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func runRename(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := workspace.Save(cfgPath, cfg); err != nil {
+	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
 	}
 
@@ -38,7 +38,7 @@ func runRename(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func renameRepo(cfg *workspace.WorkspaceConfig, oldName, newName string) error {
+func renameRepo(cfg *config.WorkspaceConfig, oldName, newName string) error {
 	repoConfig, exists := cfg.Repos[oldName]
 	if !exists {
 		return fmt.Errorf("repo %q not found", oldName)
@@ -55,7 +55,7 @@ func renameRepo(cfg *workspace.WorkspaceConfig, oldName, newName string) error {
 	return nil
 }
 
-func renameRepoInGroups(cfg *workspace.WorkspaceConfig, oldName, newName string) {
+func renameRepoInGroups(cfg *config.WorkspaceConfig, oldName, newName string) {
 	for gName, g := range cfg.Groups {
 		changed := false
 

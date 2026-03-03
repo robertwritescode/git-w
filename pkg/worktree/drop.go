@@ -6,15 +6,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/repo"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
 type dropOperation struct {
 	setName string
-	wt      workspace.WorktreeConfig
+	wt      config.WorktreeConfig
 	bareAbs string
 	force   bool
 }
@@ -31,7 +31,7 @@ func registerDrop(root *cobra.Command) {
 }
 
 func runDrop(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -53,20 +53,20 @@ func runDrop(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func finalizeDropOperation(cfg *workspace.WorkspaceConfig, cfgPath string, op dropOperation) error {
+func finalizeDropOperation(cfg *config.WorkspaceConfig, cfgPath string, op dropOperation) error {
 	if err := os.RemoveAll(op.bareAbs); err != nil {
 		return fmt.Errorf("removing bare repo: %w", err)
 	}
 
-	for _, branch := range workspace.SortedWorktreeBranchNames(op.wt.Branches) {
-		cfg.RemoveRepoFromManualGroups(workspace.WorktreeRepoName(op.setName, branch))
+	for _, branch := range config.SortedWorktreeBranchNames(op.wt.Branches) {
+		cfg.RemoveRepoFromManualGroups(config.WorktreeRepoName(op.setName, branch))
 	}
 
 	delete(cfg.Worktrees, op.setName)
-	return workspace.Save(cfgPath, cfg)
+	return config.Save(cfgPath, cfg)
 }
 
-func prepareDropOperation(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, cfgPath, setName string) (dropOperation, error) {
+func prepareDropOperation(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, setName string) (dropOperation, error) {
 	wt, err := lookupDropSet(cfg, setName)
 	if err != nil {
 		return dropOperation{}, err
@@ -89,16 +89,16 @@ func executeDropOperation(cfgPath string, op dropOperation) error {
 	return removeDropWorktrees(cfgPath, op.bareAbs, op.wt, op.force)
 }
 
-func lookupDropSet(cfg *workspace.WorkspaceConfig, setName string) (workspace.WorktreeConfig, error) {
+func lookupDropSet(cfg *config.WorkspaceConfig, setName string) (config.WorktreeConfig, error) {
 	wt, exists := cfg.Worktrees[setName]
 	if !exists {
-		return workspace.WorktreeConfig{}, fmt.Errorf("worktree set %q not found", setName)
+		return config.WorktreeConfig{}, fmt.Errorf("worktree set %q not found", setName)
 	}
 
 	return wt, nil
 }
 
-func validateDropSafety(force bool, cfgPath, setName string, wt workspace.WorktreeConfig) error {
+func validateDropSafety(force bool, cfgPath, setName string, wt config.WorktreeConfig) error {
 	if force {
 		return nil
 	}
@@ -115,9 +115,9 @@ func validateDropSafety(force bool, cfgPath, setName string, wt workspace.Worktr
 	return fmt.Errorf("refusing to drop %q:\n%s", setName, strings.Join(violations, "\n"))
 }
 
-func removeDropWorktrees(cfgPath, bareAbs string, wt workspace.WorktreeConfig, force bool) error {
-	for _, branch := range workspace.SortedWorktreeBranchNames(wt.Branches) {
-		absPath, err := workspace.ResolveRepoPath(cfgPath, wt.Branches[branch])
+func removeDropWorktrees(cfgPath, bareAbs string, wt config.WorktreeConfig, force bool) error {
+	for _, branch := range config.SortedWorktreeBranchNames(wt.Branches) {
+		absPath, err := config.ResolveRepoPath(cfgPath, wt.Branches[branch])
 		if err != nil {
 			return err
 		}
@@ -134,10 +134,10 @@ func removeDropWorktrees(cfgPath, bareAbs string, wt workspace.WorktreeConfig, f
 	return nil
 }
 
-func collectDropViolations(cfgPath, setName string, wt workspace.WorktreeConfig) ([]string, error) {
+func collectDropViolations(cfgPath, setName string, wt config.WorktreeConfig) ([]string, error) {
 	var violations []string
-	for _, branch := range workspace.SortedWorktreeBranchNames(wt.Branches) {
-		absPath, err := workspace.ResolveRepoPath(cfgPath, wt.Branches[branch])
+	for _, branch := range config.SortedWorktreeBranchNames(wt.Branches) {
+		absPath, err := config.ResolveRepoPath(cfgPath, wt.Branches[branch])
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +148,7 @@ func collectDropViolations(cfgPath, setName string, wt workspace.WorktreeConfig)
 			return nil, statErr
 		}
 
-		r := repo.Repo{Name: workspace.WorktreeRepoName(setName, branch), AbsPath: absPath}
+		r := repo.Repo{Name: config.WorktreeRepoName(setName, branch), AbsPath: absPath}
 		msgs, err := safetyViolations(r)
 		if err != nil {
 			return nil, err

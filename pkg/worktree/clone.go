@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/output"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ type cloneOperation struct {
 	setName string
 	baseAbs string
 	bareAbs string
-	wt      workspace.WorktreeConfig
+	wt      config.WorktreeConfig
 }
 
 func registerClone(root *cobra.Command) {
@@ -31,7 +31,7 @@ func registerClone(root *cobra.Command) {
 }
 
 func runClone(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 	}
 
 	cfg.Worktrees[op.setName] = op.wt
-	if err := workspace.Save(cfgPath, cfg); err != nil {
+	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
 	}
 
@@ -54,7 +54,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func prepareCloneOperation(cfg *workspace.WorkspaceConfig, cfgPath string, args []string) (cloneOperation, error) {
+func prepareCloneOperation(cfg *config.WorkspaceConfig, cfgPath string, args []string) (cloneOperation, error) {
 	url, baseAbs, setName, err := parseCloneArgs(args)
 	if err != nil {
 		return cloneOperation{}, err
@@ -116,19 +116,19 @@ func parseCloneArgs(args []string) (string, string, string, error) {
 }
 
 func validateCloneBasePath(cfgPath, baseAbs string) error {
-	baseRel, err := workspace.RelPath(cfgPath, baseAbs)
+	baseRel, err := config.RelPath(cfgPath, baseAbs)
 	if err != nil {
 		return err
 	}
 
-	if _, err := workspace.ResolveRepoPath(cfgPath, baseRel); err != nil {
+	if _, err := config.ResolveRepoPath(cfgPath, baseRel); err != nil {
 		return fmt.Errorf("base path must be inside workspace root")
 	}
 
 	return nil
 }
 
-func ensureCloneTarget(cfg *workspace.WorkspaceConfig, setName, baseAbs string) error {
+func ensureCloneTarget(cfg *config.WorkspaceConfig, setName, baseAbs string) error {
 	if _, exists := cfg.Worktrees[setName]; exists {
 		return fmt.Errorf("worktree set %q already exists", setName)
 	}
@@ -159,20 +159,20 @@ func createWorktreeSet(url, baseAbs, bareAbs string) error {
 	return nil
 }
 
-func initWorktreeConfig(cfgPath, url, bareAbs string) (workspace.WorktreeConfig, error) {
-	bareRel, err := workspace.RelPath(cfgPath, bareAbs)
+func initWorktreeConfig(cfgPath, url, bareAbs string) (config.WorktreeConfig, error) {
+	bareRel, err := config.RelPath(cfgPath, bareAbs)
 	if err != nil {
-		return workspace.WorktreeConfig{}, err
+		return config.WorktreeConfig{}, err
 	}
 
-	return workspace.WorktreeConfig{
+	return config.WorktreeConfig{
 		URL:      url,
 		BarePath: bareRel,
 		Branches: make(map[string]string),
 	}, nil
 }
 
-func addCloneBranches(cmd *cobra.Command, cfgPath string, gitignore bool, wt *workspace.WorktreeConfig, bareAbs, baseAbs string, branches []string) error {
+func addCloneBranches(cmd *cobra.Command, cfgPath string, gitignore bool, wt *config.WorktreeConfig, bareAbs, baseAbs string, branches []string) error {
 	for _, branch := range branches {
 		branchAbs := filepath.Join(baseAbs, branch)
 		relPath, err := addBranchWorktree(cfgPath, bareAbs, branchAbs, branch)
@@ -197,5 +197,5 @@ func addBranchWorktree(cfgPath, bareAbs, branchAbs, branch string) (string, erro
 		return "", err
 	}
 
-	return workspace.RelPath(cfgPath, branchAbs)
+	return config.RelPath(cfgPath, branchAbs)
 }

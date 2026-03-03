@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 )
 
 type CloneSuite struct {
@@ -45,12 +45,12 @@ func (s *CloneSuite) TestClone() {
 			_, err := s.ExecuteCmd(args...)
 			s.Require().NoError(err)
 
-			cfg, err := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, err := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(err)
 			s.Require().NotEmpty(cfg.Repos)
 
 			var repoName string
-			var repoCfg workspace.RepoConfig
+			var repoCfg config.RepoConfig
 			for n, rc := range cfg.Repos {
 				repoName = n
 				repoCfg = rc

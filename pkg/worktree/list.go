@@ -3,8 +3,8 @@ package worktree
 import (
 	"fmt"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/output"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ func registerList(root *cobra.Command) {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	cfg, _, err := workspace.LoadConfig(cmd)
+	cfg, _, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -31,21 +31,21 @@ func runList(cmd *cobra.Command, args []string) error {
 	return listWorktreeBranches(cmd, cfg, args[0])
 }
 
-func listWorktreeSets(cmd *cobra.Command, cfg *workspace.WorkspaceConfig) error {
-	for _, name := range workspace.SortedStringKeys(cfg.Worktrees) {
+func listWorktreeSets(cmd *cobra.Command, cfg *config.WorkspaceConfig) error {
+	for _, name := range config.SortedStringKeys(cfg.Worktrees) {
 		output.Writef(cmd.OutOrStdout(), "%s\n", name)
 	}
 
 	return nil
 }
 
-func listWorktreeBranches(cmd *cobra.Command, cfg *workspace.WorkspaceConfig, setName string) error {
+func listWorktreeBranches(cmd *cobra.Command, cfg *config.WorkspaceConfig, setName string) error {
 	wt, exists := cfg.Worktrees[setName]
 	if !exists {
 		return fmt.Errorf("worktree set %q not found", setName)
 	}
 
-	for _, branch := range workspace.SortedWorktreeBranchNames(wt.Branches) {
+	for _, branch := range config.SortedWorktreeBranchNames(wt.Branches) {
 		output.Writef(cmd.OutOrStdout(), "%s\t%s\n", branch, wt.Branches[branch])
 	}
 

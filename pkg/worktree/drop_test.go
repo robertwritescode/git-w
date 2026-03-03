@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/robertwritescode/git-w/pkg/worktree"
 )
 
@@ -29,7 +29,7 @@ func (s *WorktreeDropSuite) TestDropCleansManualGroupMembership() {
 	_, err = s.ExecuteCmd("worktree", "drop", "infra")
 	s.Require().NoError(err)
 
-	cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(loadErr)
 	s.Assert().NotContains(cfg.Groups["mixed"].Repos, "infra-dev")
 }
@@ -101,7 +101,7 @@ func (s *WorktreeDropSuite) TestDropSafetyMatrix() {
 			}
 
 			s.Require().NoError(err)
-			cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+			cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 			s.Require().NoError(loadErr)
 			_, exists := cfg.Worktrees["infra"]
 			s.Assert().False(exists)
@@ -120,7 +120,7 @@ func (s *WorktreeDropSuite) TestDropSkipsMissingBranchPathInSafetyCheck() {
 	_, err = s.ExecuteCmd("worktree", "drop", "infra")
 	s.Require().NoError(err)
 
-	cfg, loadErr := workspace.Load(filepath.Join(wsDir, ".gitw"))
+	cfg, loadErr := config.Load(filepath.Join(wsDir, ".gitw"))
 	s.Require().NoError(loadErr)
 	_, exists := cfg.Worktrees["infra"]
 	s.Assert().False(exists)

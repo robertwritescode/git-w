@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -19,22 +19,22 @@ func TestFilter(t *testing.T) {
 }
 
 // makeConfig builds a minimal WorkspaceConfig and returns it with a temp cfgPath.
-func (s *FilterSuite) makeConfig(repoNames []string, groups map[string][]string, activeCtx string) (*workspace.WorkspaceConfig, string) {
+func (s *FilterSuite) makeConfig(repoNames []string, groups map[string][]string, activeCtx string) (*config.WorkspaceConfig, string) {
 	dir := s.T().TempDir()
 	cfgPath := filepath.Join(dir, ".gitw")
 
-	cfg := &workspace.WorkspaceConfig{
-		Repos:   make(map[string]workspace.RepoConfig, len(repoNames)),
-		Groups:  make(map[string]workspace.GroupConfig, len(groups)),
-		Context: workspace.ContextConfig{Active: activeCtx},
+	cfg := &config.WorkspaceConfig{
+		Repos:   make(map[string]config.RepoConfig, len(repoNames)),
+		Groups:  make(map[string]config.GroupConfig, len(groups)),
+		Context: config.ContextConfig{Active: activeCtx},
 	}
 
 	for _, r := range repoNames {
-		cfg.Repos[r] = workspace.RepoConfig{Path: r}
+		cfg.Repos[r] = config.RepoConfig{Path: r}
 	}
 
 	for g, members := range groups {
-		cfg.Groups[g] = workspace.GroupConfig{Repos: members}
+		cfg.Groups[g] = config.GroupConfig{Repos: members}
 	}
 
 	return cfg, cfgPath

@@ -24,6 +24,7 @@ Both files are TOML. The loader reads both and merges them; `.local` values take
 [workspace]
 name = "my-workspace"
 auto_gitignore = true       # Add repo paths to .gitignore on add/clone/restore (default: true)
+sync_push = true            # Push as part of `git w sync` (default: true; set false on read-only boxes)
 
 [repos.frontend]
 path = "apps/frontend"      # Relative to .gitw location
@@ -83,12 +84,15 @@ git-w/
     │   ├── completion.go       # Shell completion (bash/zsh/fish/powershell) — registerCompletion
     │   └── completion_test.go
     │
-    ├── workspace/              # domain: workspace definition, state, and commands
+    ├── config/                 # shared: config types, loader, discovery
     │   ├── config.go           # WorkspaceConfig, RepoConfig, GroupConfig, ContextConfig, WorktreeConfig
     │   ├── loader.go           # TOML load/save, atomic writes, LoadCWD, LoadConfig(cmd); synthesizeWorktreeTargets
     │   ├── discovery.go        # Walk-up .gitw search, Discover()
+    │   └── *_test.go
+    │
+    ├── workspace/              # domain: workspace commands (init, context, group)
     │   ├── register.go         # Register(root) → registerInit + registerContext + registerGroup
-    │   ├── cmd_config.go       # Shared config-flag helpers for worktree commands
+    │   ├── cmd_config.go       # Shared withConfig/withMutableConfig/withConfigReadOnly helpers
     │   ├── init.go             # Create new .gitw + .gitignore setup
     │   ├── context.go          # Context show/set/clear/auto
     │   ├── group.go            # Group subcommand tree (add/rm/rename/rmrepo/list/info/edit)
@@ -110,11 +114,12 @@ git-w/
     ├── git/                    # domain: cross-repo git execution and commands
     │   ├── executor.go         # RunParallel: goroutine pool using pkg/parallel
     │   ├── result.go           # ExecResult, WriteResults, ExecErrors
-    │   ├── register.go         # Register(root) → registerGit + registerExec + registerInfo
-    │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root)
+    │   ├── register.go         # Register(root) → registerGit + registerSync + registerExec + registerInfo
+    │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root); loadInputs helper
     │   ├── runner.go           # Shared runGitCmd helper for git subcommands
     │   ├── exec.go             # Execute arbitrary git commands across repos
     │   ├── info.go             # Status table for all or group repos (alias: ll)
+    │   ├── sync.go             # sync: fetch→pull→push pipeline per repo (alias: s); worktree-set aware
     │   └── *_test.go
     │
     ├── worktree/               # domain: git worktree set management commands
@@ -153,11 +158,12 @@ git-w/
 
 Dependency graph (cycle-free):
 ```
-workspace  → gitutil
-repo       → workspace, gitutil
+config     → (none)
+workspace  → config, gitutil
+repo       → config, gitutil
 display    → repo
-git        → repo, workspace, display, parallel
-worktree   → workspace, repo, gitutil, parallel
+git        → repo, config, display, parallel
+worktree   → config, repo, gitutil, parallel
 output     → (none)
 parallel   → (none)
 gitutil    → (none)
@@ -168,7 +174,7 @@ testutil   → (none)
 
 ## Go Types
 
-### Config (`pkg/workspace/`)
+### Config (`pkg/config/`)
 
 ```go
 // config.go — merged from .gitw + .gitw.local at load time
@@ -187,7 +193,8 @@ type WorktreeConfig struct {
 }
 
 // Methods on WorkspaceConfig:
-func (c *WorkspaceConfig) AutoGitignoreEnabled() bool  // nil → true
+func (c WorkspaceConfig) AutoGitignoreEnabled() bool  // nil → true
+func (c WorkspaceConfig) SyncPushEnabled() bool       // nil → true
 func (c *WorkspaceConfig) AddRepoToGroup(group, name string)
 func (c *WorkspaceConfig) RepoName(absPath string) (string, error)
 func (c *WorkspaceConfig) WorktreeRepoName(setName, branch string) string  // "<set>-<branch>"
@@ -197,6 +204,7 @@ func (c *WorkspaceConfig) SortedWorktreeBranchNames(setName string) []string
 type WorkspaceMeta struct {
     Name          string `toml:"name"`
     AutoGitignore *bool  `toml:"auto_gitignore"` // nil = true (default on)
+    SyncPush      *bool  `toml:"sync_push"`      // nil = true (default on)
 }
 
 type RepoConfig struct {
@@ -226,7 +234,7 @@ func RelPath(cfgPath, absPath string) (string, error)
 
 // discovery.go
 const ConfigFileName = ".gitw"
-var ErrNotFound = errors.New("no .gitw found")
+var ErrNotFound = errors.New("no .gitw found in current directory or any parent")
 func Discover(startDir string) (string, error)
 ```
 
@@ -411,6 +419,7 @@ When no filter: uses active context if set, otherwise all repos.
 | `git w pull [repos]` | `pl` | yes | `git pull` |
 | `git w push [repos]` | `ps` | yes | `git push` |
 | `git w status [repos]` | `st` | yes | `git status -sb` |
+| `git w sync [repos]` | `s` | yes | Fetch → pull → push pipeline per repo; stop-on-error per repo; deduplicates bare fetch for worktree sets; `--push`/`--no-push` flags; config: `[workspace].sync_push` (default true) |
 | `git w exec [repos] -- <git-args>` | — | yes* | Any git command |
 | `git w info [group]` | `ll` | — | Status table for all or group repos |
 

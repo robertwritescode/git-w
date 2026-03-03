@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/output"
-	"github.com/robertwritescode/git-w/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +20,7 @@ func registerUnlink(root *cobra.Command) {
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
-	cfg, cfgPath, err := workspace.LoadConfig(cmd)
+	cfg, cfgPath, err := config.LoadConfig(cmd)
 	if err != nil {
 		return err
 	}
@@ -33,10 +33,10 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		output.Writef(cmd.OutOrStdout(), "Removed repo %q\n", name)
 	}
 
-	return workspace.Save(cfgPath, cfg)
+	return config.Save(cfgPath, cfg)
 }
 
-func removeRepo(cfg *workspace.WorkspaceConfig, name string) error {
+func removeRepo(cfg *config.WorkspaceConfig, name string) error {
 	if _, exists := cfg.Repos[name]; !exists {
 		return fmt.Errorf("repo %q not found", name)
 	}
@@ -46,7 +46,7 @@ func removeRepo(cfg *workspace.WorkspaceConfig, name string) error {
 	return nil
 }
 
-func removeRepoFromGroups(cfg *workspace.WorkspaceConfig, name string) {
+func removeRepoFromGroups(cfg *config.WorkspaceConfig, name string) {
 	for gName, g := range cfg.Groups {
 		before := len(g.Repos)
 		g.Repos = slices.DeleteFunc(g.Repos, func(r string) bool {
