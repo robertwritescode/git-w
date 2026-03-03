@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -53,11 +54,11 @@ func runFetch(cmd *cobra.Command, args []string) error {
 	}
 
 	if setName, ok := singleWorktreeSet(cfg, repos); ok {
-		return fetchSetBare(cmd, cfgPath, setName, cfg.Worktrees[setName])
+		return fetchSetBare(cmd.Context(), cmd, cfgPath, setName, cfg.Worktrees[setName])
 	}
 
 	if len(args) == 0 {
-		return fetchWithAllRepoDedup(cmd, cfg, cfgPath, repos)
+		return fetchWithAllRepoDedup(cmd.Context(), cmd, cfg, cfgPath, repos)
 	}
 
 	return runGitCmd(cmd, args, "fetch")
@@ -112,13 +113,13 @@ func singleWorktreeSet(cfg *config.WorkspaceConfig, repos []repo.Repo) (string, 
 	return setName, setName != ""
 }
 
-func fetchSetBare(cmd *cobra.Command, cfgPath, setName string, wt config.WorktreeConfig) error {
+func fetchSetBare(ctx context.Context, cmd *cobra.Command, cfgPath, setName string, wt config.WorktreeConfig) error {
 	bareAbsPath, err := config.ResolveRepoPath(cfgPath, wt.BarePath)
 	if err != nil {
 		return err
 	}
 
-	if err := gitutil.FetchBare(bareAbsPath); err != nil {
+	if err := gitutil.FetchBare(ctx, bareAbsPath); err != nil {
 		return err
 	}
 
@@ -126,14 +127,14 @@ func fetchSetBare(cmd *cobra.Command, cfgPath, setName string, wt config.Worktre
 	return nil
 }
 
-func fetchWithAllRepoDedup(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, repos []repo.Repo) error {
+func fetchWithAllRepoDedup(ctx context.Context, cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, repos []repo.Repo) error {
 	nonWorktree, setToBare, err := collectFetchTargets(cfg, cfgPath, repos)
 	if err != nil {
 		return err
 	}
 
 	var failures []string
-	failures = append(failures, fetchWorktreeBareTargets(cmd, setToBare)...)
+	failures = append(failures, fetchWorktreeBareTargets(ctx, cmd, setToBare)...)
 	failures = append(failures, fetchNonWorktreeTargets(cmd, nonWorktree)...)
 
 	if len(failures) == 0 {
@@ -184,14 +185,14 @@ func dedupeSetsByBare(setToBare map[string][]string) map[string][]string {
 	return bareToSets
 }
 
-func fetchWorktreeBareTargets(cmd *cobra.Command, bareToSets map[string][]string) []string {
+func fetchWorktreeBareTargets(ctx context.Context, cmd *cobra.Command, bareToSets map[string][]string) []string {
 	bars := config.SortedStringKeys(bareToSets)
 	failures := make([]string, 0)
 
 	for _, bareAbsPath := range bars {
 		setNames := bareToSets[bareAbsPath]
 		label := strings.Join(setNames, ",")
-		if err := fetchBarePath(cmd, bareAbsPath, label); err != nil {
+		if err := fetchBarePath(ctx, cmd, bareAbsPath, label); err != nil {
 			failures = append(failures, fmt.Sprintf("  [%s]: %v", label, err))
 			output.Writef(cmd.ErrOrStderr(), "[%s] error: %v\n", label, err)
 		}
@@ -200,8 +201,8 @@ func fetchWorktreeBareTargets(cmd *cobra.Command, bareToSets map[string][]string
 	return failures
 }
 
-func fetchBarePath(cmd *cobra.Command, bareAbsPath, label string) error {
-	if err := gitutil.FetchBare(bareAbsPath); err != nil {
+func fetchBarePath(ctx context.Context, cmd *cobra.Command, bareAbsPath, label string) error {
+	if err := gitutil.FetchBare(ctx, bareAbsPath); err != nil {
 		return err
 	}
 

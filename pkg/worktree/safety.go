@@ -1,13 +1,14 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/robertwritescode/git-w/pkg/repo"
 )
 
-func safetyViolations(r repo.Repo) ([]string, error) {
-	status, err := repo.GetStatus(r)
+func safetyViolations(ctx context.Context, r repo.Repo) ([]string, error) {
+	status, err := repo.GetStatus(ctx, r)
 	if err != nil {
 		return nil, fmt.Errorf("checking status for %q: %w", r.Name, err)
 	}

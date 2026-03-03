@@ -2,6 +2,7 @@ package repo
 
 import (
 	"bytes"
+	"context"
 	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/gitutil"
@@ -33,8 +34,8 @@ type RepoStatus struct {
 
 // GetStatus returns the current status of r by running git subprocesses.
 // Returns an error if the directory does not exist or git cannot run.
-func GetStatus(r Repo) (RepoStatus, error) {
-	statusOut, err := gitutil.Output(r.AbsPath, "status", "-b", "--porcelain")
+func GetStatus(ctx context.Context, r Repo) (RepoStatus, error) {
+	statusOut, err := gitutil.Output(ctx, r.AbsPath, "status", "-b", "--porcelain")
 	if err != nil {
 		return RepoStatus{}, err
 	}
@@ -48,10 +49,10 @@ func GetStatus(r Repo) (RepoStatus, error) {
 	branch, remoteState := parseBranchLine(branchLine)
 	dirty, staged, untracked := parsePorcelainV1(statusOut)
 
-	stashOut, _ := gitutil.Output(r.AbsPath, "stash", "list")
+	stashOut, _ := gitutil.Output(ctx, r.AbsPath, "stash", "list")
 	stashed := parseStashCount(stashOut) > 0
 
-	logOut, _ := gitutil.Output(r.AbsPath, "log", "-1", "--format=%s")
+	logOut, _ := gitutil.Output(ctx, r.AbsPath, "log", "-1", "--format=%s")
 	lastCommit := strings.TrimSpace(string(logOut))
 
 	return RepoStatus{

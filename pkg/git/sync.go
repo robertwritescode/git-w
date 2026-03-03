@@ -150,7 +150,7 @@ func executeSyncUnit(cmd *cobra.Command, cfgPath string, unit syncUnit, doPush b
 	}
 
 	// Worktree set: fetch the bare repo once, then sync all worktrees
-	if err := fetchSetBare(cmd, cfgPath, unit.setName, unit.setConfig); err != nil {
+	if err := fetchSetBare(cmd.Context(), cmd, cfgPath, unit.setName, unit.setConfig); err != nil {
 		output.Writef(cmd.ErrOrStderr(), "[%s] fetch error: %v\n", unit.setName, err)
 		return failedSetReports(unit.setRepos)
 	}

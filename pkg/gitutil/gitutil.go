@@ -15,8 +15,8 @@ var gitignoreMu sync.Mutex
 
 // Output runs a git command in repoPath and returns its stdout.
 // On failure it returns stderr (if available) alongside the error.
-func Output(repoPath string, args ...string) ([]byte, error) {
-	out, err := exec.Command("git", append([]string{"-C", repoPath}, args...)...).Output()
+func Output(ctx context.Context, repoPath string, args ...string) ([]byte, error) {
+	out, err := exec.CommandContext(ctx, "git", append([]string{"-C", repoPath}, args...)...).Output()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -163,8 +163,8 @@ func SetBranchTrackingToOrigin(ctx context.Context, treePath, branch string) err
 }
 
 // RemoveWorktree runs `git -C <barePath> worktree remove <treePath>`.
-func RemoveWorktree(barePath, treePath string) error {
-	out, err := exec.Command("git", "-C", barePath, "worktree", "remove", treePath).CombinedOutput()
+func RemoveWorktree(ctx context.Context, barePath, treePath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "worktree", "remove", treePath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree remove: %w\n%s", err, out)
 	}
@@ -173,8 +173,8 @@ func RemoveWorktree(barePath, treePath string) error {
 }
 
 // RemoveWorktreeForce runs `git -C <barePath> worktree remove --force <treePath>`.
-func RemoveWorktreeForce(barePath, treePath string) error {
-	out, err := exec.Command("git", "-C", barePath, "worktree", "remove", "--force", treePath).CombinedOutput()
+func RemoveWorktreeForce(ctx context.Context, barePath, treePath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "worktree", "remove", "--force", treePath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree remove --force: %w\n%s", err, out)
 	}
@@ -183,8 +183,8 @@ func RemoveWorktreeForce(barePath, treePath string) error {
 }
 
 // FetchBare runs `git -C <barePath> fetch`.
-func FetchBare(barePath string) error {
-	out, err := exec.Command("git", "-C", barePath, "fetch").CombinedOutput()
+func FetchBare(ctx context.Context, barePath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "fetch").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git fetch (bare): %w\n%s", err, out)
 	}
@@ -194,8 +194,8 @@ func FetchBare(barePath string) error {
 
 // RemoteURL returns the origin remote URL of the repo at repoPath, or the
 // empty string if no origin remote is configured.
-func RemoteURL(repoPath string) string {
-	out, err := exec.Command("git", "-C", repoPath, "remote", "get-url", "origin").Output()
+func RemoteURL(ctx context.Context, repoPath string) string {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "remote", "get-url", "origin").Output()
 	if err != nil {
 		return ""
 	}

@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,7 +84,7 @@ func (s *SafetySuite) TestSafetyViolations() {
 				tc.mutate(repoDir)
 			}
 
-			violations, err := safetyViolations(repo.Repo{Name: "x", AbsPath: repoDir})
+			violations, err := safetyViolations(context.Background(), repo.Repo{Name: "x", AbsPath: repoDir})
 			s.Require().NoError(err)
 			s.Assert().Len(violations, tc.wantCount)
 		})

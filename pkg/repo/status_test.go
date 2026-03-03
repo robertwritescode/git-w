@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/testutil"
@@ -90,7 +91,7 @@ func (s *StatusSuite) TestParseStashCount() {
 
 func (s *StatusSuite) TestGetStatus_Smoke() {
 	dir := s.MakeGitRepo("")
-	status, err := GetStatus(Repo{Name: "x", AbsPath: dir})
+	status, err := GetStatus(context.Background(), Repo{Name: "x", AbsPath: dir})
 	s.Require().NoError(err)
 
 	s.Assert().NotEmpty(status.Branch)

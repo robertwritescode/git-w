@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 
@@ -37,16 +38,16 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	entries := collectStatuses(repos)
+	entries := collectStatuses(cmd.Context(), repos)
 	display.RenderTable(cmd.OutOrStdout(), entries)
 
 	return nil
 }
 
-func collectStatuses(repos []repo.Repo) []display.TableEntry {
+func collectStatuses(ctx context.Context, repos []repo.Repo) []display.TableEntry {
 	workers := parallel.MaxWorkers(runtime.NumCPU(), len(repos))
 	return parallel.RunFanOut(repos, workers, func(r repo.Repo) display.TableEntry {
-		status, err := repo.GetStatus(r)
+		status, err := repo.GetStatus(ctx, r)
 		if err != nil {
 			status = repo.RepoStatus{
 				Branch:     "?",

@@ -257,7 +257,7 @@ func createInPlainRepo(ctx context.Context, r repo.Repo, branchName, sourceBranc
 		return report
 	}
 
-	if !hasRemote(r) {
+	if !hasRemote(ctx, r) {
 		skipRemoteOps(&report, flags)
 		return report
 	}
@@ -271,7 +271,7 @@ func syncSourcePlainRepo(ctx context.Context, report *branchReport, r repo.Repo,
 		return false
 	}
 
-	if !hasRemote(r) {
+	if !hasRemote(ctx, r) {
 		return true
 	}
 
@@ -295,7 +295,7 @@ func applyRemoteOps(ctx context.Context, report *branchReport, r repo.Repo, bran
 
 func createInWorktreeSet(ctx context.Context, cfgPath string, unit branchUnit, branchName string, flags branchFlags) []branchReport {
 	if flags.SyncSource {
-		if err := fetchBareRepo(cfgPath, unit.setConfig); err != nil {
+		if err := fetchBareRepo(ctx, cfgPath, unit.setConfig); err != nil {
 			setReport := branchReport{RepoName: unit.setName, Failed: true, isSet: true}
 			recordStep(&setReport, "fetch", err, false)
 			return append([]branchReport{setReport}, failedSetReports(unit.setRepos, "fetch", err)...)
@@ -331,7 +331,7 @@ func runWorktreeReports(ctx context.Context, unit branchUnit, branchName string,
 func createInWorktree(ctx context.Context, r repo.Repo, branchName, sourceBranch string, flags branchFlags) branchReport {
 	report := branchReport{RepoName: r.Name}
 
-	if flags.SyncSource && hasRemote(r) {
+	if flags.SyncSource && hasRemote(ctx, r) {
 		if !runStep(&report, "pull", func() error { return gitutil.PullBranch(ctx, r.AbsPath, sourceBranch) }) {
 			return report
 		}
@@ -341,7 +341,7 @@ func createInWorktree(ctx context.Context, r repo.Repo, branchName, sourceBranch
 		return report
 	}
 
-	if !hasRemote(r) {
+	if !hasRemote(ctx, r) {
 		skipRemoteOps(&report, flags)
 		return report
 	}
@@ -350,13 +350,13 @@ func createInWorktree(ctx context.Context, r repo.Repo, branchName, sourceBranch
 	return report
 }
 
-func fetchBareRepo(cfgPath string, wt config.WorktreeConfig) error {
+func fetchBareRepo(ctx context.Context, cfgPath string, wt config.WorktreeConfig) error {
 	bareAbsPath, err := config.ResolveRepoPath(cfgPath, wt.BarePath)
 	if err != nil {
 		return err
 	}
 
-	return gitutil.FetchBare(bareAbsPath)
+	return gitutil.FetchBare(ctx, bareAbsPath)
 }
 
 func worktreeBranchForRepo(unit branchUnit, repoName string) string {
@@ -427,8 +427,8 @@ func recordStep(report *branchReport, stepName string, err error, skipped bool) 
 	}
 }
 
-func hasRemote(r repo.Repo) bool {
-	return gitutil.RemoteURL(r.AbsPath) != ""
+func hasRemote(ctx context.Context, r repo.Repo) bool {
+	return gitutil.RemoteURL(ctx, r.AbsPath) != ""
 }
 
 func skipRemoteOps(report *branchReport, flags branchFlags) {

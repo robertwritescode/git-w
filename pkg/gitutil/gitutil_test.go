@@ -46,14 +46,14 @@ func TestGitutilSuite(t *testing.T) {
 
 func (s *GitutilSuite) TestRemoteURL_NoRemote() {
 	repoDir := s.MakeGitRepo("")
-	got := gitutil.RemoteURL(repoDir)
+	got := gitutil.RemoteURL(context.Background(), repoDir)
 	s.Assert().Equal("", got)
 }
 
 func (s *GitutilSuite) TestRemoteURL_WithRemote() {
 	want := "file:///tmp/fake-origin"
 	repoDir := s.MakeGitRepo(want)
-	got := gitutil.RemoteURL(repoDir)
+	got := gitutil.RemoteURL(context.Background(), repoDir)
 	s.Assert().Equal(want, got)
 }
 
@@ -183,7 +183,7 @@ func (s *GitutilSuite) TestCloneBare_AddRemoveWorktree() {
 	s.Require().NoError(gitutil.AddWorktree(context.Background(), bareDir, worktreeDir, "dev"))
 	s.True(repo.IsGitRepo(worktreeDir))
 
-	s.Require().NoError(gitutil.RemoveWorktree(bareDir, worktreeDir))
+	s.Require().NoError(gitutil.RemoveWorktree(context.Background(), bareDir, worktreeDir))
 	s.NoDirExists(worktreeDir)
 }
 
@@ -202,7 +202,7 @@ func (s *GitutilSuite) TestFetchBare() {
 	s.RunGit(localDir, "commit", "-m", "fetch-update")
 	s.RunGit(localDir, "push", "origin", "dev")
 
-	s.Require().NoError(gitutil.FetchBare(bareDir))
+	s.Require().NoError(gitutil.FetchBare(context.Background(), bareDir))
 	out, err := exec.Command("git", "-C", bareDir, "show-ref").CombinedOutput()
 	s.Require().NoError(err, string(out))
 }

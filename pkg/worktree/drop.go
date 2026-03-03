@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -41,7 +42,7 @@ func runDrop(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := executeDropOperation(cfgPath, op); err != nil {
+	if err := executeDropOperation(cmd.Context(), cfgPath, op); err != nil {
 		return err
 	}
 
@@ -81,12 +82,12 @@ func prepareDropOperation(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPa
 	return dropOperation{setName: setName, wt: wt, bareAbs: bareAbs, force: force}, nil
 }
 
-func executeDropOperation(cfgPath string, op dropOperation) error {
-	if err := validateDropSafety(op.force, cfgPath, op.setName, op.wt); err != nil {
+func executeDropOperation(ctx context.Context, cfgPath string, op dropOperation) error {
+	if err := validateDropSafety(ctx, op.force, cfgPath, op.setName, op.wt); err != nil {
 		return err
 	}
 
-	return removeDropWorktrees(cfgPath, op.bareAbs, op.wt, op.force)
+	return removeDropWorktrees(ctx, cfgPath, op.bareAbs, op.wt, op.force)
 }
 
 func lookupDropSet(cfg *config.WorkspaceConfig, setName string) (config.WorktreeConfig, error) {
@@ -98,12 +99,12 @@ func lookupDropSet(cfg *config.WorkspaceConfig, setName string) (config.Worktree
 	return wt, nil
 }
 
-func validateDropSafety(force bool, cfgPath, setName string, wt config.WorktreeConfig) error {
+func validateDropSafety(ctx context.Context, force bool, cfgPath, setName string, wt config.WorktreeConfig) error {
 	if force {
 		return nil
 	}
 
-	violations, err := collectDropViolations(cfgPath, setName, wt)
+	violations, err := collectDropViolations(ctx, cfgPath, setName, wt)
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func validateDropSafety(force bool, cfgPath, setName string, wt config.WorktreeC
 	return fmt.Errorf("refusing to drop %q:\n%s", setName, strings.Join(violations, "\n"))
 }
 
-func removeDropWorktrees(cfgPath, bareAbs string, wt config.WorktreeConfig, force bool) error {
+func removeDropWorktrees(ctx context.Context, cfgPath, bareAbs string, wt config.WorktreeConfig, force bool) error {
 	for _, branch := range config.SortedWorktreeBranchNames(wt.Branches) {
 		absPath, err := config.ResolveRepoPath(cfgPath, wt.Branches[branch])
 		if err != nil {
@@ -126,7 +127,7 @@ func removeDropWorktrees(cfgPath, bareAbs string, wt config.WorktreeConfig, forc
 			continue // already removed by a prior attempt
 		}
 
-		if err := removeOneWorktree(bareAbs, absPath, force); err != nil {
+		if err := removeOneWorktree(ctx, bareAbs, absPath, force); err != nil {
 			return err
 		}
 	}
@@ -134,7 +135,7 @@ func removeDropWorktrees(cfgPath, bareAbs string, wt config.WorktreeConfig, forc
 	return nil
 }
 
-func collectDropViolations(cfgPath, setName string, wt config.WorktreeConfig) ([]string, error) {
+func collectDropViolations(ctx context.Context, cfgPath, setName string, wt config.WorktreeConfig) ([]string, error) {
 	var violations []string
 	for _, branch := range config.SortedWorktreeBranchNames(wt.Branches) {
 		absPath, err := config.ResolveRepoPath(cfgPath, wt.Branches[branch])
@@ -149,7 +150,7 @@ func collectDropViolations(cfgPath, setName string, wt config.WorktreeConfig) ([
 		}
 
 		r := repo.Repo{Name: config.WorktreeRepoName(setName, branch), AbsPath: absPath}
-		msgs, err := safetyViolations(r)
+		msgs, err := safetyViolations(ctx, r)
 		if err != nil {
 			return nil, err
 		}
