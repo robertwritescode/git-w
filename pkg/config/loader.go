@@ -33,25 +33,30 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading config %s: %w", configPath, err)
 	}
+
 	if err := toml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config %s: %w", configPath, err)
 	}
 
 	ensureWorkspaceMaps(cfg)
 
-	if err := validateWorktreePaths(configPath, cfg); err != nil {
-		return nil, err
-	}
-
-	if err := synthesizeWorktreeTargets(cfg); err != nil {
-		return nil, err
-	}
-
-	if err := validateRepoPaths(configPath, cfg); err != nil {
+	if err := buildAndValidate(configPath, cfg); err != nil {
 		return nil, err
 	}
 
 	return cfg, nil
+}
+
+func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
+	if err := validateWorktreePaths(configPath, cfg); err != nil {
+		return err
+	}
+
+	if err := synthesizeWorktreeTargets(cfg); err != nil {
+		return err
+	}
+
+	return validateRepoPaths(configPath, cfg)
 }
 
 func ensureWorkspaceMaps(cfg *WorkspaceConfig) {

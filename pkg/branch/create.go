@@ -351,10 +351,8 @@ func runWorktreeReports(ctx context.Context, unit branchUnit, branchName string,
 func createInWorktree(ctx context.Context, r repo.Repo, branchName, sourceBranch string, flags branchFlags) branchReport {
 	report := branchReport{RepoName: r.Name}
 
-	if flags.SyncSource && hasRemote(ctx, r) {
-		if !runStep(&report, "pull", func() error { return gitutil.PullBranch(ctx, r.AbsPath, sourceBranch) }) {
-			return report
-		}
+	if !syncWorktreeSource(ctx, &report, r, sourceBranch, flags) {
+		return report
 	}
 
 	if !createBranchStep(ctx, &report, r, branchName, sourceBranch) {
@@ -368,6 +366,14 @@ func createInWorktree(ctx context.Context, r repo.Repo, branchName, sourceBranch
 
 	applyRemoteOps(ctx, &report, r, branchName, flags)
 	return report
+}
+
+func syncWorktreeSource(ctx context.Context, report *branchReport, r repo.Repo, sourceBranch string, flags branchFlags) bool {
+	if !flags.SyncSource || !hasRemote(ctx, r) {
+		return true
+	}
+
+	return runStep(report, "pull", func() error { return gitutil.PullBranch(ctx, r.AbsPath, sourceBranch) })
 }
 
 func fetchBareRepo(ctx context.Context, cfgPath string, wt config.WorktreeConfig) error {
@@ -503,38 +509,40 @@ func writeBranchSummary(cmd *cobra.Command, reports []branchReport) {
 	output.Writef(cmd.OutOrStdout(), "branch create complete: %d ok, %d failed\n", ok, failed)
 }
 
+func repoReports(reports []branchReport) []branchReport {
+	out := make([]branchReport, 0, len(reports))
+
+	for _, r := range reports {
+		if !r.isSet {
+			out = append(out, r)
+		}
+	}
+
+	return out
+}
+
 func countBranchReports(reports []branchReport) (int, int) {
-	total := 0
+	filtered := repoReports(reports)
 	failed := 0
 
-	for _, report := range reports {
-		if report.isSet {
-			continue
-		}
-
-		total++
-		if report.Failed {
+	for _, r := range filtered {
+		if r.Failed {
 			failed++
 		}
 	}
 
-	return total - failed, failed
+	return len(filtered) - failed, failed
 }
 
 func branchReportsError(reports []branchReport) error {
+	filtered := repoReports(reports)
 	failures := make([]string, 0)
-	total := 0
 
-	for _, report := range reports {
-		if report.isSet {
-			continue
-		}
-
-		total++
-		if report.Failed {
-			failures = append(failures, fmt.Sprintf("  [%s]: branch create failed", report.RepoName))
+	for _, r := range filtered {
+		if r.Failed {
+			failures = append(failures, fmt.Sprintf("  [%s]: branch create failed", r.RepoName))
 		}
 	}
 
-	return parallel.FormatFailureError(failures, total)
+	return parallel.FormatFailureError(failures, len(filtered))
 }

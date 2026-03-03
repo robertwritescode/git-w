@@ -158,18 +158,30 @@ func (c *WorkspaceConfig) RemoveRepoFromManualGroups(repoName string) {
 			continue
 		}
 
-		filtered := make([]string, 0, len(g.Repos))
-		for _, r := range g.Repos {
-			if r != repoName {
-				filtered = append(filtered, r)
-			}
-		}
+		c.updateGroupWithoutRepo(groupName, g, repoName)
+	}
+}
 
-		if len(filtered) != len(g.Repos) {
-			g.Repos = filtered
-			c.Groups[groupName] = g
+func (c *WorkspaceConfig) updateGroupWithoutRepo(groupName string, g GroupConfig, repoName string) {
+	filtered := filterGroupRepos(g.Repos, repoName)
+	if len(filtered) == len(g.Repos) {
+		return
+	}
+
+	g.Repos = filtered
+	c.Groups[groupName] = g
+}
+
+func filterGroupRepos(repos []string, exclude string) []string {
+	filtered := make([]string, 0, len(repos))
+
+	for _, r := range repos {
+		if r != exclude {
+			filtered = append(filtered, r)
 		}
 	}
+
+	return filtered
 }
 
 // SortedStringKeys returns string map keys in deterministic order.

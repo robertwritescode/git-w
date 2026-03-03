@@ -547,12 +547,7 @@ func (s *BranchCreateSuite) addInfraWorktree(bareAbs, wsDir, branch string) stri
 }
 
 func (s *BranchCreateSuite) writeInfraWorktreeConfig(wsDir, remoteURL, barePath, workspaceExtra string) {
-	extra := ""
-	if workspaceExtra != "" {
-		extra = workspaceExtra
-	}
-
-	cfg := fmt.Sprintf("[workspace]\nname = \"ws\"\n%s\n[worktrees.infra]\nurl=%q\nbare_path=%q\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", extra, remoteURL, barePath)
+	cfg := fmt.Sprintf("[workspace]\nname = \"ws\"\n%s\n[worktrees.infra]\nurl=%q\nbare_path=%q\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", workspaceExtra, remoteURL, barePath)
 	writeWorkspaceFile(s, wsDir, cfg)
 }
 
