@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pelletier/go-toml/v2"
+	"github.com/robertwritescode/git-w/pkg/toml"
 	"github.com/spf13/cobra"
 )
 
@@ -97,46 +97,78 @@ func mergeLocalConfig(cfg *WorkspaceConfig, localPath string) error {
 
 // Save writes cfg to configPath atomically (write to .tmp, then rename).
 // Only the workspace, repos, and groups sections are written; context lives in .gitw.local.
+// Comments and formatting from the original file are preserved where possible.
 func Save(configPath string, cfg *WorkspaceConfig) error {
 	if err := validateRepoPaths(configPath, cfg); err != nil {
 		return err
 	}
 
-	type diskConfig struct {
-		Workspace WorkspaceMeta             `toml:"workspace"`
-		Repos     map[string]RepoConfig     `toml:"repos,omitempty"`
-		Groups    map[string]GroupConfig    `toml:"groups,omitempty"`
-		Worktrees map[string]WorktreeConfig `toml:"worktrees,omitempty"`
-	}
-
-	repos := withoutSynthesizedRepos(cfg.Repos, cfg.Worktrees)
-	groups := withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees)
-
-	data, err := toml.Marshal(diskConfig{
-		Workspace: cfg.Workspace,
-		Repos:     repos,
-		Groups:    groups,
-		Worktrees: cfg.Worktrees,
-	})
+	newConfig := prepareDiskConfig(cfg)
+	data, err := saveWithCommentPreservation(configPath, newConfig)
 	if err != nil {
-		return fmt.Errorf("marshaling config: %w", err)
+		return err
 	}
 
 	return atomicWriteFile(configPath, data)
 }
 
-// SaveLocal writes the context section to configPath+".local" atomically.
+type diskConfig struct {
+	Workspace WorkspaceMeta             `toml:"workspace"`
+	Repos     map[string]RepoConfig     `toml:"repos,omitempty"`
+	Groups    map[string]GroupConfig    `toml:"groups,omitempty"`
+	Worktrees map[string]WorktreeConfig `toml:"worktrees,omitempty"`
+}
+
+func prepareDiskConfig(cfg *WorkspaceConfig) diskConfig {
+	return diskConfig{
+		Workspace: cfg.Workspace,
+		Repos:     withoutSynthesizedRepos(cfg.Repos, cfg.Worktrees),
+		Groups:    withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
+		Worktrees: cfg.Worktrees,
+	}
+}
+
 func SaveLocal(configPath string, ctx ContextConfig) error {
 	type localFile struct {
 		Context ContextConfig `toml:"context"`
 	}
 
-	data, err := toml.Marshal(localFile{Context: ctx})
+	newConfig := localFile{Context: ctx}
+	localPath := configPath + ".local"
+
+	data, err := saveWithCommentPreservation(localPath, newConfig)
 	if err != nil {
-		return fmt.Errorf("marshaling local config: %w", err)
+		return err
 	}
 
-	return atomicWriteFile(configPath+".local", data)
+	return atomicWriteFile(localPath, data)
+}
+
+func saveWithCommentPreservation(path string, newConfig interface{}) ([]byte, error) {
+	original, err := os.ReadFile(path)
+	if err != nil {
+		return marshalToml(newConfig)
+	}
+
+	var oldConfig interface{}
+	if err := toml.Unmarshal(original, &oldConfig); err != nil {
+		return marshalToml(newConfig)
+	}
+
+	data, err := toml.UpdatePreservingComments(original, oldConfig, newConfig)
+	if err != nil {
+		return nil, fmt.Errorf("updating config: %w", err)
+	}
+
+	return data, nil
+}
+
+func marshalToml(cfg interface{}) ([]byte, error) {
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling config: %w", err)
+	}
+	return data, nil
 }
 
 func atomicWriteFile(path string, data []byte) error {

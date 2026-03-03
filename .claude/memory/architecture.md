@@ -86,9 +86,13 @@ git-w/
     │
     ├── config/                 # shared: ALL config types, loader, discovery (config.go moved here from pkg/workspace in branch/13)
     │   ├── config.go           # WorkspaceConfig, WorkspaceMeta, RepoConfig, GroupConfig, ContextConfig, WorktreeConfig; methods + WorktreeRepoToSetIndex + SortedStringKeys
-    │   ├── loader.go           # TOML load/save, atomic writes, LoadCWD, LoadConfig(cmd); synthesizeWorktreeTargets
+    │   ├── loader.go           # TOML load/save (comment-preserving), atomic writes, LoadCWD, LoadConfig(cmd); synthesizeWorktreeTargets
     │   ├── discovery.go        # Walk-up .gitw search, Discover()
     │   └── *_test.go
+    │
+    ├── toml/                   # shared utility: TOML parsing with comment preservation
+    │   ├── preserve.go         # UpdatePreservingComments, Marshal/Unmarshal re-exports
+    │   └── preserve_test.go
     │
     ├── workspace/              # domain: workspace commands (init, context, group)
     │   ├── register.go         # Register(root) → registerInit + registerContext + registerGroup
@@ -163,7 +167,8 @@ git-w/
 
 Dependency graph (cycle-free):
 ```
-config     → (none)
+toml       → (pelletier/go-toml)
+config     → toml
 workspace  → config, gitutil
 repo       → config, gitutil
 display    → repo
@@ -244,8 +249,8 @@ type ContextConfig struct {
 
 // loader.go
 func Load(configPath string) (*WorkspaceConfig, error)
-func Save(configPath string, cfg *WorkspaceConfig) error
-func SaveLocal(configPath string, ctx ContextConfig) error
+func Save(configPath string, cfg *WorkspaceConfig) error         // comment-preserving since branch/13
+func SaveLocal(configPath string, ctx ContextConfig) error       // comment-preserving since branch/13
 func LoadCWD(override string) (*WorkspaceConfig, string, error)
 func LoadConfig(cmd *cobra.Command) (*WorkspaceConfig, string, error)
 func ConfigDir(configPath string) string
@@ -538,12 +543,14 @@ All non-trivial logic has unit tests. See `testing.md` for full details.
 
 ```
 github.com/spf13/cobra          v1.x   CLI framework
-github.com/pelletier/go-toml/v2 v2.x   TOML parsing
+github.com/pelletier/go-toml/v2 v2.x   TOML parsing (wrapped in pkg/toml)
 github.com/fatih/color          v1.x   ANSI terminal colors
 github.com/stretchr/testify     v1.x   assert + require for unit tests (test only)
 ```
 
 No `golang.org/x/sync` — parallel execution uses native goroutines with channels and `sync.WaitGroup` in `pkg/parallel`.
+
+**TOML Comment Preservation:** `pkg/toml` wraps `go-toml/v2` and adds smart update logic that preserves user comments and formatting when modifying config files. The `Save()` functions in `pkg/config/loader.go` use this automatically.
 
 ---
 

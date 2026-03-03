@@ -25,7 +25,7 @@
 
 ## Tech Stack
 - CLI: `github.com/spf13/cobra`
-- Config parsing: `github.com/pelletier/go-toml/v2`
+- Config parsing: `github.com/pelletier/go-toml/v2` (wrapped in `pkg/toml` for comment preservation)
 - Colors: `github.com/fatih/color`
 - Concurrency: native goroutines + channels/WaitGroup (in `pkg/parallel`)
 - Testing: `github.com/stretchr/testify` (`assert` + `require`) — required in all test files
@@ -36,6 +36,7 @@
 ```
 pkg/cmd/             — root cobra cmd, Execute(), completion (wires 5 domain Register funcs)
 pkg/config/          — ALL config types (WorkspaceConfig etc.), loader, discovery
+pkg/toml/            — TOML parsing wrapper with comment preservation (wraps go-toml/v2)
 pkg/workspace/       — init/context/group commands; cmd_config helpers
 pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands
 pkg/git/             — executor, result, fetch/pull/push/status/exec/info/sync commands
