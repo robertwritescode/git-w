@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/robertwritescode/git-w/compare/v1.1.2...v1.2.0) (2026-03-03)
+
+
+### Features
+
+* add `git w sync` for full workspace synchronization ([#11](https://github.com/robertwritescode/git-w/issues/11)) ([c5d9840](https://github.com/robertwritescode/git-w/commit/c5d984063ebc7b426d0ed82d56831b9631b2db18))
+
 ## [1.1.2](https://github.com/robertwritescode/git-w/compare/v1.1.1...v1.1.2) (2026-03-02)
 
 
