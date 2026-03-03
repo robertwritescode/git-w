@@ -225,12 +225,5 @@ func fetchNonWorktreeTargets(cmd *cobra.Command, repos []repo.Repo) []string {
 }
 
 func worktreeRepoToSet(cfg *config.WorkspaceConfig) map[string]string {
-	result := make(map[string]string)
-	for setName, wt := range cfg.Worktrees {
-		for _, branch := range config.SortedStringKeys(wt.Branches) {
-			result[config.WorktreeRepoName(setName, branch)] = setName
-		}
-	}
-
-	return result
+	return config.WorktreeRepoToSetIndex(cfg)
 }

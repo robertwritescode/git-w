@@ -19,16 +19,21 @@ type WorkspaceConfig struct {
 
 // WorkspaceMeta holds top-level workspace settings.
 type WorkspaceMeta struct {
-	Name          string `toml:"name"`
-	AutoGitignore *bool  `toml:"auto_gitignore"` // nil means true (default on)
-	SyncPush      *bool  `toml:"sync_push"`      // nil means true (default on)
+	Name              string `toml:"name"`
+	AutoGitignore     *bool  `toml:"auto_gitignore"` // nil means true (default on)
+	SyncPush          *bool  `toml:"sync_push"`      // nil means true (default on)
+	DefaultBranch     string `toml:"default_branch"`
+	BranchSyncSource  *bool  `toml:"branch_sync_source"`  // nil means true (default on)
+	BranchSetUpstream *bool  `toml:"branch_set_upstream"` // nil means true (default on)
+	BranchPush        *bool  `toml:"branch_push"`         // nil means true (default on)
 }
 
 // RepoConfig represents one tracked repository.
 type RepoConfig struct {
-	Path  string   `toml:"path"`
-	URL   string   `toml:"url,omitempty"`
-	Flags []string `toml:"flags,omitempty"`
+	Path          string   `toml:"path"`
+	URL           string   `toml:"url,omitempty"`
+	Flags         []string `toml:"flags,omitempty"`
+	DefaultBranch string   `toml:"default_branch,omitempty"`
 }
 
 // WorktreeConfig describes one shared bare-repo + branch worktree set.
@@ -57,6 +62,47 @@ func (c WorkspaceConfig) AutoGitignoreEnabled() bool {
 // SyncPushEnabled reports whether sync runs push by default (nil means true).
 func (c WorkspaceConfig) SyncPushEnabled() bool {
 	return c.Workspace.SyncPush == nil || *c.Workspace.SyncPush
+}
+
+// BranchSyncSourceEnabled reports whether branch creation syncs the source branch (nil means true).
+func (c WorkspaceConfig) BranchSyncSourceEnabled() bool {
+	return c.Workspace.BranchSyncSource == nil || *c.Workspace.BranchSyncSource
+}
+
+// BranchSetUpstreamEnabled reports whether branch creation sets upstream (nil means true).
+func (c WorkspaceConfig) BranchSetUpstreamEnabled() bool {
+	return c.Workspace.BranchSetUpstream == nil || *c.Workspace.BranchSetUpstream
+}
+
+// BranchPushEnabled reports whether branch creation pushes by default (nil means true).
+func (c WorkspaceConfig) BranchPushEnabled() bool {
+	return c.Workspace.BranchPush == nil || *c.Workspace.BranchPush
+}
+
+// ResolveDefaultBranch returns the source branch for a repo.
+func (c WorkspaceConfig) ResolveDefaultBranch(repoName string) string {
+	if repoCfg, ok := c.Repos[repoName]; ok && repoCfg.DefaultBranch != "" {
+		return repoCfg.DefaultBranch
+	}
+
+	if c.Workspace.DefaultBranch != "" {
+		return c.Workspace.DefaultBranch
+	}
+
+	return "main"
+}
+
+// WorktreeBranchForRepo returns the worktree branch for a synthesized repo name.
+func (c WorkspaceConfig) WorktreeBranchForRepo(repoName string) (string, bool) {
+	for setName, wt := range c.Worktrees {
+		for branch := range wt.Branches {
+			if WorktreeRepoName(setName, branch) == repoName {
+				return branch, true
+			}
+		}
+	}
+
+	return "", false
 }
 
 // AddRepoToGroup appends name to the named group, creating the group if absent.
@@ -88,6 +134,19 @@ func (c *WorkspaceConfig) RepoName(absPath string) (string, error) {
 // WorktreeRepoName returns the synthesized repo name for a set+branch.
 func WorktreeRepoName(setName, branch string) string {
 	return fmt.Sprintf("%s-%s", setName, branch)
+}
+
+// WorktreeRepoToSetIndex returns a map of synthesized repo name to worktree set name.
+func WorktreeRepoToSetIndex(c *WorkspaceConfig) map[string]string {
+	result := make(map[string]string)
+
+	for setName, wt := range c.Worktrees {
+		for _, branch := range SortedStringKeys(wt.Branches) {
+			result[WorktreeRepoName(setName, branch)] = setName
+		}
+	}
+
+	return result
 }
 
 // RemoveRepoFromManualGroups removes repoName from every group that is not

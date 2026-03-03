@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/robertwritescode/git-w/pkg/branch"
 	gitpkg "github.com/robertwritescode/git-w/pkg/git"
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/robertwritescode/git-w/pkg/workspace"
@@ -25,6 +26,7 @@ Invoke as 'git w <cmd>' via git's plugin system (git-w must be in $PATH).`,
 	workspace.Register(root)
 	repo.Register(root)
 	worktree.Register(root)
+	branch.Register(root)
 	gitpkg.Register(root)
 	registerCompletion(root)
 
