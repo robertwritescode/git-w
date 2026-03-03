@@ -7,6 +7,7 @@ import (
 
 	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/gitutil"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/spf13/cobra"
 )
@@ -121,7 +122,7 @@ func fetchSetBare(cmd *cobra.Command, cfgPath, setName string, wt config.Worktre
 		return err
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "[%s] fetch\n", setName)
+	output.Writef(cmd.OutOrStdout(), "[%s] fetch\n", setName)
 	return nil
 }
 
@@ -192,7 +193,7 @@ func fetchWorktreeBareTargets(cmd *cobra.Command, bareToSets map[string][]string
 		label := strings.Join(setNames, ",")
 		if err := fetchBarePath(cmd, bareAbsPath, label); err != nil {
 			failures = append(failures, fmt.Sprintf("  [%s]: %v", label, err))
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[%s] error: %v\n", label, err)
+			output.Writef(cmd.ErrOrStderr(), "[%s] error: %v\n", label, err)
 		}
 	}
 
@@ -204,7 +205,7 @@ func fetchBarePath(cmd *cobra.Command, bareAbsPath, label string) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "[%s] fetch\n", label)
+	output.Writef(cmd.OutOrStdout(), "[%s] fetch\n", label)
 	return nil
 }
 

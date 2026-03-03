@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/config"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/parallel"
 	"github.com/robertwritescode/git-w/pkg/repo"
 	"github.com/spf13/cobra"
@@ -26,6 +27,14 @@ type syncReport struct {
 }
 
 type syncRepoFn func(repo.Repo, bool) syncReport
+
+type syncUnit struct {
+	isWorktree bool
+	plain      *repo.Repo
+	setName    string
+	setRepos   []repo.Repo
+	setConfig  config.WorktreeConfig
+}
 
 func registerSync(root *cobra.Command) {
 	cmd := &cobra.Command{
@@ -75,44 +84,78 @@ func resolveSyncPush(cmd *cobra.Command, cfg *config.WorkspaceConfig) (bool, err
 }
 
 func collectSyncReports(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, repos []repo.Repo, doPush bool) []syncReport {
-	plain, setRepos := splitSyncTargets(cfg, repos)
-	reports := runSyncReports(plain, doPush, syncPlainRepo)
-	reports = append(reports, runWorktreeSetSync(cmd, cfg, cfgPath, setRepos, doPush)...)
+	units := buildSyncUnits(cfg, repos)
+
+	if len(units) == 0 {
+		return nil
+	}
+
+	if len(units) == 1 {
+		return executeSyncUnit(cmd, cfgPath, units[0], doPush)
+	}
+
+	workers := parallel.MaxWorkers(0, len(units))
+	allReports := parallel.RunFanOut(units, workers, func(unit syncUnit) []syncReport {
+		return executeSyncUnit(cmd, cfgPath, unit, doPush)
+	})
+
+	// Flatten the reports
+	reports := make([]syncReport, 0)
+	for _, unitReports := range allReports {
+		reports = append(reports, unitReports...)
+	}
+
 	return reports
 }
 
-func splitSyncTargets(cfg *config.WorkspaceConfig, repos []repo.Repo) ([]repo.Repo, map[string][]repo.Repo) {
+func buildSyncUnits(cfg *config.WorkspaceConfig, repos []repo.Repo) []syncUnit {
 	byRepo := worktreeRepoToSet(cfg)
-	plain := make([]repo.Repo, 0, len(repos))
+	units := make([]syncUnit, 0)
 	setRepos := make(map[string][]repo.Repo)
 
+	// Separate plain repos and worktree repos
 	for _, r := range repos {
 		setName, isWorktree := byRepo[r.Name]
 		if !isWorktree {
-			plain = append(plain, r)
+			// Each plain repo is its own unit
+			rCopy := r
+			units = append(units, syncUnit{
+				isWorktree: false,
+				plain:      &rCopy,
+			})
 			continue
 		}
 
+		// Group worktree repos by set
 		setRepos[setName] = append(setRepos[setName], r)
 	}
 
-	return plain, setRepos
-}
-
-func runWorktreeSetSync(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath string, setRepos map[string][]repo.Repo, doPush bool) []syncReport {
-	reports := make([]syncReport, 0)
-
+	// Each worktree set becomes a unit
 	for _, setName := range config.SortedStringKeys(setRepos) {
-		if err := fetchSetBare(cmd, cfgPath, setName, cfg.Worktrees[setName]); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[%s] fetch error: %v\n", setName, err)
-			reports = append(reports, failedSetReports(setRepos[setName])...)
-			continue
-		}
-
-		reports = append(reports, runSyncReports(setRepos[setName], doPush, syncWorktreeRepo)...)
+		units = append(units, syncUnit{
+			isWorktree: true,
+			setName:    setName,
+			setRepos:   setRepos[setName],
+			setConfig:  cfg.Worktrees[setName],
+		})
 	}
 
-	return reports
+	return units
+}
+
+func executeSyncUnit(cmd *cobra.Command, cfgPath string, unit syncUnit, doPush bool) []syncReport {
+	if !unit.isWorktree {
+		// Plain repo: just sync it
+		return []syncReport{syncPlainRepo(*unit.plain, doPush)}
+	}
+
+	// Worktree set: fetch the bare repo once, then sync all worktrees
+	if err := fetchSetBare(cmd, cfgPath, unit.setName, unit.setConfig); err != nil {
+		output.Writef(cmd.ErrOrStderr(), "[%s] fetch error: %v\n", unit.setName, err)
+		return failedSetReports(unit.setRepos)
+	}
+
+	return runSyncReports(unit.setRepos, doPush, syncWorktreeRepo)
 }
 
 func failedSetReports(repos []repo.Repo) []syncReport {
@@ -179,11 +222,11 @@ func writeSyncReports(cmd *cobra.Command, reports []syncReport) {
 	for _, report := range reports {
 		for _, step := range report.Steps {
 			if syncStepFailed(step) {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[%s] %s error: %s\n", report.RepoName, step.Op, syncStepMessage(step))
+				output.Writef(cmd.ErrOrStderr(), "[%s] %s error: %s\n", report.RepoName, step.Op, syncStepMessage(step))
 				continue
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s\n", report.RepoName, step.Op)
+			output.Writef(cmd.OutOrStdout(), "[%s] %s\n", report.RepoName, step.Op)
 		}
 	}
 }
@@ -197,7 +240,7 @@ func writeSyncSummary(cmd *cobra.Command, reports []syncReport) {
 	}
 
 	ok := len(reports) - failed
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "sync complete: %d ok, %d failed\n", ok, failed)
+	output.Writef(cmd.OutOrStdout(), "sync complete: %d ok, %d failed\n", ok, failed)
 }
 
 func syncReportsError(reports []syncReport) error {
@@ -216,7 +259,10 @@ func syncStepFailed(step syncStep) bool {
 }
 
 func syncStepMessage(step syncStep) string {
-	text := strings.TrimSpace(string(append(step.Stderr, step.Stdout...)))
+	combined := make([]byte, 0, len(step.Stderr)+len(step.Stdout))
+	combined = append(combined, step.Stderr...)
+	combined = append(combined, step.Stdout...)
+	text := strings.TrimSpace(string(combined))
 	if text != "" {
 		return text
 	}
