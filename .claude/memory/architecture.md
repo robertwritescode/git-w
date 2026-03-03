@@ -84,8 +84,8 @@ git-w/
     │   ├── completion.go       # Shell completion (bash/zsh/fish/powershell) — registerCompletion
     │   └── completion_test.go
     │
-    ├── config/                 # shared: config types, loader, discovery
-    │   ├── config.go           # WorkspaceConfig, RepoConfig, GroupConfig, ContextConfig, WorktreeConfig
+    ├── config/                 # shared: ALL config types, loader, discovery (config.go moved here from pkg/workspace in branch/13)
+    │   ├── config.go           # WorkspaceConfig, WorkspaceMeta, RepoConfig, GroupConfig, ContextConfig, WorktreeConfig; methods + WorktreeRepoToSetIndex + SortedStringKeys
     │   ├── loader.go           # TOML load/save, atomic writes, LoadCWD, LoadConfig(cmd); synthesizeWorktreeTargets
     │   ├── discovery.go        # Walk-up .gitw search, Discover()
     │   └── *_test.go
@@ -115,11 +115,16 @@ git-w/
     │   ├── executor.go         # RunParallel: goroutine pool using pkg/parallel
     │   ├── result.go           # ExecResult, WriteResults, ExecErrors
     │   ├── register.go         # Register(root) → registerGit + registerSync + registerExec + registerInfo
-    │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root); loadInputs helper
+    │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root); worktreeRepoToSet delegates to config.WorktreeRepoToSetIndex
     │   ├── runner.go           # Shared runGitCmd helper for git subcommands
     │   ├── exec.go             # Execute arbitrary git commands across repos
     │   ├── info.go             # Status table for all or group repos (alias: ll)
     │   ├── sync.go             # sync: fetch→pull→push pipeline per repo (alias: s); worktree-set aware
+    │   └── *_test.go
+    │
+    ├── branch/                 # domain: branch management commands
+    │   ├── register.go         # Register(root) → registerCreate (currently single subcommand creates branch parent itself)
+    │   ├── create.go           # branch create: branchFlags/branchStep/branchReport/branchUnit types; all helpers
     │   └── *_test.go
     │
     ├── worktree/               # domain: git worktree set management commands
@@ -133,8 +138,8 @@ git-w/
     │   ├── safety.go           # Safety check logic: dirty and local-ahead detection
     │   └── *_test.go
     │
-    ├── gitutil/                # shared utility: low-level git subprocess wrappers
-    │   ├── gitutil.go          # Clone, CloneContext, CloneBare, AddWorktree, RemoveWorktree, RemoveWorktreeForce, FetchBare, RemoteURL, EnsureGitignore (mutex-protected)
+    ├── gitutil/                # shared utility: low-level git subprocess wrappers; ALL functions take context.Context as first param
+    │   ├── gitutil.go          # Output, Clone, CloneContext, CloneBare, AddWorktree, RemoveWorktree, RemoveWorktreeForce, FetchBare, RemoteURL, EnsureGitignore (mutex-protected); CheckoutBranch, FetchOrigin, PullBranch, BranchExists, CreateBranch, PushBranchUpstream, SetBranchUpstream
     │   └── gitutil_test.go
     │
     ├── output/                 # shared utility: standardized command output helpers
@@ -163,6 +168,7 @@ workspace  → config, gitutil
 repo       → config, gitutil
 display    → repo
 git        → repo, config, display, parallel
+branch     → config, repo, gitutil, parallel, output
 worktree   → config, repo, gitutil, parallel
 output     → (none)
 parallel   → (none)
@@ -193,24 +199,38 @@ type WorktreeConfig struct {
 }
 
 // Methods on WorkspaceConfig:
-func (c WorkspaceConfig) AutoGitignoreEnabled() bool  // nil → true
-func (c WorkspaceConfig) SyncPushEnabled() bool       // nil → true
+func (c WorkspaceConfig) AutoGitignoreEnabled() bool          // nil → true
+func (c WorkspaceConfig) SyncPushEnabled() bool               // nil → true
+func (c WorkspaceConfig) BranchSyncSourceEnabled() bool       // nil → true
+func (c WorkspaceConfig) BranchSetUpstreamEnabled() bool      // nil → true
+func (c WorkspaceConfig) BranchPushEnabled() bool             // nil → true
+func (c WorkspaceConfig) ResolveDefaultBranch(repoName string) string  // per-repo → workspace → "main"
+func (c WorkspaceConfig) WorktreeBranchForRepo(repoName string) (string, bool)
 func (c *WorkspaceConfig) AddRepoToGroup(group, name string)
 func (c *WorkspaceConfig) RepoName(absPath string) (string, error)
-func (c *WorkspaceConfig) WorktreeRepoName(setName, branch string) string  // "<set>-<branch>"
 func (c *WorkspaceConfig) RemoveRepoFromManualGroups(repoName string)
-func (c *WorkspaceConfig) SortedWorktreeBranchNames(setName string) []string
+
+// Standalone functions in pkg/config:
+func WorktreeRepoName(setName, branch string) string           // "<set>-<branch>"
+func WorktreeRepoToSetIndex(c *WorkspaceConfig) map[string]string
+func SortedStringKeys[V any](values map[string]V) []string
+func SortedWorktreeBranchNames(branches map[string]string) []string  // alias for SortedStringKeys
 
 type WorkspaceMeta struct {
-    Name          string `toml:"name"`
-    AutoGitignore *bool  `toml:"auto_gitignore"` // nil = true (default on)
-    SyncPush      *bool  `toml:"sync_push"`      // nil = true (default on)
+    Name              string `toml:"name"`
+    AutoGitignore     *bool  `toml:"auto_gitignore"`      // nil = true (default on)
+    SyncPush          *bool  `toml:"sync_push"`           // nil = true (default on)
+    DefaultBranch     string `toml:"default_branch,omitempty"`
+    BranchSyncSource  *bool  `toml:"branch_sync_source"`  // nil = true (default on)
+    BranchSetUpstream *bool  `toml:"branch_set_upstream"` // nil = true (default on)
+    BranchPush        *bool  `toml:"branch_push"`         // nil = true (default on)
 }
 
 type RepoConfig struct {
-    Path  string   `toml:"path"`
-    URL   string   `toml:"url,omitempty"`   // remote URL; set by clone/add; required for restore
-    Flags []string `toml:"flags,omitempty"`
+    Path          string   `toml:"path"`
+    URL           string   `toml:"url,omitempty"`
+    Flags         []string `toml:"flags,omitempty"`
+    DefaultBranch string   `toml:"default_branch,omitempty"`
 }
 
 type GroupConfig struct {
@@ -335,16 +355,29 @@ func RenderTable(w io.Writer, entries []TableEntry)
 
 ### Gitutil (`pkg/gitutil/`)
 
+All functions take `context.Context` as the first parameter (retrofitted in branch/13).
+
 ```go
-func Clone(url, destPath string) error
+// Pre-existing (retrofitted with ctx):
+func Output(ctx context.Context, repoPath string, args ...string) ([]byte, error)
+func Clone(url, destPath string) error                                          // no ctx (uses exec.Command)
 func CloneContext(ctx context.Context, url, destPath string) error
 func CloneBare(ctx context.Context, url, dest string) error
 func AddWorktree(ctx context.Context, barePath, treePath, branch string) error
-func RemoveWorktree(barePath, treePath string) error
-func RemoveWorktreeForce(barePath, treePath string) error
-func FetchBare(barePath string) error
-func RemoteURL(repoPath string) string
-func EnsureGitignore(dir, entry string) error  // mutex-protected for concurrent use
+func RemoveWorktree(ctx context.Context, barePath, treePath string) error
+func RemoveWorktreeForce(ctx context.Context, barePath, treePath string) error
+func FetchBare(ctx context.Context, barePath string) error
+func RemoteURL(ctx context.Context, repoPath string) string
+func EnsureGitignore(dir, entry string) error  // mutex-protected; no ctx needed
+
+// Added in branch/13:
+func CheckoutBranch(ctx context.Context, repoPath, branch string) error
+func FetchOrigin(ctx context.Context, repoPath string) error
+func PullBranch(ctx context.Context, repoPath, branch string) error
+func BranchExists(ctx context.Context, repoPath, branchName string) (bool, error)
+func CreateBranch(ctx context.Context, repoPath, branchName, sourceBranch string) error
+func PushBranchUpstream(ctx context.Context, repoPath, remote, branchName string) error
+func SetBranchUpstream(ctx context.Context, repoPath, branchName, remote string) error
 ```
 
 ---
@@ -398,6 +431,17 @@ Safety checks for `rm` and `drop`: refuses if working tree is dirty or has unpus
 **`restore`** handles worktrees: bare-clones if missing, runs `git worktree add` per branch if path missing, else `git pull`. Concurrent with regular repo restore.
 
 **`fetch` deduplication**: fetching a worktree set fetches once via `git -C <bare-path> fetch`. All-repo fetch deduplicates worktrees sharing a bare path.
+
+### Branch Management (`git w branch` / `git w b`)
+
+| Command | Aliases | Description |
+|---|---|---|
+| `git w branch create <name> [repos...]` | `c`, `cut`, `new` | Create branch across repos; worktree branch names prefixed with folder name (`<folder>-<name>`) |
+
+Flags: `--sync-source`/`--no-sync-source`, `--allow-upstream`/`--no-upstream`, `--push`/`--no-push`
+Config: `branch_sync_source`, `branch_set_upstream`, `branch_push` (all default true); `default_branch` on workspace and per-repo.
+
+For worktree repos: branch is named `<worktree-folder>-<branchname>` (e.g. for set `infra`, worktree `dev` → branch `dev-feature`). Source branch = that worktree's assigned branch (not workspace default). Bare fetch is done once per set before parallel per-worktree execution.
 
 ### Context
 
