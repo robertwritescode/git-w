@@ -22,7 +22,7 @@ type WorkspaceMeta struct {
 	Name              string `toml:"name"`
 	AutoGitignore     *bool  `toml:"auto_gitignore"` // nil means true (default on)
 	SyncPush          *bool  `toml:"sync_push"`      // nil means true (default on)
-	DefaultBranch     string `toml:"default_branch"`
+	DefaultBranch     string `toml:"default_branch,omitempty"`
 	BranchSyncSource  *bool  `toml:"branch_sync_source"`  // nil means true (default on)
 	BranchSetUpstream *bool  `toml:"branch_set_upstream"` // nil means true (default on)
 	BranchPush        *bool  `toml:"branch_push"`         // nil means true (default on)

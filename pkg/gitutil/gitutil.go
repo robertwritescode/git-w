@@ -79,7 +79,7 @@ func PullBranch(ctx context.Context, repoPath, branch string) error {
 
 // BranchExists reports whether branchName exists locally in repoPath.
 func BranchExists(ctx context.Context, repoPath, branchName string) (bool, error) {
-	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--list", branchName).Output()
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--list", branchName).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("git branch --list: %w\n%s", err, out)
 	}

@@ -373,6 +373,10 @@ func syncWorktreeSource(ctx context.Context, report *branchReport, r repo.Repo, 
 		return true
 	}
 
+	if !runStep(report, "checkout", func() error { return gitutil.CheckoutBranch(ctx, r.AbsPath, sourceBranch) }) {
+		return false
+	}
+
 	return runStep(report, "pull", func() error { return gitutil.PullBranch(ctx, r.AbsPath, sourceBranch) })
 }
 

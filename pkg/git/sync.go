@@ -26,7 +26,7 @@ type syncReport struct {
 	Failed   bool
 }
 
-type syncRepoFn func(repo.Repo, bool) syncReport
+type syncRepoFn func(context.Context, repo.Repo, bool) syncReport
 
 type syncUnit struct {
 	isWorktree bool
@@ -144,18 +144,20 @@ func buildSyncUnits(cfg *config.WorkspaceConfig, repos []repo.Repo) []syncUnit {
 }
 
 func executeSyncUnit(cmd *cobra.Command, cfgPath string, unit syncUnit, doPush bool) []syncReport {
+	ctx := cmd.Context()
+
 	if !unit.isWorktree {
 		// Plain repo: just sync it
-		return []syncReport{syncPlainRepo(*unit.plain, doPush)}
+		return []syncReport{syncPlainRepo(ctx, *unit.plain, doPush)}
 	}
 
 	// Worktree set: fetch the bare repo once, then sync all worktrees
-	if err := fetchSetBare(cmd.Context(), cmd, cfgPath, unit.setName, unit.setConfig); err != nil {
+	if err := fetchSetBare(ctx, cmd, cfgPath, unit.setName, unit.setConfig); err != nil {
 		output.Writef(cmd.ErrOrStderr(), "[%s] fetch error: %v\n", unit.setName, err)
 		return failedSetReports(unit.setRepos)
 	}
 
-	return runSyncReports(unit.setRepos, doPush, syncWorktreeRepo)
+	return runSyncReports(ctx, unit.setRepos, doPush, syncWorktreeRepo)
 }
 
 func failedSetReports(repos []repo.Repo) []syncReport {
@@ -166,47 +168,47 @@ func failedSetReports(repos []repo.Repo) []syncReport {
 	return reports
 }
 
-func runSyncReports(repos []repo.Repo, doPush bool, fn syncRepoFn) []syncReport {
+func runSyncReports(ctx context.Context, repos []repo.Repo, doPush bool, fn syncRepoFn) []syncReport {
 	if len(repos) <= 1 {
 		if len(repos) == 0 {
 			return nil
 		}
-		return []syncReport{fn(repos[0], doPush)}
+		return []syncReport{fn(ctx, repos[0], doPush)}
 	}
 
 	workers := parallel.MaxWorkers(0, len(repos))
 	return parallel.RunFanOut(repos, workers, func(r repo.Repo) syncReport {
-		return fn(r, doPush)
+		return fn(ctx, r, doPush)
 	})
 }
 
-func syncPlainRepo(r repo.Repo, doPush bool) syncReport {
+func syncPlainRepo(ctx context.Context, r repo.Repo, doPush bool) syncReport {
 	report := syncReport{RepoName: r.Name}
-	if !runSyncStep(&report, r, "fetch") {
+	if !runSyncStep(ctx, &report, r, "fetch") {
 		return report
 	}
-	if !runSyncStep(&report, r, "pull") {
+	if !runSyncStep(ctx, &report, r, "pull") {
 		return report
 	}
 	if doPush {
-		runSyncStep(&report, r, "push")
+		runSyncStep(ctx, &report, r, "push")
 	}
 	return report
 }
 
-func syncWorktreeRepo(r repo.Repo, doPush bool) syncReport {
+func syncWorktreeRepo(ctx context.Context, r repo.Repo, doPush bool) syncReport {
 	report := syncReport{RepoName: r.Name}
-	if !runSyncStep(&report, r, "pull") {
+	if !runSyncStep(ctx, &report, r, "pull") {
 		return report
 	}
 	if doPush {
-		runSyncStep(&report, r, "push")
+		runSyncStep(ctx, &report, r, "push")
 	}
 	return report
 }
 
-func runSyncStep(report *syncReport, r repo.Repo, op string) bool {
-	result := runOne(context.Background(), r, []string{op})
+func runSyncStep(ctx context.Context, report *syncReport, r repo.Repo, op string) bool {
+	result := runOne(ctx, r, []string{op})
 	step := syncStep{Op: op, Stdout: result.Stdout, Stderr: result.Stderr, ExitCode: result.ExitCode, Err: result.Err}
 	report.Steps = append(report.Steps, step)
 
