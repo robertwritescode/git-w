@@ -1,5 +1,18 @@
 # Testing Strategy
 
+## IMPORTANT: Running Tests
+
+**ALWAYS use mage commands to run tests. DO NOT use `go test` directly.**
+
+This project uses mage targets that properly configure parallelism, race detection, and caching:
+
+- **Active development**: `mage testfast` (quick iterations, uses cache)
+- **Final validation/before completion**: `mage test` (thorough, with race detection)
+
+Never run `go test ./...` or similar commands directly. The mage targets ensure consistent test execution across development and CI.
+
+---
+
 ## Guiding Principles
 
 - All non-trivial logic must have unit tests
@@ -317,8 +330,25 @@ See `release.md` for exact workflow YAML.
 
 ## Local Development (Mage Targets)
 
-| Target | Command |
-|---|---|
-| `mage test` | `go test -race -count=1 ./...` |
-| `mage cover` | `go test -coverprofile=coverage.out ./...` then open HTML report |
-| `mage lint` | `golangci-lint fmt --diff` + `golangci-lint run` |
+| Target | Command | Use When |
+|---|---|---|
+| `mage testfast` | `go test -p=8 ./...` | **Active development** — iterating on code, quick feedback loop. Uses test cache (1s cached, 23s fresh). No race detector. |
+| `mage test` | `go clean -testcache && go test -race -count=1 -p=8 ./...` | **Validation before completion** — verifying work is done, pre-commit, CI. Clears cache, runs with race detector (~25s). |
+| `mage cover` | `go test -race -count=1 -coverprofile=coverage.out ./...` then open HTML report | Coverage analysis |
+| `mage lint` | `golangci-lint fmt --diff` + `golangci-lint run` | Linting |
+
+### Test Command Guidelines
+
+**Use `mage testfast` for:**
+- Day-to-day development iterations
+- Quick validation during coding
+- Running tests frequently while working on a feature
+- Benefits from test caching (25x speed improvement on unchanged code)
+
+**Use `mage test` for:**
+- Before marking work as complete
+- Before committing changes
+- Before pushing to PR
+- When you need race detection
+- When validating final implementation
+- Always clears cache to ensure fresh, thorough run

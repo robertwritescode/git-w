@@ -26,8 +26,18 @@ func Install() error {
 	return sh.RunV("go", "install", ".")
 }
 
+// TestFast runs tests without race detector (faster for local dev)
+func TestFast() error {
+	return sh.RunV("go", "test", "-p=8", "./...")
+}
+
+// Test runs full tests with race detector (for CI/pre-commit)
 func Test() error {
-	return sh.RunV("go", "test", "-race", "-count=1", "./...")
+	// Clear cache to ensure fresh run and avoid stale cached results
+	if err := sh.RunV("go", "clean", "-testcache"); err != nil {
+		return err
+	}
+	return sh.RunV("go", "test", "-race", "-count=1", "-p=8", "./...")
 }
 
 func Cover() error {
