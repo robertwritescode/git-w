@@ -365,6 +365,93 @@ func (s *BranchCreateSuite) TestCreate_NoReposIsError() {
 	s.Require().Error(err)
 }
 
+func (s *BranchCreateSuite) TestCreate_CheckoutFlag_ChecksOutNewBranch() {
+	wsDir, names := s.makeLocalWorkspaceWithDefaultBranch(2)
+
+	out, err := s.runBranchCreate(wsDir, "my-feature", "--checkout", "--no-sync-source", "--no-upstream", "--no-push")
+	s.Require().NoError(err)
+
+	for _, name := range names {
+		s.Assert().Equal("my-feature", s.currentBranch(repoPath(wsDir, name)))
+	}
+	s.Contains(out, "checkout")
+}
+
+func (s *BranchCreateSuite) TestCreate_CheckoutFlag_AlreadyExists_ChecksOut() {
+	wsDir, names := s.makeLocalWorkspaceWithDefaultBranch(2)
+
+	repo0 := repoPath(wsDir, names[0])
+	s.RunGit(repo0, "checkout", "-b", "feature")
+	defaultBranch := s.currentBranch(repoPath(wsDir, names[1]))
+	s.RunGit(repo0, "checkout", defaultBranch)
+
+	out, err := s.runBranchCreate(wsDir, "feature", "--checkout", "--no-sync-source", "--no-upstream", "--no-push")
+	s.Require().NoError(err)
+
+	s.Assert().Equal("feature", s.currentBranch(repo0))
+	s.Contains(out, "["+names[0]+"] branch: already exists, skipped")
+	s.Contains(out, "["+names[0]+"] checkout")
+}
+
+func (s *BranchCreateSuite) TestCreate_CheckoutFlag_ShortFlag() {
+	wsDir, names := s.makeLocalWorkspaceWithDefaultBranch(1)
+
+	out, err := s.runBranchCreate(wsDir, "feat", "-c", "--no-sync-source", "--no-upstream", "--no-push")
+	s.Require().NoError(err)
+
+	s.Assert().Equal("feat", s.currentBranch(repoPath(wsDir, names[0])))
+	s.Contains(out, "checkout")
+}
+
+func (s *BranchCreateSuite) TestCreate_CheckoutFlag_WithPush() {
+	wsDir, names, _ := s.setupRemoteWorkspaceWithDefaultBranch()
+
+	out, err := s.runBranchCreate(wsDir, "feat", "--checkout", "--push", "--no-sync-source", "--no-upstream")
+	s.Require().NoError(err)
+
+	repo0 := repoPath(wsDir, names[0])
+	s.Assert().Equal("feat", s.currentBranch(repo0))
+
+	remoteURL := s.remoteURL(repo0)
+	s.Assert().True(s.remoteBranchExists(remoteURL, "feat"))
+	s.Contains(out, "push")
+	s.Contains(out, "checkout")
+}
+
+func (s *BranchCreateSuite) TestCreate_CheckoutFlag_WorktreeSet() {
+	wsDir := s.T().TempDir()
+	s.ChangeToDir(wsDir)
+
+	configExtra := "branch_sync_source = false\nbranch_set_upstream = false\nbranch_push = false\n"
+	s.setupInfraWorktreeSet(wsDir, configExtra)
+
+	out, err := s.runBranchCreate(wsDir, "feature", "--checkout")
+	s.Require().NoError(err, out)
+
+	devWorktree := filepath.Join(wsDir, "infra", "dev")
+	testWorktree := filepath.Join(wsDir, "infra", "test")
+
+	s.Assert().Equal("dev-feature", s.currentBranch(devWorktree))
+	s.Assert().Equal("test-feature", s.currentBranch(testWorktree))
+	s.Contains(out, "checkout")
+}
+
+func (s *BranchCreateSuite) TestCreate_WithoutCheckoutFlag_AlreadyExists_DoesNotCheckout() {
+	wsDir, names := s.makeLocalWorkspaceWithDefaultBranch(2)
+
+	repo0 := repoPath(wsDir, names[0])
+	s.RunGit(repo0, "checkout", "-b", "feature")
+	defaultBranch := s.currentBranch(repoPath(wsDir, names[1]))
+	s.RunGit(repo0, "checkout", defaultBranch)
+
+	out, err := s.runBranchCreate(wsDir, "feature", "--no-sync-source", "--no-upstream", "--no-push")
+	s.Require().NoError(err)
+
+	s.Assert().Equal(defaultBranch, s.currentBranch(repo0))
+	s.Contains(out, "already exists, skipped")
+	s.NotContains(out, "checkout")
+}
+
 func (s *BranchCreateSuite) makeLocalWorkspace(n int) (string, []string) {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(n)
 	return wsDir, names

@@ -17,6 +17,7 @@ type branchFlags struct {
 	SyncSource  bool
 	SetUpstream bool
 	Push        bool
+	Checkout    bool
 }
 
 type branchStep struct {
@@ -57,6 +58,7 @@ func registerCreate(branchCmd *cobra.Command) {
 	createCmd.Flags().Bool("no-upstream", false, "skip setting upstream")
 	createCmd.Flags().Bool("push", false, "push branch to origin")
 	createCmd.Flags().Bool("no-push", false, "skip pushing branch to origin")
+	createCmd.Flags().BoolP("checkout", "c", false, "check out the branch after creating it")
 
 	branchCmd.AddCommand(createCmd)
 }
@@ -128,7 +130,15 @@ func resolveBranchFlags(cmd *cobra.Command, cfg *config.WorkspaceConfig) (branch
 		return branchFlags{}, err
 	}
 
-	return branchFlags{SyncSource: syncSource, SetUpstream: setUpstream, Push: push}, nil
+	var checkout bool
+	if cmd.Flags().Lookup("checkout") != nil {
+		checkout, err = cmd.Flags().GetBool("checkout")
+		if err != nil {
+			return branchFlags{}, err
+		}
+	}
+
+	return branchFlags{SyncSource: syncSource, SetUpstream: setUpstream, Push: push, Checkout: checkout}, nil
 }
 
 func resolveBoolFlag(cmd *cobra.Command, onFlag, offFlag string, dflt bool) (bool, error) {
@@ -258,16 +268,18 @@ func createInPlainRepo(ctx context.Context, r repo.Repo, branchName, sourceBranc
 		}
 	}
 
-	if !createBranchStep(ctx, &report, r, branchName, sourceBranch) {
+	created := createBranchStep(ctx, &report, r, branchName, sourceBranch)
+
+	if report.Failed {
 		return report
 	}
 
-	if !hasRemote(ctx, r) {
-		skipRemoteOps(&report, flags)
-		return report
+	if created {
+		applyCreateRemoteOps(ctx, &report, r, branchName, flags)
 	}
 
-	applyRemoteOps(ctx, &report, r, branchName, flags)
+	checkoutIfRequested(ctx, &report, r, branchName, flags.Checkout)
+
 	return report
 }
 
@@ -285,6 +297,25 @@ func syncSourcePlainRepo(ctx context.Context, report *branchReport, r repo.Repo,
 	}
 
 	return runStep(report, "pull", func() error { return gitutil.PullBranch(ctx, r.AbsPath, sourceBranch) })
+}
+
+func applyCreateRemoteOps(ctx context.Context, report *branchReport, r repo.Repo, branchName string, flags branchFlags) {
+	if !hasRemote(ctx, r) {
+		skipRemoteOps(report, flags)
+		return
+	}
+
+	applyRemoteOps(ctx, report, r, branchName, flags)
+}
+
+func checkoutIfRequested(ctx context.Context, report *branchReport, r repo.Repo, branchName string, checkout bool) {
+	if !checkout || report.Failed {
+		return
+	}
+
+	runStep(report, "checkout", func() error {
+		return gitutil.CheckoutBranch(ctx, r.AbsPath, branchName)
+	})
 }
 
 func applyRemoteOps(ctx context.Context, report *branchReport, r repo.Repo, branchName string, flags branchFlags) {
@@ -349,16 +380,18 @@ func createInWorktree(ctx context.Context, r repo.Repo, branchName, sourceBranch
 		return report
 	}
 
-	if !createBranchStep(ctx, &report, r, branchName, sourceBranch) {
+	created := createBranchStep(ctx, &report, r, branchName, sourceBranch)
+
+	if report.Failed {
 		return report
 	}
 
-	if !hasRemote(ctx, r) {
-		skipRemoteOps(&report, flags)
-		return report
+	if created {
+		applyCreateRemoteOps(ctx, &report, r, branchName, flags)
 	}
 
-	applyRemoteOps(ctx, &report, r, branchName, flags)
+	checkoutIfRequested(ctx, &report, r, branchName, flags.Checkout)
+
 	return report
 }
 

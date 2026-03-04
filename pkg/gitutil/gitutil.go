@@ -13,6 +13,63 @@ import (
 
 var gitignoreMu sync.Mutex
 
+// BranchLocation describes where a branch exists relative to a repo.
+type BranchLocation int
+
+const (
+	BranchLocal   BranchLocation = iota // exists as a local branch
+	BranchRemote                        // exists only on the origin remote
+	BranchMissing                       // not found locally or on remote
+)
+
+// ResolveBranchLocation reports whether branchName exists locally, only on
+// remote, or is missing from both. No remote returns BranchMissing.
+func ResolveBranchLocation(ctx context.Context, repoPath, branchName string) (BranchLocation, error) {
+	local, err := BranchExists(ctx, repoPath, branchName)
+	if err != nil {
+		return 0, err
+	}
+
+	if local {
+		return BranchLocal, nil
+	}
+
+	if RemoteURL(ctx, repoPath) == "" {
+		return BranchMissing, nil
+	}
+
+	remote, err := RemoteBranchExists(ctx, repoPath, branchName)
+	if err != nil {
+		return 0, err
+	}
+
+	if remote {
+		return BranchRemote, nil
+	}
+
+	return BranchMissing, nil
+}
+
+// AddWorktreeNewBranch runs `git worktree add -b <branch> <treePath> <source>`.
+func AddWorktreeNewBranch(ctx context.Context, repoPath, treePath, branchName, sourceBranch string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "worktree", "add", "-b", branchName, treePath, sourceBranch).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree add -b: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
+// DeleteBranch runs `git branch -d <branchName>` in repoPath.
+func DeleteBranch(ctx context.Context, repoPath, branchName string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "-d", branchName).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git branch -d: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
 // Output runs a git command in repoPath and returns its stdout.
 // On failure it returns stderr (if available) alongside the error.
 func Output(ctx context.Context, repoPath string, args ...string) ([]byte, error) {
@@ -82,6 +139,16 @@ func BranchExists(ctx context.Context, repoPath, branchName string) (bool, error
 	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--list", branchName).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("git branch --list: %w\n%s", err, out)
+	}
+
+	return strings.TrimSpace(string(out)) != "", nil
+}
+
+// RemoteBranchExists reports whether branchName exists on the origin remote.
+func RemoteBranchExists(ctx context.Context, repoPath, branchName string) (bool, error) {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "ls-remote", "--heads", "origin", branchName).CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("git ls-remote --heads: %w\n%s", err, out)
 	}
 
 	return strings.TrimSpace(string(out)) != "", nil

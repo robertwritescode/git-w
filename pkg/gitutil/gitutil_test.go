@@ -40,6 +40,13 @@ type branchExistsCase struct {
 	wantErr bool
 }
 
+type remoteBranchExistsCase struct {
+	name           string
+	remoteBranches []string
+	query          string
+	want           bool
+}
+
 type currentBranchCase struct {
 	name       string
 	checkout   string
@@ -242,6 +249,28 @@ func (s *GitutilSuite) TestBranchExists() {
 	s.runBranchExistsCases(branchExistsCases())
 }
 
+func (s *GitutilSuite) TestRemoteBranchExists() {
+	for _, tt := range remoteBranchExistsCases() {
+		s.Run(tt.name, func() {
+			remoteURL := s.MakeRemoteWithBranches(tt.remoteBranches)
+			repoDir := s.MakeGitRepo(remoteURL)
+
+			got, err := gitutil.RemoteBranchExists(context.Background(), repoDir, tt.query)
+
+			s.Require().NoError(err)
+			s.Assert().Equal(tt.want, got)
+		})
+	}
+}
+
+func (s *GitutilSuite) TestRemoteBranchExists_NoRemote() {
+	repoDir := s.MakeGitRepo("")
+
+	_, err := gitutil.RemoteBranchExists(context.Background(), repoDir, "feature")
+
+	s.Require().Error(err)
+}
+
 func (s *GitutilSuite) TestCurrentBranch() {
 	for _, tt := range currentBranchCases() {
 		s.Run(tt.name, func() { s.assertCurrentBranch(tt) })
@@ -440,11 +469,103 @@ func branchExistsCases() []branchExistsCase {
 	}
 }
 
+func remoteBranchExistsCases() []remoteBranchExistsCase {
+	return []remoteBranchExistsCase{
+		{name: "exists", remoteBranches: []string{"feature"}, query: "feature", want: true},
+		{name: "missing", remoteBranches: []string{"dev"}, query: "feature", want: false},
+		{name: "default branch only", remoteBranches: []string{}, query: "nonexistent", want: false},
+	}
+}
+
 func currentBranchCases() []currentBranchCase {
 	return []currentBranchCase{
 		{name: "main branch", wantBranch: "main"},
 		{name: "feature branch", checkout: "feature", wantBranch: "feature"},
 		{name: "invalid repo", invalidDir: true, wantErr: true},
+	}
+}
+
+type resolveBranchLocationCase struct {
+	name      string
+	local     bool
+	remote    bool
+	hasRemote bool
+	wantLoc   gitutil.BranchLocation
+}
+
+func (s *GitutilSuite) TestResolveBranchLocation() {
+	for _, tt := range resolveBranchLocationCases() {
+		s.Run(tt.name, func() { s.assertResolveBranchLocation(tt) })
+	}
+}
+
+func (s *GitutilSuite) assertResolveBranchLocation(tt resolveBranchLocationCase) {
+	var remoteURL string
+
+	if tt.hasRemote {
+		remoteURL = s.MakeRemoteWithBranches(nil)
+		if tt.remote {
+			remoteURL = s.MakeRemoteWithBranches([]string{"feature"})
+		}
+	}
+
+	repoDir := s.MakeGitRepo(remoteURL)
+
+	if tt.local {
+		s.RunGit(repoDir, "checkout", "-b", "feature")
+	}
+
+	loc, err := gitutil.ResolveBranchLocation(context.Background(), repoDir, "feature")
+
+	s.Require().NoError(err)
+	s.Assert().Equal(tt.wantLoc, loc)
+}
+
+func (s *GitutilSuite) TestAddWorktreeNewBranch() {
+	repoDir, _ := s.makeRemoteMainRepo()
+	treePath := s.T().TempDir()
+
+	err := gitutil.AddWorktreeNewBranch(context.Background(), repoDir, treePath, "feature", "main")
+	s.Require().NoError(err)
+
+	cur, err := gitutil.CurrentBranch(context.Background(), treePath)
+	s.Require().NoError(err)
+	s.Assert().Equal("feature", cur)
+}
+
+func (s *GitutilSuite) TestAddWorktreeNewBranch_DuplicateFails() {
+	repoDir, _ := s.makeRemoteMainRepo()
+	treePath1 := s.T().TempDir()
+	treePath2 := s.T().TempDir()
+
+	s.Require().NoError(gitutil.AddWorktreeNewBranch(context.Background(), repoDir, treePath1, "feature", "main"))
+	s.Assert().Error(gitutil.AddWorktreeNewBranch(context.Background(), repoDir, treePath2, "feature", "main"))
+}
+
+func (s *GitutilSuite) TestDeleteBranch() {
+	repoDir := s.MakeGitRepo("")
+	s.RunGit(repoDir, "branch", "to-delete")
+
+	s.Require().NoError(gitutil.DeleteBranch(context.Background(), repoDir, "to-delete"))
+
+	exists, err := gitutil.BranchExists(context.Background(), repoDir, "to-delete")
+	s.Require().NoError(err)
+	s.Assert().False(exists)
+}
+
+func (s *GitutilSuite) TestDeleteBranch_CheckedOut_Fails() {
+	repoDir := s.MakeGitRepo("")
+	s.RunGit(repoDir, "branch", "-M", "main")
+
+	s.Assert().Error(gitutil.DeleteBranch(context.Background(), repoDir, "main"))
+}
+
+func resolveBranchLocationCases() []resolveBranchLocationCase {
+	return []resolveBranchLocationCase{
+		{name: "local branch", local: true, wantLoc: gitutil.BranchLocal},
+		{name: "remote only", remote: true, hasRemote: true, wantLoc: gitutil.BranchRemote},
+		{name: "missing with remote", hasRemote: true, wantLoc: gitutil.BranchMissing},
+		{name: "missing no remote", wantLoc: gitutil.BranchMissing},
 	}
 }
 
