@@ -23,6 +23,7 @@ type branchStep struct {
 	name    string
 	err     error
 	skipped bool
+	detail  string
 }
 
 type branchReport struct {
@@ -42,13 +43,7 @@ type branchUnit struct {
 	setConfig    config.WorktreeConfig
 }
 
-func registerCreate(root *cobra.Command) {
-	branchCmd := &cobra.Command{
-		Use:     "branch",
-		Aliases: []string{"b"},
-		Short:   "Manage branches across repos",
-	}
-
+func registerCreate(branchCmd *cobra.Command) {
 	createCmd := &cobra.Command{
 		Use:     "create <branchname> [repos/groups/sets]...",
 		Aliases: []string{"c", "cut", "new"},
@@ -64,7 +59,6 @@ func registerCreate(root *cobra.Command) {
 	createCmd.Flags().Bool("no-push", false, "skip pushing branch to origin")
 
 	branchCmd.AddCommand(createCmd)
-	root.AddCommand(branchCmd)
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
@@ -87,9 +81,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	reports := collectBranchReports(ctx, cfgPath, repos, cfg, branchName, flags)
 	writeBranchReports(cmd, reports)
-	writeBranchSummary(cmd, reports)
+	writeSummary(cmd, reports, "branch create")
 
-	return branchReportsError(reports)
+	return branchReportsError(reports, "branch create")
 }
 
 func parseBranchArgs(args []string) (string, []string, error) {
@@ -323,42 +317,29 @@ func createInWorktreeSet(ctx context.Context, cfgPath string, unit branchUnit, b
 }
 
 func runWorktreeReports(ctx context.Context, unit branchUnit, branchName string, flags branchFlags) []branchReport {
-	repos := unit.setRepos
-	if len(repos) == 0 {
+	if len(unit.setRepos) == 0 {
 		return nil
 	}
 
-	if len(repos) == 1 {
-		r := repos[0]
-		branch, ok := worktreeBranchForRepo(unit, r.Name)
-		if !ok {
-			return []branchReport{missingWorktreeBranchReport(r)}
-		}
+	workers := parallel.MaxWorkers(0, len(unit.setRepos))
+	return parallel.RunFanOut(unit.setRepos, workers, func(r repo.Repo) branchReport {
+		return createWorktreeReport(ctx, unit, r, branchName, flags)
+	})
+}
 
-		folderName, ok := extractWorktreeFolderName(unit.setName, r.Name)
-		if !ok {
-			return []branchReport{missingWorktreeBranchReport(r)}
-		}
-
-		finalBranchName := fmt.Sprintf("%s-%s", folderName, branchName)
-		return []branchReport{createInWorktree(ctx, r, finalBranchName, branch, flags)}
+func createWorktreeReport(ctx context.Context, unit branchUnit, r repo.Repo, branchName string, flags branchFlags) branchReport {
+	branch, ok := worktreeBranchForRepo(unit, r.Name)
+	if !ok {
+		return missingWorktreeBranchReport(r)
 	}
 
-	workers := parallel.MaxWorkers(0, len(repos))
-	return parallel.RunFanOut(repos, workers, func(r repo.Repo) branchReport {
-		branch, ok := worktreeBranchForRepo(unit, r.Name)
-		if !ok {
-			return missingWorktreeBranchReport(r)
-		}
+	folderName, ok := extractWorktreeFolderName(unit.setName, r.Name)
+	if !ok {
+		return missingWorktreeBranchReport(r)
+	}
 
-		folderName, ok := extractWorktreeFolderName(unit.setName, r.Name)
-		if !ok {
-			return missingWorktreeBranchReport(r)
-		}
-
-		finalBranchName := fmt.Sprintf("%s-%s", folderName, branchName)
-		return createInWorktree(ctx, r, finalBranchName, branch, flags)
-	})
+	finalBranchName := fmt.Sprintf("%s-%s", folderName, branchName)
+	return createInWorktree(ctx, r, finalBranchName, branch, flags)
 }
 
 func createInWorktree(ctx context.Context, r repo.Repo, branchName, sourceBranch string, flags branchFlags) branchReport {
@@ -502,7 +483,7 @@ func writeBranchReports(cmd *cobra.Command, reports []branchReport) {
 	for _, report := range reports {
 		for _, step := range report.Steps {
 			if step.skipped {
-				output.Writef(cmd.OutOrStdout(), "[%s] %s: %s, skipped\n", report.RepoName, step.name, stepSkipMessage(step.name))
+				output.Writef(cmd.OutOrStdout(), "[%s] %s: %s, skipped\n", report.RepoName, step.name, skipMessage(step))
 				continue
 			}
 
@@ -516,22 +497,25 @@ func writeBranchReports(cmd *cobra.Command, reports []branchReport) {
 	}
 }
 
-func stepSkipMessage(stepName string) string {
-	if stepName == "branch" {
-		return "already exists"
+func skipMessage(step branchStep) string {
+	if step.detail != "" {
+		return step.detail
 	}
 
-	if stepName == "push" || stepName == "upstream" {
+	switch step.name {
+	case "branch":
+		return "already exists"
+	case "push", "upstream", "pull":
 		return "no remote"
 	}
 
 	return "skipped"
 }
 
-func writeBranchSummary(cmd *cobra.Command, reports []branchReport) {
+func writeSummary(cmd *cobra.Command, reports []branchReport, opName string) {
 	ok, failed := countBranchReports(reports)
 
-	output.Writef(cmd.OutOrStdout(), "branch create complete: %d ok, %d failed\n", ok, failed)
+	output.Writef(cmd.OutOrStdout(), "%s complete: %d ok, %d failed\n", opName, ok, failed)
 }
 
 func repoReports(reports []branchReport) []branchReport {
@@ -559,13 +543,13 @@ func countBranchReports(reports []branchReport) (int, int) {
 	return len(filtered) - failed, failed
 }
 
-func branchReportsError(reports []branchReport) error {
+func branchReportsError(reports []branchReport, opName string) error {
 	filtered := repoReports(reports)
 	failures := make([]string, 0)
 
 	for _, r := range filtered {
 		if r.Failed {
-			failures = append(failures, fmt.Sprintf("  [%s]: branch create failed", r.RepoName))
+			failures = append(failures, fmt.Sprintf("  [%s]: %s failed", r.RepoName, opName))
 		}
 	}
 

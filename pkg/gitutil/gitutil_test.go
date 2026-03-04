@@ -40,6 +40,14 @@ type branchExistsCase struct {
 	wantErr bool
 }
 
+type currentBranchCase struct {
+	name       string
+	checkout   string
+	invalidDir bool
+	wantBranch string
+	wantErr    bool
+}
+
 func TestGitutilSuite(t *testing.T) {
 	testutil.RunSuite(t, new(GitutilSuite))
 }
@@ -234,6 +242,40 @@ func (s *GitutilSuite) TestBranchExists() {
 	s.runBranchExistsCases(branchExistsCases())
 }
 
+func (s *GitutilSuite) TestCurrentBranch() {
+	for _, tt := range currentBranchCases() {
+		s.Run(tt.name, func() { s.assertCurrentBranch(tt) })
+	}
+}
+
+func (s *GitutilSuite) assertCurrentBranch(tt currentBranchCase) {
+	dir := s.makeCurrentBranchRepo(tt)
+
+	got, err := gitutil.CurrentBranch(context.Background(), dir)
+	if tt.wantErr {
+		s.Assert().Error(err)
+		return
+	}
+
+	s.Assert().NoError(err)
+	s.Assert().Equal(tt.wantBranch, got)
+}
+
+func (s *GitutilSuite) makeCurrentBranchRepo(tt currentBranchCase) string {
+	if tt.invalidDir {
+		return s.T().TempDir()
+	}
+
+	dir := s.MakeGitRepo("")
+	if tt.checkout != "" {
+		s.RunGit(dir, "checkout", "-b", tt.checkout)
+		return dir
+	}
+
+	s.RunGit(dir, "branch", "-M", "main")
+	return dir
+}
+
 func (s *GitutilSuite) TestCreateBranch() {
 	repoDir := s.MakeGitRepo("")
 
@@ -395,6 +437,14 @@ func branchExistsCases() []branchExistsCase {
 		{name: "exists", branch: "feature", valid: true, want: true, wantErr: false},
 		{name: "missing", branch: "missing", valid: true, want: false, wantErr: false},
 		{name: "invalid repo", branch: "main", valid: false, want: false, wantErr: true},
+	}
+}
+
+func currentBranchCases() []currentBranchCase {
+	return []currentBranchCase{
+		{name: "main branch", wantBranch: "main"},
+		{name: "feature branch", checkout: "feature", wantBranch: "feature"},
+		{name: "invalid repo", invalidDir: true, wantErr: true},
 	}
 }
 
