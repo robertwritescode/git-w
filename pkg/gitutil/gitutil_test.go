@@ -40,6 +40,13 @@ type branchExistsCase struct {
 	wantErr bool
 }
 
+type remoteBranchExistsCase struct {
+	name           string
+	remoteBranches []string
+	query          string
+	want           bool
+}
+
 type currentBranchCase struct {
 	name       string
 	checkout   string
@@ -242,6 +249,28 @@ func (s *GitutilSuite) TestBranchExists() {
 	s.runBranchExistsCases(branchExistsCases())
 }
 
+func (s *GitutilSuite) TestRemoteBranchExists() {
+	for _, tt := range remoteBranchExistsCases() {
+		s.Run(tt.name, func() {
+			remoteURL := s.MakeRemoteWithBranches(tt.remoteBranches)
+			repoDir := s.MakeGitRepo(remoteURL)
+
+			got, err := gitutil.RemoteBranchExists(context.Background(), repoDir, tt.query)
+
+			s.Require().NoError(err)
+			s.Assert().Equal(tt.want, got)
+		})
+	}
+}
+
+func (s *GitutilSuite) TestRemoteBranchExists_NoRemote() {
+	repoDir := s.MakeGitRepo("")
+
+	_, err := gitutil.RemoteBranchExists(context.Background(), repoDir, "feature")
+
+	s.Require().Error(err)
+}
+
 func (s *GitutilSuite) TestCurrentBranch() {
 	for _, tt := range currentBranchCases() {
 		s.Run(tt.name, func() { s.assertCurrentBranch(tt) })
@@ -437,6 +466,14 @@ func branchExistsCases() []branchExistsCase {
 		{name: "exists", branch: "feature", valid: true, want: true, wantErr: false},
 		{name: "missing", branch: "missing", valid: true, want: false, wantErr: false},
 		{name: "invalid repo", branch: "main", valid: false, want: false, wantErr: true},
+	}
+}
+
+func remoteBranchExistsCases() []remoteBranchExistsCase {
+	return []remoteBranchExistsCase{
+		{name: "exists", remoteBranches: []string{"feature"}, query: "feature", want: true},
+		{name: "missing", remoteBranches: []string{"dev"}, query: "feature", want: false},
+		{name: "default branch only", remoteBranches: []string{}, query: "nonexistent", want: false},
 	}
 }
 

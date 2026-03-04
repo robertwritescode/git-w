@@ -7,6 +7,7 @@ func Register(root *cobra.Command) {
 	branchCmd := newBranchCmd()
 	registerCreate(branchCmd)
 	registerDefault(branchCmd)
+	registerCheckout(branchCmd)
 	root.AddCommand(branchCmd)
 }
 

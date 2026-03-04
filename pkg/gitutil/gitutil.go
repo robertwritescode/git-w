@@ -87,6 +87,16 @@ func BranchExists(ctx context.Context, repoPath, branchName string) (bool, error
 	return strings.TrimSpace(string(out)) != "", nil
 }
 
+// RemoteBranchExists reports whether branchName exists on the origin remote.
+func RemoteBranchExists(ctx context.Context, repoPath, branchName string) (bool, error) {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "ls-remote", "--heads", "origin", branchName).CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("git ls-remote --heads: %w\n%s", err, out)
+	}
+
+	return strings.TrimSpace(string(out)) != "", nil
+}
+
 // CurrentBranch returns the current branch name in repoPath.
 func CurrentBranch(ctx context.Context, repoPath string) (string, error) {
 	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "rev-parse", "--abbrev-ref", "HEAD").CombinedOutput()
