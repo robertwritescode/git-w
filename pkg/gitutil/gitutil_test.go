@@ -485,6 +485,90 @@ func currentBranchCases() []currentBranchCase {
 	}
 }
 
+type resolveBranchLocationCase struct {
+	name      string
+	local     bool
+	remote    bool
+	hasRemote bool
+	wantLoc   gitutil.BranchLocation
+}
+
+func (s *GitutilSuite) TestResolveBranchLocation() {
+	for _, tt := range resolveBranchLocationCases() {
+		s.Run(tt.name, func() { s.assertResolveBranchLocation(tt) })
+	}
+}
+
+func (s *GitutilSuite) assertResolveBranchLocation(tt resolveBranchLocationCase) {
+	var remoteURL string
+
+	if tt.hasRemote {
+		remoteURL = s.MakeRemoteWithBranches(nil)
+		if tt.remote {
+			remoteURL = s.MakeRemoteWithBranches([]string{"feature"})
+		}
+	}
+
+	repoDir := s.MakeGitRepo(remoteURL)
+
+	if tt.local {
+		s.RunGit(repoDir, "checkout", "-b", "feature")
+	}
+
+	loc, err := gitutil.ResolveBranchLocation(context.Background(), repoDir, "feature")
+
+	s.Require().NoError(err)
+	s.Assert().Equal(tt.wantLoc, loc)
+}
+
+func (s *GitutilSuite) TestAddWorktreeNewBranch() {
+	repoDir, _ := s.makeRemoteMainRepo()
+	treePath := s.T().TempDir()
+
+	err := gitutil.AddWorktreeNewBranch(context.Background(), repoDir, treePath, "feature", "main")
+	s.Require().NoError(err)
+
+	cur, err := gitutil.CurrentBranch(context.Background(), treePath)
+	s.Require().NoError(err)
+	s.Assert().Equal("feature", cur)
+}
+
+func (s *GitutilSuite) TestAddWorktreeNewBranch_DuplicateFails() {
+	repoDir, _ := s.makeRemoteMainRepo()
+	treePath1 := s.T().TempDir()
+	treePath2 := s.T().TempDir()
+
+	s.Require().NoError(gitutil.AddWorktreeNewBranch(context.Background(), repoDir, treePath1, "feature", "main"))
+	s.Assert().Error(gitutil.AddWorktreeNewBranch(context.Background(), repoDir, treePath2, "feature", "main"))
+}
+
+func (s *GitutilSuite) TestDeleteBranch() {
+	repoDir := s.MakeGitRepo("")
+	s.RunGit(repoDir, "branch", "to-delete")
+
+	s.Require().NoError(gitutil.DeleteBranch(context.Background(), repoDir, "to-delete"))
+
+	exists, err := gitutil.BranchExists(context.Background(), repoDir, "to-delete")
+	s.Require().NoError(err)
+	s.Assert().False(exists)
+}
+
+func (s *GitutilSuite) TestDeleteBranch_CheckedOut_Fails() {
+	repoDir := s.MakeGitRepo("")
+	s.RunGit(repoDir, "branch", "-M", "main")
+
+	s.Assert().Error(gitutil.DeleteBranch(context.Background(), repoDir, "main"))
+}
+
+func resolveBranchLocationCases() []resolveBranchLocationCase {
+	return []resolveBranchLocationCase{
+		{name: "local branch", local: true, wantLoc: gitutil.BranchLocal},
+		{name: "remote only", remote: true, hasRemote: true, wantLoc: gitutil.BranchRemote},
+		{name: "missing with remote", hasRemote: true, wantLoc: gitutil.BranchMissing},
+		{name: "missing no remote", wantLoc: gitutil.BranchMissing},
+	}
+}
+
 func gitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 
