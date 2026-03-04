@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/robertwritescode/git-w/compare/v1.4.0...v1.5.0) (2026-03-04)
+
+
+### Features
+
+* `git w branch checkout` and `--checkout` flag for `branch create` ([#27](https://github.com/robertwritescode/git-w/issues/27)) ([c5b2d2c](https://github.com/robertwritescode/git-w/commit/c5b2d2c30e3a8b06e5b856d2c0596e6d55ab435f))
+
 ## [1.4.0](https://github.com/robertwritescode/git-w/compare/v1.3.0...v1.4.0) (2026-03-04)
 
 
