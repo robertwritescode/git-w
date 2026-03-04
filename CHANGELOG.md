@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/robertwritescode/git-w/compare/v1.3.0...v1.4.0) (2026-03-04)
+
+
+### Features
+
+* **branch:** add default subcommand to switch repos to default branch ([#24](https://github.com/robertwritescode/git-w/issues/24)) ([ec3348b](https://github.com/robertwritescode/git-w/commit/ec3348bebe193a89cc9aea0a0a8cc7f65c3d6d74))
+
 ## [1.3.0](https://github.com/robertwritescode/git-w/compare/v1.2.0...v1.3.0) (2026-03-03)
 
 
