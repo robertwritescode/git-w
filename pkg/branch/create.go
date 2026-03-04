@@ -130,7 +130,13 @@ func resolveBranchFlags(cmd *cobra.Command, cfg *config.WorkspaceConfig) (branch
 		return branchFlags{}, err
 	}
 
-	checkout, _ := cmd.Flags().GetBool("checkout")
+	var checkout bool
+	if cmd.Flags().Lookup("checkout") != nil {
+		checkout, err = cmd.Flags().GetBool("checkout")
+		if err != nil {
+			return branchFlags{}, err
+		}
+	}
 
 	return branchFlags{SyncSource: syncSource, SetUpstream: setUpstream, Push: push, Checkout: checkout}, nil
 }
