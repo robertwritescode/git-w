@@ -89,9 +89,9 @@ func BranchExists(ctx context.Context, repoPath, branchName string) (bool, error
 
 // CurrentBranch returns the current branch name in repoPath.
 func CurrentBranch(ctx context.Context, repoPath string) (string, error) {
-	out, err := Output(ctx, repoPath, "rev-parse", "--abbrev-ref", "HEAD")
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "rev-parse", "--abbrev-ref", "HEAD").CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("git rev-parse --abbrev-ref HEAD: %w", err)
+		return "", fmt.Errorf("git rev-parse --abbrev-ref HEAD: %w\n%s", err, out)
 	}
 
 	return strings.TrimSpace(string(out)), nil
