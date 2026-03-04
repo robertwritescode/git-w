@@ -19,7 +19,7 @@ type checkoutFlags struct {
 type checkoutStrategy int
 
 const (
-	strategySkip   checkoutStrategy = iota
+	strategySkip checkoutStrategy = iota
 	strategyLocal
 	strategyRemote
 	strategyCreate
