@@ -34,6 +34,10 @@ func ResolveBranchLocation(ctx context.Context, repoPath, branchName string) (Br
 		return BranchLocal, nil
 	}
 
+	return checkRemoteBranch(ctx, repoPath, branchName)
+}
+
+func checkRemoteBranch(ctx context.Context, repoPath, branchName string) (BranchLocation, error) {
 	if RemoteURL(ctx, repoPath) == "" {
 		return BranchMissing, nil
 	}
@@ -219,6 +223,16 @@ func ConfigureBareOriginTracking(ctx context.Context, barePath string) error {
 	return nil
 }
 
+// PruneWorktrees runs `git -C <repoPath> worktree prune` to remove stale worktree registrations.
+func PruneWorktrees(ctx context.Context, repoPath string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repoPath, "worktree", "prune").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree prune: %w\n%s", err, out)
+	}
+
+	return nil
+}
+
 // AddWorktree runs `git -C <barePath> worktree add <treePath> <branch>` with context support for cancellation.
 func AddWorktree(ctx context.Context, barePath, treePath, branch string) error {
 	out, err := exec.CommandContext(ctx, "git", "-C", barePath, "worktree", "add", treePath, branch).CombinedOutput()
@@ -278,6 +292,11 @@ func RemoteURL(ctx context.Context, repoPath string) string {
 	}
 
 	return strings.TrimSpace(string(out))
+}
+
+// HasRemote reports whether the repo at repoPath has an origin remote configured.
+func HasRemote(ctx context.Context, repoPath string) bool {
+	return RemoteURL(ctx, repoPath) != ""
 }
 
 // EnsureGitignore appends entry to the .gitignore in dir if not already present.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/cmdutil"
 	"github.com/robertwritescode/git-w/pkg/config"
 	"github.com/robertwritescode/git-w/pkg/gitutil"
 	"github.com/robertwritescode/git-w/pkg/output"
@@ -115,49 +116,37 @@ func loadBranchInputs(cmd *cobra.Command, targets []string) (*config.WorkspaceCo
 }
 
 func resolveBranchFlags(cmd *cobra.Command, cfg *config.WorkspaceConfig) (branchFlags, error) {
-	syncSource, err := resolveBoolFlag(cmd, "sync-source", "no-sync-source", cfg.BranchSyncSourceEnabled())
+	syncSource, err := cmdutil.ResolveBoolFlag(cmd, "sync-source", "no-sync-source", cfg.BranchSyncSourceEnabled())
 	if err != nil {
 		return branchFlags{}, err
 	}
 
-	setUpstream, err := resolveBoolFlag(cmd, "allow-upstream", "no-upstream", cfg.BranchSetUpstreamEnabled())
+	setUpstream, err := cmdutil.ResolveBoolFlag(cmd, "allow-upstream", "no-upstream", cfg.BranchSetUpstreamEnabled())
 	if err != nil {
 		return branchFlags{}, err
 	}
 
-	push, err := resolveBoolFlag(cmd, "push", "no-push", cfg.BranchPushEnabled())
+	push, err := cmdutil.ResolveBoolFlag(cmd, "push", "no-push", cfg.BranchPushEnabled())
 	if err != nil {
 		return branchFlags{}, err
 	}
 
-	var checkout bool
-	if cmd.Flags().Lookup("checkout") != nil {
-		checkout, err = cmd.Flags().GetBool("checkout")
-		if err != nil {
-			return branchFlags{}, err
-		}
-	}
+	checkout := resolveCheckoutBool(cmd)
 
 	return branchFlags{SyncSource: syncSource, SetUpstream: setUpstream, Push: push, Checkout: checkout}, nil
 }
 
-func resolveBoolFlag(cmd *cobra.Command, onFlag, offFlag string, dflt bool) (bool, error) {
-	on, _ := cmd.Flags().GetBool(onFlag)
-	off, _ := cmd.Flags().GetBool(offFlag)
-
-	if on && off {
-		return false, fmt.Errorf("--%s and --%s cannot be used together", onFlag, offFlag)
+func resolveCheckoutBool(cmd *cobra.Command) bool {
+	if cmd.Flags().Lookup("checkout") == nil {
+		return false
 	}
 
-	if on {
-		return true, nil
+	v, err := cmd.Flags().GetBool("checkout")
+	if err != nil {
+		return false
 	}
 
-	if off {
-		return false, nil
-	}
-
-	return dflt, nil
+	return v
 }
 
 func collectBranchReports(ctx context.Context, cfgPath string, repos []repo.Repo, cfg *config.WorkspaceConfig, branchName string, flags branchFlags) []branchReport {
@@ -494,7 +483,7 @@ func recordStep(report *branchReport, stepName string, err error, skipped bool) 
 }
 
 func hasRemote(ctx context.Context, r repo.Repo) bool {
-	return gitutil.RemoteURL(ctx, r.AbsPath) != ""
+	return gitutil.HasRemote(ctx, r.AbsPath)
 }
 
 func skipRemoteOps(report *branchReport, flags branchFlags) {

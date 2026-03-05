@@ -10,11 +10,19 @@ import (
 // WorkspaceConfig is the merged result of `.gitw` and `.gitw.local`.
 // Repos and Groups maps are always non-nil after loading.
 type WorkspaceConfig struct {
-	Workspace WorkspaceMeta             `toml:"workspace"`
-	Context   ContextConfig             `toml:"context"` // sourced from .gitw.local
-	Repos     map[string]RepoConfig     `toml:"repos"`
-	Groups    map[string]GroupConfig    `toml:"groups"`
-	Worktrees map[string]WorktreeConfig `toml:"worktrees"`
+	Workspace  WorkspaceMeta              `toml:"workspace"`
+	Context    ContextConfig              `toml:"context"` // sourced from .gitw.local
+	Repos      map[string]RepoConfig      `toml:"repos"`
+	Groups     map[string]GroupConfig     `toml:"groups"`
+	Worktrees  map[string]WorktreeConfig  `toml:"worktrees"`
+	Workgroups map[string]WorkgroupConfig `toml:"workgroup"` // sourced from .gitw.local
+}
+
+// WorkgroupConfig is a local workgroup entry (stored only in .gitw.local).
+type WorkgroupConfig struct {
+	Repos   []string `toml:"repos"`
+	Branch  string   `toml:"branch"`
+	Created string   `toml:"created,omitempty"`
 }
 
 // WorkspaceMeta holds top-level workspace settings.
@@ -81,6 +89,11 @@ func (c WorkspaceConfig) BranchPushEnabled() bool {
 
 // ResolveDefaultBranch returns the source branch for a repo.
 func (c WorkspaceConfig) ResolveDefaultBranch(repoName string) string {
+	// Worktree repos use their own branch as the source (e.g. infra-dev → dev).
+	if branch, ok := c.WorktreeBranchForRepo(repoName); ok {
+		return branch
+	}
+
 	if repoCfg, ok := c.Repos[repoName]; ok && repoCfg.DefaultBranch != "" {
 		return repoCfg.DefaultBranch
 	}

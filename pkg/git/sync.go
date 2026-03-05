@@ -73,9 +73,11 @@ func resolveSyncPush(cmd *cobra.Command, cfg *config.WorkspaceConfig) (bool, err
 	if push && noPush {
 		return false, fmt.Errorf("--push and --no-push cannot be used together")
 	}
+
 	if push {
 		return push, nil
 	}
+
 	if noPush {
 		return !noPush, nil
 	}
@@ -99,8 +101,12 @@ func collectSyncReports(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath
 		return executeSyncUnit(cmd, cfgPath, unit, doPush)
 	})
 
-	// Flatten the reports
+	return flattenSyncReports(allReports)
+}
+
+func flattenSyncReports(allReports [][]syncReport) []syncReport {
 	reports := make([]syncReport, 0)
+
 	for _, unitReports := range allReports {
 		reports = append(reports, unitReports...)
 	}
@@ -147,7 +153,6 @@ func executeSyncUnit(cmd *cobra.Command, cfgPath string, unit syncUnit, doPush b
 	ctx := cmd.Context()
 
 	if !unit.isWorktree {
-		// Plain repo: just sync it
 		return []syncReport{syncPlainRepo(ctx, *unit.plain, doPush)}
 	}
 

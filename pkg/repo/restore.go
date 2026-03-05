@@ -205,6 +205,7 @@ func processWorktreeRestore(ctx context.Context, cfgPath string, wt config.Workt
 	if err != nil {
 		return "", err
 	}
+
 	if skipped {
 		return "skipped: no URL configured", nil
 	}
@@ -271,13 +272,7 @@ func restoreWorktreeBranch(ctx context.Context, cfgPath, bareAbsPath, branch, br
 	}
 
 	if IsGitRepo(absPath) {
-		if err := gitutil.SetBranchTrackingToOrigin(ctx, absPath, branch); err != nil {
-			return false, false, err
-		}
-		if _, err := gitutil.Pull(ctx, absPath); err != nil {
-			return false, false, err
-		}
-		return false, true, nil
+		return restoreExistingWorktree(ctx, absPath, branch)
 	}
 
 	if err := gitutil.AddWorktree(ctx, bareAbsPath, absPath, branch); err != nil {
@@ -289,4 +284,16 @@ func restoreWorktreeBranch(ctx context.Context, cfgPath, bareAbsPath, branch, br
 	}
 
 	return true, false, nil
+}
+
+func restoreExistingWorktree(ctx context.Context, absPath, branch string) (bool, bool, error) {
+	if err := gitutil.SetBranchTrackingToOrigin(ctx, absPath, branch); err != nil {
+		return false, false, err
+	}
+
+	if _, err := gitutil.Pull(ctx, absPath); err != nil {
+		return false, false, err
+	}
+
+	return false, true, nil
 }

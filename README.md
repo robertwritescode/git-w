@@ -35,6 +35,7 @@ It uses a config file that can be committed to version control to share your met
 - Organize repos into named groups
 - Set an active context to scope all commands to a group without specifying it each time
 - Local overrides (active context) stored in `.gitw.local`, which is kept out of version control automatically
+- Create and manage **workgroups**: named sets of git worktrees — one per repo, all on the same branch — that persist across shell sessions and can be resumed, extended, or dropped safely
 
 ## Installation
 
@@ -200,6 +201,79 @@ git w group rename backend services
 # Delete a group
 git w group remove backend
 ```
+
+### Workgroups
+
+A workgroup is a named set of git worktrees — one per repo — all checked out on the same branch. It's persistent: workgroup membership and state are stored in `.gitw.local` and survive across shell sessions. Worktrees live under `.workgroup/<name>/<repo>/` inside the config directory, which is auto-gitignored.
+
+The intended workflow: `create` to start a new feature, `checkout` to resume it in a new session, `add` if you discover another repo needs to be involved, `drop` when done.
+
+| Command | Description |
+|---|---|
+| `git w workgroup create <name> [repos/groups]` | Create a branch named `<name>` and provision worktrees across the target repos. Fails if the workgroup already exists unless `--checkout/-c` is passed. |
+| `git w workgroup checkout <name> [repos/groups]` | Resume a workgroup, or create it if it doesn't exist. Attaches to local branches, fetches and attaches to remote branches, or creates new ones — idempotent in all cases. Aliases: `co`, `switch` |
+| `git w workgroup add <name> [repos]` | Add repos to an existing workgroup. Only processes repos not already tracked; uses checkout semantics (attach or create). |
+| `git w workgroup drop <name>` | Remove all worktrees and the local workgroup entry. Refuses if any worktree has uncommitted changes or unpushed commits unless `--force` is passed. |
+| `git w workgroup push <name>` | Push the workgroup branch to `origin` across all tracked repos. |
+| `git w workgroup list` | List all active workgroups with their branch name and repo count. |
+| `git w workgroup path <name> [repo]` | Print the path to the workgroup directory, or to a specific repo's worktree within it. |
+
+All `workgroup` subcommands accept `work` and `wg` as aliases (e.g. `git w wg create`).
+
+**Examples:**
+
+```sh
+# Start a new feature workgroup across all repos in the backend group
+git w workgroup create my-feature backend
+
+# Resume it in a new shell session (uses the stored repo list automatically)
+git w workgroup checkout my-feature
+
+# Create or resume — useful in scripts where you don't know if it exists yet
+git w workgroup create my-feature --checkout
+
+# cd into a specific repo's worktree
+cd $(git w workgroup path my-feature repo-a)
+
+# Discover mid-feature that another repo needs to be involved
+git w workgroup add my-feature repo-c
+
+# Push all workgroup branches to origin
+git w workgroup push my-feature
+
+# Clean up: safe by default — refuses if worktrees are dirty or have unpushed commits
+git w workgroup drop my-feature
+
+# Force-drop and delete the branches too
+git w workgroup drop my-feature --force --delete-branch
+```
+
+**Flags for `create`:**
+
+| Flag | Description |
+|---|---|
+| `--checkout / -c` | Attach to existing branches instead of failing when the workgroup already exists. |
+| `--push` | Push newly created branches to origin. |
+| `--no-push` | Skip pushing (overrides workspace default). |
+| `--allow-upstream` | Set tracking upstream on newly created branches. |
+| `--no-upstream` | Skip setting upstream (overrides workspace default). |
+
+**Flags for `checkout` and `add`:**
+
+| Flag | Description |
+|---|---|
+| `--pull` | Pull after attaching to an existing branch. |
+| `--push` | Push newly created branches to origin. |
+| `--no-push` | Skip pushing (overrides workspace default). |
+| `--allow-upstream` | Set tracking upstream on newly created branches. |
+| `--no-upstream` | Skip setting upstream (overrides workspace default). |
+
+**Flags for `drop`:**
+
+| Flag | Description |
+|---|---|
+| `--force` | Remove worktrees even if they have uncommitted changes or unpushed commits. |
+| `--delete-branch` | Delete the workgroup branch in each repo after removing its worktree. |
 
 ### Context
 

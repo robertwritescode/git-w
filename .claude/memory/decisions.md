@@ -120,7 +120,7 @@ Three ways to register repos:
 - Repos directly under scan root get no group
 
 ### `git w` Short Alias: Symlink at Install Time
-Git requires a `git-w` executable in `$PATH` for `git w` to work.
+Git requires a `git-w` executable in `$PATH` for `git w` to workgroup.
 Approach: install a `git-w` symlink pointing to `git-w` via the Homebrew formula
 (`bin.install_symlink`). No code changes needed — cobra parses `os.Args[1:]`
 regardless of `os.Args[0]`. For non-Homebrew installs, README documents a manual `ln -s`.
@@ -267,3 +267,42 @@ The predefined git commands (fetch, pull, push, status) all share identical logi
 load config → filter repos → run parallel → write results → collect errors.
 Extracted to `runGitCmd(cmd, args, gitArgs...)` in `runner.go` to avoid duplicating
 this pipeline across four command definitions.
+
+### `ResolveBoolFlag` in `pkg/cmdutil`
+The pattern of `--flag` / `--no-flag` pairs with a config-default fallback was duplicated
+between `pkg/branch/create.go` and `pkg/workgroup`. Extracted to `cmdutil.ResolveBoolFlag(cmd, onFlag, offFlag, dflt)`.
+Both packages import `pkg/cmdutil` — a leaf package with no internal dependencies.
+
+### `repo.SafetyViolations` as Canonical Safety Check
+Drop-safety logic (uncommitted changes + unpushed commits) was originally inline in `pkg/worktree/safety.go`.
+Extracted to `pkg/repo/safety.go` as `repo.SafetyViolations(ctx, r)` so `pkg/workgroup/drop.go` can reuse it.
+`pkg/worktree/safety.go` is now a one-line wrapper delegating to `repo.SafetyViolations`.
+
+### Workgroup Storage: `.gitw.local` + `.workgroup/` directory
+Two-part storage for workgroups:
+- **Membership metadata** (`WorkgroupConfig`: which repos, branch name, created timestamp) stored in `.gitw.local` under `[workgroup.<name>]`. Never committed — purely local.
+- **Worktree directories** at `<configDir>/.workgroup/<name>/<repo>/`. Auto-gitignored via `EnsureGitignore` on create/checkout.
+
+`SaveLocalWorkgroup` and `RemoveLocalWorkgroup` in `pkg/config/loader.go` do read-modify-write on
+the `localDiskConfig` struct (which holds both context and workgroups) to avoid clobbering other `.local` fields.
+
+### Workgroup `create` vs `checkout` Design
+Two entry points with different strictness:
+- `create` — strict by default: fails if workgroup already exists. Pass `--checkout/-c` for idempotent behavior.
+  Intended for "start fresh" workflows where collision is an error.
+- `checkout` — always idempotent: attaches to existing local branch, fetches+attaches remote branch, or creates new.
+  Intended as the "resume" operation; uses stored repo list if workgroup exists.
+- `add` — requires existing workgroup; enrolls only repos not already tracked.
+
+This design means `checkout` is safe to script (always succeeds if possible) while `create` protects against
+accidental overwrites in interactive use.
+
+### `SilenceUsage: true` on Root Command
+Added to `pkg/cmd/root.go`. Cobra's default behavior prints the full usage text on any command error,
+which is noisy and unhelpful for runtime errors (as opposed to usage errors). Silencing it means
+errors print just the error message.
+
+### Workgroup Worktree Path Convention
+Worktrees are stored at `<configDir>/.workgroup/<workgroupName>/<repoName>/`.
+`configDir` is the directory containing `.gitw` (not the CWD). This makes worktree paths stable
+regardless of where in the workspace the user runs commands from.
