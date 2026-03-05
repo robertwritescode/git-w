@@ -120,7 +120,7 @@ Three ways to register repos:
 - Repos directly under scan root get no group
 
 ### `git w` Short Alias: Symlink at Install Time
-Git requires a `git-w` executable in `$PATH` for `git w` to workgroup.
+Git requires a `git-w` executable in `$PATH` for `git w` to work.
 Approach: install a `git-w` symlink pointing to `git-w` via the Homebrew formula
 (`bin.install_symlink`). No code changes needed — cobra parses `os.Args[1:]`
 regardless of `os.Args[0]`. For non-Homebrew installs, README documents a manual `ln -s`.

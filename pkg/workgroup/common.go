@@ -29,7 +29,6 @@ type workReport struct {
 }
 
 type workFlags struct {
-	SyncSource  bool
 	SetUpstream bool
 	Push        bool
 	Checkout    bool

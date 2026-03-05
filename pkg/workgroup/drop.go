@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/config"
@@ -136,20 +135,16 @@ func removeDropWorktrees(ctx context.Context, op dropOp) error {
 		}
 
 		treePath := worktreePath(op.cfgPath, op.wgName, repoName)
-		if err := removeOneWorktree(ctx, repoAbsPath, treePath, op.wgName, op.force, op.deleteBranch); err != nil {
+		if err := removeOneWorktree(ctx, repoAbsPath, treePath, op.wg.Branch, op.force, op.deleteBranch); err != nil {
 			return err
 		}
 	}
 
 	// Remove the now-empty workgroup directory. os.Remove is a no-op if the
 	// directory is non-empty (e.g. some repos were skipped).
-	_ = os.Remove(wgDir(op.cfgPath, op.wgName))
+	_ = os.Remove(workgroupRootPath(op.cfgPath, op.wgName))
 
 	return nil
-}
-
-func wgDir(cfgPath, wgName string) string {
-	return filepath.Join(config.ConfigDir(cfgPath), ".workgroup", wgName)
 }
 
 func removeOneWorktree(ctx context.Context, repoAbsPath, treePath, branchName string, force, deleteBranch bool) error {
