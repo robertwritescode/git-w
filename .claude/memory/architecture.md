@@ -127,7 +127,7 @@ git-w/
     │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root); worktreeRepoToSet delegates to config.WorktreeRepoToSetIndex
     │   ├── runner.go           # Shared runGitCmd helper for git subcommands
     │   ├── exec.go             # Execute arbitrary git commands across repos
-    │   ├── info.go             # Status table for all or group repos (alias: ll)
+    │   ├── info.go             # Status table for all or group repos (alias: ll); worktree set collapsing + workgroup section
     │   ├── sync.go             # sync: fetch→pull→push pipeline per repo (alias: s); worktree-set aware
     │   └── *_test.go
     │
@@ -175,7 +175,7 @@ git-w/
     │   └── parallel_test.go
     │
     ├── display/                # shared utility: terminal output formatting
-    │   ├── table.go            # RenderTable: tabwriter-based status table
+    │   ├── table.go            # RenderTable, RenderGroupedTable (worktree set collapsing), RenderWorkgroupTable (5-col workgroup section)
     │   ├── colors.go           # ANSI color helpers, visualWidth()
     │   └── *_test.go
     │
@@ -192,8 +192,8 @@ config     → toml
 cmdutil    → (none)
 workspace  → config, gitutil
 repo       → config, gitutil
-display    → repo
-git        → repo, config, display, parallel
+display    → repo, config
+git        → repo, config, display, parallel, output
 branch     → config, repo, gitutil, parallel, output, cmdutil
 worktree   → config, repo, gitutil, parallel
 workgroup  → config, repo, gitutil, parallel, output, cmdutil
@@ -392,7 +392,21 @@ type TableEntry struct {
     LastCommit  string
 }
 
+// WorktreeSet groups entries belonging to a single worktree set (for collapsing in grouped table).
+type WorktreeSet struct {
+    SetName  string
+    Branches []string
+}
+
+// WorkgroupSection holds entries for one workgroup in the 5-column workgroup table.
+type WorkgroupSection struct {
+    Name    string
+    Entries []TableEntry
+}
+
 func RenderTable(w io.Writer, entries []TableEntry)
+func RenderGroupedTable(w io.Writer, entries []TableEntry, sets []WorktreeSet)   // worktree sets collapsed under header rows
+func RenderWorkgroupTable(w io.Writer, sections []WorkgroupSection)              // 5-col: WORKGROUP, REPO, BRANCH, STATUS, COMMIT
 ```
 
 ### Gitutil (`pkg/gitutil/`)
@@ -546,11 +560,23 @@ When no filter: uses active context if set, otherwise all repos.
 
 ## Status Display (`info` / `ll`)
 
+The `info` command renders two sections:
+
+**Main table** — repos and worktree sets (sets collapsed under a header with tree-drawing characters):
 ```
 REPO          BRANCH          STATUS  COMMIT
+infra
+  └ dev       main ✓                  chore: bump versions
+  └ prod      main ✓                  fix: config
 frontend      main ✓          *+      feat: add login page
 backend       feature/auth ↑  +       fix: token validation
-infra         main ↓          ?       chore: bump versions
+```
+
+**Workgroup section** (only shown when workgroups with existing worktrees are present):
+```
+WORKGROUP    REPO        BRANCH          STATUS  COMMIT
+fix-auth     service-a   fix-auth ✓              wip: token
+             service-b   fix-auth ✓  *           wip: start
 ```
 
 **Branch color coding:**

@@ -36,6 +36,7 @@ It uses a config file that can be committed to version control to share your met
 - Set an active context to scope all commands to a group without specifying it each time
 - Local overrides (active context) stored in `.gitw.local`, which is kept out of version control automatically
 - Create and manage **workgroups**: named sets of git worktrees — one per repo, all on the same branch — that persist across shell sessions and can be resumed, extended, or dropped safely
+- Status overview (`info`) collapses worktree sets into a visual tree and shows active workgroups in a separate section
 
 ## Installation
 
@@ -303,6 +304,21 @@ git w info
 
 # Show status table for a specific group
 git w info backend
+```
+
+The `info` command groups worktree sets under a collapsible header and shows active workgroups in a separate section:
+
+```
+REPO          BRANCH          STATUS  COMMIT
+infra
+  └ dev       main ✓                  chore: bump versions
+  └ prod      main ✓                  fix: config
+service-a     main ✓          *+      feat: add login page
+service-b     feature/auth ↑  +       fix: token validation
+
+WORKGROUP    REPO        BRANCH          STATUS  COMMIT
+fix-auth     service-a   fix-auth ✓              wip: token
+             service-b   fix-auth ✓  *           wip: start
 ```
 
 ### Shell completion

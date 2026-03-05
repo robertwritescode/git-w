@@ -6,7 +6,7 @@
 - **Language**: Go 1.26
 - **Inspired by**: [gita](https://github.com/nosarthur/gita) (Python multi-repo manager)
 - **Purpose**: Manage multiple git repos defined in a local `.gitw` TOML config
-- **Status**: Active development — workgroup feature in progress on branch `23-feature-workgroup`
+- **Status**: Active development — display improvements (worktree set collapsing, workgroup section in `info`) in progress on branch `22-grouping-display`
 
 ## Documentation Index
 - [architecture.md](architecture.md) — Directory structure, type definitions, command inventory, config schema
@@ -46,7 +46,7 @@ pkg/worktree/        — worktree set commands: clone/add/rm/drop/list; safety c
 pkg/workgroup/       — workgroup commands: create/checkout/add/drop/push/list/path; common helpers
 pkg/gitutil/         — low-level git subprocess wrappers; ALL functions take context.Context
 pkg/parallel/        — generic concurrency primitives (RunFanOut, MaxWorkers, FormatFailureError)
-pkg/display/         — terminal output formatting (RenderTable, ANSI colors)
+pkg/display/         — terminal output formatting (RenderTable, RenderGroupedTable, RenderWorkgroupTable, ANSI colors)
 pkg/output/          — standardized command output helpers
 pkg/testutil/        — shared test infrastructure (CmdSuite, MakeGitRepo, MakeBareGitRepo, AddWorktreeToRepo, etc.)
 ```
@@ -57,8 +57,8 @@ config     → (none)
 cmdutil    → (none)
 workspace  → config, gitutil
 repo       → config, gitutil
-display    → repo
-git        → repo, config, display, parallel
+display    → repo, config
+git        → repo, config, display, parallel, output
 branch     → config, repo, gitutil, parallel, output, cmdutil
 worktree   → config, repo, gitutil, parallel
 workgroup  → config, repo, gitutil, parallel, output, cmdutil
