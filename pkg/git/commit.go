@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/config"
@@ -123,10 +124,15 @@ func resolveWorkgroupRepos(cmd *cobra.Command, wgName string) ([]repo.Repo, erro
 }
 
 func workgroupWorktreeRepos(cfgPath, wgName string, wg config.WorkgroupConfig) []repo.Repo {
-	repos := make([]repo.Repo, len(wg.Repos))
+	repos := make([]repo.Repo, 0)
 
-	for i, name := range wg.Repos {
-		repos[i] = repo.Repo{Name: name, AbsPath: config.WorkgroupWorktreePath(cfgPath, wgName, name)}
+	for _, name := range wg.Repos {
+		path := config.WorkgroupWorktreePath(cfgPath, wgName, name)
+		if _, err := os.Stat(path); err != nil && errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+
+		repos = append(repos, repo.Repo{Name: name, AbsPath: path})
 	}
 
 	return repos
@@ -220,10 +226,25 @@ func reportFailure(w io.Writer, commitResults, rollbackResults []ExecResult) {
 	reportRollbackResults(w, rollbackResults)
 }
 
+// formatExecError normalizes stderr for display, removing a leading
+// "[repoName] " prefix if present to avoid double-prefixing when
+// combined with our own "[%s] failed: ..." formatting.
+func formatExecError(repoName string, stderr []byte) string {
+	msg := strings.TrimSpace(string(stderr))
+	if msg == "" {
+		return msg
+	}
+
+	prefix := fmt.Sprintf("[%s] ", repoName)
+
+	return strings.TrimPrefix(msg, prefix)
+}
+
 func reportCommitFailures(w io.Writer, results []ExecResult) {
 	for _, r := range results {
 		if r.ExitCode != 0 || r.Err != nil {
-			output.Writef(w, "[%s] failed: %s\n", r.RepoName, strings.TrimSpace(string(r.Stderr)))
+			msg := formatExecError(r.RepoName, r.Stderr)
+			output.Writef(w, "[%s] failed: %s\n", r.RepoName, msg)
 		}
 	}
 }

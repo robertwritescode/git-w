@@ -381,3 +381,28 @@ func (s *CommitSuite) TestCommit_Workgroup_DryRun() {
 	s.Assert().Contains(out, names[0])
 	s.Assert().Equal(initialCount, commitCount(s.T(), filepath.Join(wgDir, names[0])))
 }
+
+func (s *CommitSuite) TestCommit_Workgroup_SkipsMissingWorktrees() {
+	wsDir, names := s.MakeWorkspaceWithNLocalRepos(2)
+	wgName := "feature-x"
+	setupWorkgroup(s.T(), wsDir, wgName, names)
+	s.ChangeToDir(wsDir)
+
+	wgDir := workgroupDir(wsDir, wgName)
+
+	// Stage a file in the first worktree only.
+	stageFile(s.T(), filepath.Join(wgDir, names[0]), "f.txt", "hello")
+
+	// Remove the second worktree directory to simulate a missing path.
+	missingPath := filepath.Join(wgDir, names[1])
+	testutil.RunGit(s.T(), filepath.Join(wsDir, names[1]), "worktree", "remove", missingPath)
+
+	out, err := s.ExecuteCmd("commit", "-m", "skip missing", "--workgroup", wgName)
+	s.Require().NoError(err)
+
+	// The first repo should have been committed.
+	s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wgDir, names[0])))
+
+	// The missing worktree should NOT appear as "skipped: no staged changes".
+	s.Assert().NotContains(out, names[1])
+}
