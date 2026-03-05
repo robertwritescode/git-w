@@ -79,7 +79,7 @@ func appendWorkgroupConfig(t *testing.T, wsDir, wgName string, repoNames []strin
 	localPath := filepath.Join(wsDir, ".gitw.local")
 	f, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	require.NoError(t, err)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	quoted := make([]string, len(repoNames))
 	for i, name := range repoNames {
