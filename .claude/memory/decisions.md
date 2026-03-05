@@ -80,6 +80,27 @@ behavior predictable in CI/scripts.
   strips escape codes, then pads manually to target column width
 - Rows built as pre-colored strings, written to tabwriter with tab separators
 
+### Worktree Set Collapsing in `info`
+Worktree sets (e.g. `infra` with branches `dev`, `prod`) collapsed under a header row
+in the main repo table instead of appearing as flat peers (`infra-dev`, `infra-prod`).
+Uses tree-drawing characters (`└`) for child rows. Standalone repos appear first, then
+grouped sets in sorted order. `RenderGroupedTable` replaces `RenderTable` as the default
+renderer in `info`; `RenderTable` is kept unchanged for backward compatibility.
+Branch display within a set strips the set name prefix (e.g. `infra-dev` → `dev`).
+
+### Workgroup Section in `info`
+Workgroups rendered as a separate 5-column table (`WORKGROUP, REPO, BRANCH, STATUS, COMMIT`)
+below the main repo table, separated by a blank line. Only shown when at least one workgroup
+has existing worktree directories on disk. The workgroup name appears on the first row of
+each section; subsequent rows in the same workgroup leave the column blank.
+Worktree paths resolved via `<configDir>/.workgroup/<wgName>/<repoName>/` — consistent with
+the convention used by `pkg/workgroup`. Repos with missing directories are silently skipped.
+
+### `display` Package Depends on `config`
+`RenderGroupedTable` needs `config.WorktreeRepoName` to reverse-map synthesized repo names
+back to their parent set. This adds `config` as a dependency of `display`. The dependency
+is minimal (single function call) and preserves the cycle-free graph.
+
 ### Predefined Command Set: Hardcoded
 Static, not configurable. Final execution commands:
 - `fetch` (alias: `f`) — `git fetch`
