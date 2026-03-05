@@ -37,6 +37,7 @@ It uses a config file that can be committed to version control to share your met
 - Local overrides (active context) stored in `.gitw.local`, which is kept out of version control automatically
 - Create and manage **workgroups**: named sets of git worktrees — one per repo, all on the same branch — that persist across shell sessions and can be resumed, extended, or dropped safely
 - Status overview (`info`) collapses worktree sets into a visual tree and shows active workgroups in a separate section
+- **Atomic cross-repo commit** (`commit`): commit staged changes across repos with a single message; automatic rollback if any repo fails
 
 ## Installation
 
@@ -149,6 +150,7 @@ All git commands accept an optional list of repo names to filter targets. With n
 | `git w push [repos...]` | Run `git push` in repos. Alias: `ps` |
 | `git w sync [repos...]` | Fetch, pull, and push in order. Stops per-repo on first failure. Alias: `s` |
 | `git w status [repos...]` | Run `git status -sb` in repos. Alias: `st` |
+| `git w commit -m "<msg>" [repos...]` | Atomically commit staged changes across repos. Rolls back all on failure. Alias: `ci` |
 | `git w exec [repos...] -- <git-args>` | Run any git command across repos concurrently. Output is prefixed with `[repo-name]`. Aliases: `x`, `run` |
 
 **Examples:**
@@ -172,6 +174,37 @@ git w exec -- log --oneline -5
 # Run a command on specific repos
 git w exec repo-a repo-c -- diff HEAD~1
 ```
+
+### Atomic commit
+
+Commit staged changes across repos atomically. If any repo's commit fails, all successful commits are rolled back (`git reset --soft HEAD~1`), restoring staged changes.
+
+```sh
+# Commit across all repos that have staged changes
+git w commit -m "fix: update config"
+
+# Commit only in specific repos
+git w commit -m "feat: new endpoint" repo-a repo-b
+
+# Dry run — see which repos would be committed
+git w commit --dry-run -m "check"
+
+# Skip pre-commit hooks
+git w commit --no-verify -m "wip"
+
+# Commit within a workgroup's worktrees
+git w commit -m "fix auth flow" --workgroup fix-auth
+git w commit -m "fix auth flow" -W fix-auth
+```
+
+**Flags:**
+
+| Flag | Description |
+|---|---|
+| `-m <message>` | Commit message (required) |
+| `--dry-run` | Show which repos would be committed without committing |
+| `--no-verify` | Skip pre-commit and commit-msg hooks |
+| `--workgroup <name>` / `-W <name>` | Scope commit to a workgroup's worktrees |
 
 ### Groups
 

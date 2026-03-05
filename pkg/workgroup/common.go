@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/robertwritescode/git-w/pkg/cmdutil"
 	"github.com/robertwritescode/git-w/pkg/config"
@@ -54,10 +53,6 @@ func recordStep(report *workReport, stepName string, err error, skipped bool) {
 
 func skipStep(report *workReport, stepName, detail string) {
 	report.Steps = append(report.Steps, workStep{name: stepName, skipped: true, detail: detail})
-}
-
-func worktreePath(cfgPath, wgName, repoName string) string {
-	return filepath.Join(config.ConfigDir(cfgPath), ".workgroup", wgName, repoName)
 }
 
 func pathExists(p string) bool {

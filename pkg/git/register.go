@@ -8,4 +8,5 @@ func Register(root *cobra.Command) {
 	registerSync(root)
 	registerExec(root)
 	registerInfo(root)
+	registerCommit(root)
 }

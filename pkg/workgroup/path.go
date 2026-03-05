@@ -35,7 +35,7 @@ func runPath(cmd *cobra.Command, args []string) error {
 	}
 
 	repoName := args[1]
-	output.Writef(cmd.OutOrStdout(), "%s\n", worktreePath(cfgPath, wgName, repoName))
+	output.Writef(cmd.OutOrStdout(), "%s\n", config.WorkgroupWorktreePath(cfgPath, wgName, repoName))
 
 	return nil
 }

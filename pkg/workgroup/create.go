@@ -103,7 +103,7 @@ func collectCreateReports(ctx context.Context, inputs createInputs) []workReport
 
 func createInRepo(ctx context.Context, r repo.Repo, cfgPath, wgName, sourceBranch string, flags workFlags) workReport {
 	report := workReport{RepoName: r.Name}
-	treePath := worktreePath(cfgPath, wgName, r.Name)
+	treePath := config.WorkgroupWorktreePath(cfgPath, wgName, r.Name)
 
 	if pathExists(treePath) {
 		resolveExistingTreePath(ctx, &report, r, treePath, wgName, false)

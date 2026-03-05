@@ -139,7 +139,7 @@ func collectCheckoutReports(ctx context.Context, inputs checkoutInputs) []workRe
 
 func checkoutInRepo(ctx context.Context, r repo.Repo, cfgPath, wgName, sourceBranch string, flags checkoutWorkFlags) workReport {
 	report := workReport{RepoName: r.Name}
-	treePath := worktreePath(cfgPath, wgName, r.Name)
+	treePath := config.WorkgroupWorktreePath(cfgPath, wgName, r.Name)
 
 	if pathExists(treePath) {
 		resolveExistingTreePath(ctx, &report, r, treePath, wgName, flags.Pull)

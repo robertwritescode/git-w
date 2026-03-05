@@ -123,11 +123,12 @@ git-w/
     ├── git/                    # domain: cross-repo git execution and commands
     │   ├── executor.go         # RunParallel: goroutine pool using pkg/parallel
     │   ├── result.go           # ExecResult, WriteResults, ExecErrors
-    │   ├── register.go         # Register(root) → registerGit + registerSync + registerExec + registerInfo
+    │   ├── register.go         # Register(root) → registerGit + registerSync + registerExec + registerInfo + registerCommit
     │   ├── commands.go         # fetch, pull, push, status command definitions (directly on root); worktreeRepoToSet delegates to config.WorktreeRepoToSetIndex
     │   ├── runner.go           # Shared runGitCmd helper for git subcommands
     │   ├── exec.go             # Execute arbitrary git commands across repos
     │   ├── info.go             # Status table for all or group repos (alias: ll); worktree set collapsing + workgroup section
+    │   ├── commit.go           # Atomic cross-repo commit with rollback (alias: ci); workgroup scoping
     │   ├── sync.go             # sync: fetch→pull→push pipeline per repo (alias: s); worktree-set aware
     │   └── *_test.go
     │
@@ -285,6 +286,7 @@ func RemoveLocalWorkgroup(configPath, name string) error                        
 func LoadCWD(override string) (*WorkspaceConfig, string, error)
 func LoadConfig(cmd *cobra.Command) (*WorkspaceConfig, string, error)
 func ConfigDir(configPath string) string
+func WorkgroupWorktreePath(cfgPath, wgName, repoName string) string
 func ResolveRepoPath(cfgPath, repoPath string) (string, error)
 func RelPath(cfgPath, absPath string) (string, error)
 

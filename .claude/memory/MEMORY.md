@@ -6,7 +6,7 @@
 - **Language**: Go 1.26
 - **Inspired by**: [gita](https://github.com/nosarthur/gita) (Python multi-repo manager)
 - **Purpose**: Manage multiple git repos defined in a local `.gitw` TOML config
-- **Status**: Active development — display improvements (worktree set collapsing, workgroup section in `info`) in progress on branch `22-grouping-display`
+- **Status**: Active development — atomic cross-repo commit (`git w commit`) and display improvements in progress on branch `18-atomic-commits`
 
 ## Documentation Index
 - [architecture.md](architecture.md) — Directory structure, type definitions, command inventory, config schema
@@ -40,7 +40,7 @@ pkg/toml/            — TOML parsing wrapper with comment preservation (wraps g
 pkg/cmdutil/         — shared CLI flag helpers (ResolveBoolFlag for on/off flag pairs)
 pkg/workspace/       — init/context/group commands; cmd_config helpers
 pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands; SafetyViolations
-pkg/git/             — executor, result, fetch/pull/push/status/exec/info/sync commands
+pkg/git/             — executor, result, fetch/pull/push/status/exec/info/sync/commit commands
 pkg/branch/          — branch create (and future branch subcommands); register.go + create.go
 pkg/worktree/        — worktree set commands: clone/add/rm/drop/list; safety checks
 pkg/workgroup/       — workgroup commands: create/checkout/add/drop/push/list/path; common helpers

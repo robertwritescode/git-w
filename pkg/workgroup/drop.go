@@ -104,7 +104,7 @@ func collectDropViolations(ctx context.Context, op dropOp) ([]string, error) {
 	var violations []string
 
 	for _, repoName := range op.wg.Repos {
-		treePath := worktreePath(op.cfgPath, op.wgName, repoName)
+		treePath := config.WorkgroupWorktreePath(op.cfgPath, op.wgName, repoName)
 		if !pathExists(treePath) {
 			continue
 		}
@@ -134,7 +134,7 @@ func removeDropWorktrees(ctx context.Context, op dropOp) error {
 			return err
 		}
 
-		treePath := worktreePath(op.cfgPath, op.wgName, repoName)
+		treePath := config.WorkgroupWorktreePath(op.cfgPath, op.wgName, repoName)
 		if err := removeOneWorktree(ctx, repoAbsPath, treePath, op.wg.Branch, op.force, op.deleteBranch); err != nil {
 			return err
 		}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 
 	"github.com/robertwritescode/git-w/pkg/config"
@@ -111,7 +110,7 @@ func workgroupRepos(cfgPath, wgName string, wg config.WorkgroupConfig) []repo.Re
 	repos := make([]repo.Repo, 0)
 
 	for _, repoName := range wg.Repos {
-		path := workgroupWorktreePath(cfgPath, wgName, repoName)
+		path := config.WorkgroupWorktreePath(cfgPath, wgName, repoName)
 		if _, err := os.Stat(path); err != nil && errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -120,8 +119,4 @@ func workgroupRepos(cfgPath, wgName string, wg config.WorkgroupConfig) []repo.Re
 	}
 
 	return repos
-}
-
-func workgroupWorktreePath(cfgPath, wgName, repoName string) string {
-	return filepath.Join(config.ConfigDir(cfgPath), ".workgroup", wgName, repoName)
 }
