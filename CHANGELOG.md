@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.6.0](https://github.com/robertwritescode/git-w/compare/v1.5.0...v1.6.0) (2026-03-05)
+
+
+### Features
+
+* display improvements for `info` command ([#32](https://github.com/robertwritescode/git-w/issues/32)) ([b0b78ce](https://github.com/robertwritescode/git-w/commit/b0b78ce80900b11ce9091df3325a231ca4b2e5cb))
+* implement Atomic Cross-Repo Commit (`git w commit`) ([#33](https://github.com/robertwritescode/git-w/issues/33)) ([6b39356](https://github.com/robertwritescode/git-w/commit/6b39356ec92cbe11cccb5e556165394b52c0e5dd))
+* Workgroups (`git w work`) ([#29](https://github.com/robertwritescode/git-w/issues/29)) ([d348446](https://github.com/robertwritescode/git-w/commit/d34844632aa7d18c1ae693b9a3c9be6698703ef0))
+
 ## [1.5.0](https://github.com/robertwritescode/git-w/compare/v1.4.0...v1.5.0) (2026-03-04)
 
 
