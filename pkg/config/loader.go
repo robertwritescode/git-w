@@ -71,25 +71,30 @@ func ensureWorkspaceMaps(cfg *WorkspaceConfig) {
 	if cfg.Worktrees == nil {
 		cfg.Worktrees = make(map[string]WorktreeConfig)
 	}
+
+	if cfg.Workgroups == nil {
+		cfg.Workgroups = make(map[string]WorkgroupConfig)
+	}
+}
+
+// localDiskConfig is the schema for the .gitw.local file.
+type localDiskConfig struct {
+	Context    ContextConfig              `toml:"context"`
+	Workgroups map[string]WorkgroupConfig `toml:"workgroup,omitempty"`
 }
 
 func mergeLocalConfig(cfg *WorkspaceConfig, localPath string) error {
-	localData, err := os.ReadFile(localPath)
+	local, err := readLocalDiskConfig(localPath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil // .local is optional
-		}
-
-		return fmt.Errorf("reading local config %s: %w", localPath, err)
-	}
-
-	var local WorkspaceConfig
-	if err := toml.Unmarshal(localData, &local); err != nil {
-		return fmt.Errorf("parsing .local config %s: %w", localPath, err)
+		return err
 	}
 
 	if local.Context.Active != "" {
 		cfg.Context = local.Context
+	}
+
+	for name, wg := range local.Workgroups {
+		cfg.Workgroups[name] = wg
 	}
 
 	return nil
@@ -129,14 +134,68 @@ func prepareDiskConfig(cfg *WorkspaceConfig) diskConfig {
 }
 
 func SaveLocal(configPath string, ctx ContextConfig) error {
-	type localFile struct {
-		Context ContextConfig `toml:"context"`
-	}
-
-	newConfig := localFile{Context: ctx}
 	localPath := configPath + ".local"
 
-	data, err := saveWithCommentPreservation(localPath, newConfig)
+	existing, err := readLocalDiskConfig(localPath)
+	if err != nil {
+		return err
+	}
+
+	existing.Context = ctx
+
+	return writeLocalDiskConfig(localPath, existing)
+}
+
+func SaveLocalWorkgroup(configPath, name string, wg WorkgroupConfig) error {
+	localPath := configPath + ".local"
+
+	existing, err := readLocalDiskConfig(localPath)
+	if err != nil {
+		return err
+	}
+
+	if existing.Workgroups == nil {
+		existing.Workgroups = make(map[string]WorkgroupConfig)
+	}
+
+	existing.Workgroups[name] = wg
+
+	return writeLocalDiskConfig(localPath, existing)
+}
+
+func RemoveLocalWorkgroup(configPath, name string) error {
+	localPath := configPath + ".local"
+
+	existing, err := readLocalDiskConfig(localPath)
+	if err != nil {
+		return err
+	}
+
+	delete(existing.Workgroups, name)
+
+	return writeLocalDiskConfig(localPath, existing)
+}
+
+func readLocalDiskConfig(localPath string) (localDiskConfig, error) {
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return localDiskConfig{}, nil
+		}
+
+		return localDiskConfig{}, fmt.Errorf("reading local config %s: %w", localPath, err)
+	}
+
+	var cfg localDiskConfig
+	if err := toml.Unmarshal(data, &cfg); err != nil {
+		return localDiskConfig{}, fmt.Errorf("parsing local config %s: %w", localPath, err)
+	}
+
+	return cfg, nil
+}
+
+func writeLocalDiskConfig(localPath string, cfg localDiskConfig) error {
+	data, err := saveWithCommentPreservation(localPath, cfg)
 	if err != nil {
 		return err
 	}
@@ -254,12 +313,14 @@ func validateRepoPaths(cfgPath string, cfg *WorkspaceConfig) error {
 func validateWorktreePaths(cfgPath string, cfg *WorkspaceConfig) error {
 	for name, wt := range cfg.Worktrees {
 		if wt.BarePath == "" {
-			continue // empty is allowed; will produce clear error at operation time
+			continue
 		}
+
 		if _, err := ResolveRepoPath(cfgPath, wt.BarePath); err != nil {
 			return fmt.Errorf("invalid bare_path for worktree set %q: %w", name, err)
 		}
 	}
+
 	return nil
 }
 

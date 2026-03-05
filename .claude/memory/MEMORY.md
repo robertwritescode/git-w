@@ -6,7 +6,7 @@
 - **Language**: Go 1.26
 - **Inspired by**: [gita](https://github.com/nosarthur/gita) (Python multi-repo manager)
 - **Purpose**: Manage multiple git repos defined in a local `.gitw` TOML config
-- **Status**: v0.1.0 MVP — all commands implemented, all tests passing
+- **Status**: Active development — workgroup feature in progress on branch `23-feature-workgroup`
 
 ## Documentation Index
 - [architecture.md](architecture.md) — Directory structure, type definitions, command inventory, config schema
@@ -17,7 +17,7 @@
 
 ## Config Files
 - **`.gitw`** — committed, shared workspace definition (repos, groups, settings); TOML format
-- **`.gitw.local`** — gitignored, per-developer state (`[context]` section only)
+- **`.gitw.local`** — gitignored, per-developer state (`[context]` section + `[workgroup.*]` entries)
 - Location: workspace root; discovered by walking up from CWD (like `.git`)
 - Env var override: `GIT_W_CONFIG`; CLI override: `--config` flag
 - Loader merges both files; `.local` values take precedence
@@ -34,14 +34,16 @@
 
 ## pkg/ Domain Layout
 ```
-pkg/cmd/             — root cobra cmd, Execute(), completion (wires 5 domain Register funcs)
+pkg/cmd/             — root cobra cmd, Execute(), completion (wires domain Register funcs)
 pkg/config/          — ALL config types (WorkspaceConfig etc.), loader, discovery
 pkg/toml/            — TOML parsing wrapper with comment preservation (wraps go-toml/v2)
+pkg/cmdutil/         — shared CLI flag helpers (ResolveBoolFlag for on/off flag pairs)
 pkg/workspace/       — init/context/group commands; cmd_config helpers
-pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands
+pkg/repo/            — repo types, filter, status, add/clone/unlink/rename/restore/list commands; SafetyViolations
 pkg/git/             — executor, result, fetch/pull/push/status/exec/info/sync commands
 pkg/branch/          — branch create (and future branch subcommands); register.go + create.go
 pkg/worktree/        — worktree set commands: clone/add/rm/drop/list; safety checks
+pkg/workgroup/       — workgroup commands: create/checkout/add/drop/push/list/path; common helpers
 pkg/gitutil/         — low-level git subprocess wrappers; ALL functions take context.Context
 pkg/parallel/        — generic concurrency primitives (RunFanOut, MaxWorkers, FormatFailureError)
 pkg/display/         — terminal output formatting (RenderTable, ANSI colors)
@@ -52,12 +54,14 @@ pkg/testutil/        — shared test infrastructure (CmdSuite, MakeGitRepo, Make
 Dependency graph (cycle-free):
 ```
 config     → (none)
+cmdutil    → (none)
 workspace  → config, gitutil
 repo       → config, gitutil
 display    → repo
 git        → repo, config, display, parallel
-branch     → config, repo, gitutil, parallel, output
+branch     → config, repo, gitutil, parallel, output, cmdutil
 worktree   → config, repo, gitutil, parallel
+workgroup  → config, repo, gitutil, parallel, output, cmdutil
 output     → (none)
 gitutil    → (none)
 parallel   → (none)
@@ -73,10 +77,12 @@ testutil   → (none)
 - `gitutil.Clone` / `gitutil.CloneContext` / `gitutil.EnsureGitignore` in `pkg/gitutil`; `EnsureGitignore` is mutex-protected for concurrent calls
 - `pkg/git/runner.go` provides shared `runGitCmd` helper used by fetch/pull/push/status
 - `pkg/parallel` provides `RunFanOut` (generic fan-out over goroutines) used by `pkg/git/executor.go`
+- `cmdutil.ResolveBoolFlag` handles `--flag` / `--no-flag` pairs with config default fallback (used by branch and workgroup)
+- `repo.SafetyViolations` is the canonical safety check (uncommitted + unpushed); used by both `pkg/worktree` and `pkg/workgroup`
 
 ## How to Add a New Command
 
-Choose the appropriate domain package (`pkg/workspace`, `pkg/repo`, `pkg/git`, or `pkg/branch`).
+Choose the appropriate domain package (`pkg/workspace`, `pkg/repo`, `pkg/git`, `pkg/branch`, or `pkg/workgroup`).
 
 1. **Add file**: `pkg/<domain>/<name>.go` with `package <domain>`
 2. **Define command and private register function**:

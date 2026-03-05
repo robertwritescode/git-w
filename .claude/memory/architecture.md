@@ -13,7 +13,7 @@ So `git w fetch` → `git-w fetch`.
 Discovered by walking up from CWD. Env var `GIT_W_CONFIG` or `--config` flag override.
 
 **`.gitw`** — committed, shared workspace definition (repos, groups)
-**`.gitw.local`** — gitignored, per-developer state (active context)
+**`.gitw.local`** — gitignored, per-developer state (active context + workgroup entries)
 
 Both files are TOML. The loader reads both and merges them; `.local` values take precedence.
 `git w init` automatically adds `.gitw.local` to `.gitignore`.
@@ -60,6 +60,11 @@ Worktree sets synthesize repos named `<set>-<branch>` (e.g., `infra-dev`) and a 
 
 [context]
 active = "web"
+
+[workgroup.my-feature]
+repos   = ["repo-a", "repo-b"]
+branch  = "my-feature"
+created = "2026-03-04T00:00:00Z"
 ```
 
 ---
@@ -126,6 +131,9 @@ git-w/
     │   ├── sync.go             # sync: fetch→pull→push pipeline per repo (alias: s); worktree-set aware
     │   └── *_test.go
     │
+    ├── cmdutil/                # shared utility: CLI flag helpers
+    │   └── flags.go            # ResolveBoolFlag(cmd, onFlag, offFlag, dflt) — handles --flag/--no-flag pairs
+    │
     ├── branch/                 # domain: branch management commands
     │   ├── register.go         # Register(root) → registerCreate (currently single subcommand creates branch parent itself)
     │   ├── create.go           # branch create: branchFlags/branchStep/branchReport/branchUnit types; all helpers
@@ -139,7 +147,19 @@ git-w/
     │   ├── rm.go               # rm: remove individual worktree; safety checks + --force
     │   ├── drop.go             # drop: destroy entire set (all worktrees + bare repo); safety checks
     │   ├── list.go             # list (alias: ls): list sets or branches of a set
-    │   ├── safety.go           # Safety check logic: dirty and local-ahead detection
+    │   ├── safety.go           # Thin wrapper: delegates to repo.SafetyViolations
+    │   └── *_test.go
+    │
+    ├── workgroup/              # domain: cross-repo branch workgroup commands
+    │   ├── register.go         # Register(root): creates "workgroup" subcommand (aliases: work, wg)
+    │   ├── common.go           # Shared types (workStep/workReport/workFlags), step helpers, remote ops, output
+    │   ├── create.go           # create: new branch + worktrees across repos; strict by default, --checkout/-c for idempotent
+    │   ├── checkout.go         # checkout (co/switch): resume or create workgroup; always idempotent; merges repo list
+    │   ├── add.go              # add: enroll additional repos into an existing workgroup
+    │   ├── drop.go             # drop: remove worktrees + local entry; safety checks; --force; --delete-branch
+    │   ├── push.go             # push: push workgroup branch to origin across all repos
+    │   ├── list.go             # list: list active workgroups (name, branch, repo count)
+    │   ├── path.go             # path: print path to workgroup dir or specific repo worktree
     │   └── *_test.go
     │
     ├── gitutil/                # shared utility: low-level git subprocess wrappers; ALL functions take context.Context as first param
@@ -169,12 +189,14 @@ Dependency graph (cycle-free):
 ```
 toml       → (pelletier/go-toml)
 config     → toml
+cmdutil    → (none)
 workspace  → config, gitutil
 repo       → config, gitutil
 display    → repo
 git        → repo, config, display, parallel
-branch     → config, repo, gitutil, parallel, output
+branch     → config, repo, gitutil, parallel, output, cmdutil
 worktree   → config, repo, gitutil, parallel
+workgroup  → config, repo, gitutil, parallel, output, cmdutil
 output     → (none)
 parallel   → (none)
 gitutil    → (none)
@@ -190,11 +212,18 @@ testutil   → (none)
 ```go
 // config.go — merged from .gitw + .gitw.local at load time
 type WorkspaceConfig struct {
-    Workspace WorkspaceMeta             `toml:"workspace"`
-    Context   ContextConfig             `toml:"context"`  // from .local
-    Repos     map[string]RepoConfig     `toml:"repos"`
-    Groups    map[string]GroupConfig    `toml:"groups"`
-    Worktrees map[string]WorktreeConfig `toml:"worktrees"`
+    Workspace  WorkspaceMeta              `toml:"workspace"`
+    Context    ContextConfig              `toml:"context"`    // from .local
+    Repos      map[string]RepoConfig      `toml:"repos"`
+    Groups     map[string]GroupConfig     `toml:"groups"`
+    Worktrees  map[string]WorktreeConfig  `toml:"worktrees"`
+    Workgroups map[string]WorkgroupConfig `toml:"workgroup"`  // from .local
+}
+
+type WorkgroupConfig struct {
+    Repos   []string `toml:"repos"`
+    Branch  string   `toml:"branch"`
+    Created string   `toml:"created,omitempty"`
 }
 
 type WorktreeConfig struct {
@@ -249,13 +278,18 @@ type ContextConfig struct {
 
 // loader.go
 func Load(configPath string) (*WorkspaceConfig, error)
-func Save(configPath string, cfg *WorkspaceConfig) error         // comment-preserving since branch/13
-func SaveLocal(configPath string, ctx ContextConfig) error       // comment-preserving since branch/13
+func Save(configPath string, cfg *WorkspaceConfig) error                          // comment-preserving
+func SaveLocal(configPath string, ctx ContextConfig) error                        // comment-preserving; preserves workgroup entries
+func SaveLocalWorkgroup(configPath, name string, wg WorkgroupConfig) error        // upsert workgroup in .gitw.local
+func RemoveLocalWorkgroup(configPath, name string) error                          // delete workgroup from .gitw.local
 func LoadCWD(override string) (*WorkspaceConfig, string, error)
 func LoadConfig(cmd *cobra.Command) (*WorkspaceConfig, string, error)
 func ConfigDir(configPath string) string
 func ResolveRepoPath(cfgPath, repoPath string) (string, error)
 func RelPath(cfgPath, absPath string) (string, error)
+
+// localDiskConfig is the internal schema for .gitw.local (not exported)
+// holds Context + Workgroups; both SaveLocal and SaveLocalWorkgroup read-modify-write this
 
 // discovery.go
 const ConfigFileName = ".gitw"
@@ -281,6 +315,9 @@ func IsGitRepo(path string) bool
 func Filter(cfg *workspace.WorkspaceConfig, cfgPath string, names []string) ([]Repo, error)
 func ForContext(cfg *workspace.WorkspaceConfig, cfgPath string) ([]Repo, error)
 func ForGroup(cfg *workspace.WorkspaceConfig, cfgPath string, groupName string) ([]Repo, error)
+
+// safety.go — canonical drop safety checks (used by pkg/worktree and pkg/workgroup)
+func SafetyViolations(ctx context.Context, r Repo) ([]string, error)  // checks uncommitted + unpushed
 
 // status.go
 type RemoteState int
@@ -383,6 +420,21 @@ func BranchExists(ctx context.Context, repoPath, branchName string) (bool, error
 func CreateBranch(ctx context.Context, repoPath, branchName, sourceBranch string) error
 func PushBranchUpstream(ctx context.Context, repoPath, remote, branchName string) error
 func SetBranchUpstream(ctx context.Context, repoPath, branchName, remote string) error
+
+// Added in branch/23 (workgroup):
+func HasRemote(ctx context.Context, repoPath string) bool               // wraps RemoteURL != ""
+func PruneWorktrees(ctx context.Context, repoPath string) error         // git worktree prune
+func AddWorktreeNewBranch(ctx context.Context, repoPath, treePath, branchName, sourceBranch string) error
+func DeleteBranch(ctx context.Context, repoPath, branchName string) error
+func CurrentBranch(ctx context.Context, repoPath string) (string, error)
+
+type BranchLocation int
+const (
+    BranchLocal   BranchLocation = iota // branch exists locally
+    BranchRemote                        // branch exists on remote only
+    BranchMissing                       // branch does not exist anywhere
+)
+func ResolveBranchLocation(ctx context.Context, repoPath, branchName string) (BranchLocation, error)
 ```
 
 ---
@@ -436,6 +488,22 @@ Safety checks for `rm` and `drop`: refuses if working tree is dirty or has unpus
 **`restore`** handles worktrees: bare-clones if missing, runs `git worktree add` per branch if path missing, else `git pull`. Concurrent with regular repo restore.
 
 **`fetch` deduplication**: fetching a worktree set fetches once via `git -C <bare-path> fetch`. All-repo fetch deduplicates worktrees sharing a bare path.
+
+### Workgroup Management (`git w workgroup` / `git w work` / `git w wg`)
+
+A workgroup is a named set of git worktrees — one per repo, all on the same branch. State stored in `.gitw.local`; worktrees live at `<configDir>/.workgroup/<name>/<repo>/` (auto-gitignored).
+
+| Command | Aliases | Description |
+|---|---|---|
+| `git w workgroup create <name> [repos/groups]` | — | Create branch + worktrees. Fails if workgroup exists unless `--checkout/-c` |
+| `git w workgroup checkout <name> [repos/groups]` | `co`, `switch` | Resume or create; always idempotent; attaches local/remote or creates |
+| `git w workgroup add <name> [repos]` | — | Add repos to existing workgroup (checkout semantics for each new repo) |
+| `git w workgroup drop <name>` | — | Remove worktrees + local entry; safety check by default; `--force`; `--delete-branch` |
+| `git w workgroup push <name>` | — | Push branch to origin across all repos |
+| `git w workgroup list` | — | List workgroups (name, branch, repo count) |
+| `git w workgroup path <name> [repo]` | — | Print path to workgroup dir or specific repo worktree |
+
+`create` vs `checkout`: `create` is strict (fails if exists), `checkout` is always idempotent. `--checkout/-c` on `create` bridges them.
 
 ### Branch Management (`git w branch` / `git w b`)
 

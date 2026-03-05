@@ -371,3 +371,61 @@ func (s *LoaderSuite) TestResolveRepoPath() {
 		})
 	}
 }
+
+func (s *LoaderSuite) TestSaveLocalWorkgroup_RoundTrip() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"test\"\n"), 0o644))
+
+	wg := config.WorkgroupConfig{
+		Repos:  []string{"svc-a", "svc-b"},
+		Branch: "fix-bug",
+	}
+
+	s.Require().NoError(config.SaveLocalWorkgroup(s.cfgPath, "fix-bug", wg))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	got, ok := cfg.Workgroups["fix-bug"]
+	s.Require().True(ok)
+	s.Assert().Equal(wg.Repos, got.Repos)
+	s.Assert().Equal(wg.Branch, got.Branch)
+}
+
+func (s *LoaderSuite) TestSaveLocal_PreservesWorkgroups() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"test\"\n"), 0o644))
+
+	wg := config.WorkgroupConfig{Repos: []string{"svc-a"}, Branch: "feat"}
+	s.Require().NoError(config.SaveLocalWorkgroup(s.cfgPath, "feat", wg))
+
+	s.Require().NoError(config.SaveLocal(s.cfgPath, config.ContextConfig{Active: "grp"}))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().Equal("grp", cfg.Context.Active)
+	s.Require().Contains(cfg.Workgroups, "feat")
+}
+
+func (s *LoaderSuite) TestRemoveLocalWorkgroup() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"test\"\n"), 0o644))
+
+	s.Require().NoError(config.SaveLocalWorkgroup(s.cfgPath, "feat-a", config.WorkgroupConfig{Repos: []string{"svc-a"}, Branch: "feat-a"}))
+	s.Require().NoError(config.SaveLocalWorkgroup(s.cfgPath, "feat-b", config.WorkgroupConfig{Repos: []string{"svc-b"}, Branch: "feat-b"}))
+
+	s.Require().NoError(config.RemoveLocalWorkgroup(s.cfgPath, "feat-a"))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().NotContains(cfg.Workgroups, "feat-a")
+	s.Assert().Contains(cfg.Workgroups, "feat-b")
+}
+
+func (s *LoaderSuite) TestInitializesWorkgroupsMap() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"empty\"\n"), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().NotNil(cfg.Workgroups)
+}

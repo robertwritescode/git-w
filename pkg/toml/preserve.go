@@ -82,7 +82,6 @@ func applySmartUpdate(originalContent []byte, oldMap, newMap map[string]interfac
 	return result, nil
 }
 
-// normalizeToml removes blank lines and normalizes whitespace for comparison
 func normalizeToml(data []byte) []byte {
 	lines := bytes.Split(data, []byte("\n"))
 	var normalized [][]byte
@@ -97,13 +96,8 @@ func normalizeToml(data []byte) []byte {
 	return bytes.Join(normalized, []byte("\n"))
 }
 
-// smartUpdate attempts to surgically update specific sections
 func smartUpdate(original []byte, oldMap, newMap map[string]interface{}, fullNew []byte) ([]byte, error) {
 	changes := detectChanges(oldMap, newMap)
-
-	if changes.tooComplex {
-		return nil, fmt.Errorf("changes too complex for smart update")
-	}
 
 	result := original
 	var err error
@@ -120,8 +114,7 @@ func smartUpdate(original []byte, oldMap, newMap map[string]interface{}, fullNew
 }
 
 type sectionChanges struct {
-	sections   []string
-	tooComplex bool
+	sections []string
 }
 
 func detectChanges(oldMap, newMap map[string]interface{}) sectionChanges {
@@ -168,19 +161,23 @@ func updateSection(content []byte, sectionName string, newMap map[string]interfa
 		return removeSection(content, start, end), nil
 	}
 
-	// Preserve within-section comments by anchoring them to structural lines
-	anchors := extractCommentAnchors(content[start:end])
+	newSection = preserveSectionComments(content[start:end], newSection)
+
+	return replaceSection(content, start, end, newSection), nil
+}
+
+func preserveSectionComments(original, newSection []byte) []byte {
+	anchors := extractCommentAnchors(original)
 	if len(anchors) > 0 {
 		newSection = injectSectionComments(newSection, anchors)
 	}
 
-	// Preserve trailing comments/whitespace before next section
-	trailingComments := extractTrailingComments(content[start:end])
+	trailingComments := extractTrailingComments(original)
 	if len(trailingComments) > 0 {
 		newSection = append(newSection, trailingComments...)
 	}
 
-	return replaceSection(content, start, end, newSection), nil
+	return newSection
 }
 
 func findSectionBounds(content []byte, section string) (start, end int, err error) {
@@ -286,16 +283,11 @@ func replaceSection(content []byte, start, end int, newSection []byte) []byte {
 	return result
 }
 
-// commentAnchor associates a block of comment lines with the structural line
-// (subsection header or key=value) that immediately follows them.
 type commentAnchor struct {
 	comments []string
 	identity string
 }
 
-// extractCommentAnchors parses a TOML section and returns comments paired with
-// the identity of the structural line they precede. This allows comments to be
-// re-inserted at the correct position when the section is regenerated.
 func extractCommentAnchors(sectionContent []byte) []commentAnchor {
 	var anchors []commentAnchor
 	var pending []string
@@ -304,51 +296,63 @@ func extractCommentAnchors(sectionContent []byte) []commentAnchor {
 	lines := strings.Split(string(sectionContent), "\n")
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
-		if trimmed == "" {
-			if len(pending) > 0 {
-				pending = append(pending, line)
-			}
-			continue
-		}
-
-		if strings.HasPrefix(trimmed, "#") {
-			pending = append(pending, line)
-			continue
-		}
-
-		// Track current subsection for scoped key identity.
-		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-			currentSubsection = strings.Trim(trimmed, "[] \t")
-		}
-
-		if len(pending) > 0 {
-			id := anchorIdentity(trimmed, currentSubsection)
-			if id != "" {
-				cleaned := trimTrailingBlankStrings(pending)
-				if len(cleaned) > 0 {
-					anchors = append(anchors, commentAnchor{
-						comments: cleaned,
-						identity: id,
-					})
-				}
-			}
-			pending = nil
-		}
+		pending, currentSubsection = processAnchorLine(&anchors, pending, currentSubsection, line, trimmed)
 	}
 
 	return anchors
 }
 
-// anchorIdentity returns a stable identity for a structural TOML line.
-// Subsection headers and key-value pairs under the same parent use a dot-separated
-// form so that inline tables (key = { ... }) and subsection notation ([parent.key])
-// produce the same identity.
+func processAnchorLine(anchors *[]commentAnchor, pending []string, subsection, line, trimmed string) ([]string, string) {
+	if trimmed == "" {
+		if len(pending) > 0 {
+			pending = append(pending, line)
+		}
+
+		return pending, subsection
+	}
+
+	if strings.HasPrefix(trimmed, "#") {
+		return append(pending, line), subsection
+	}
+
+	if name, ok := parseSubsectionHeader(trimmed); ok {
+		subsection = name
+	}
+
+	flushPendingComments(anchors, pending, trimmed, subsection)
+
+	return nil, subsection
+}
+
+func flushPendingComments(anchors *[]commentAnchor, pending []string, trimmed, subsection string) {
+	if len(pending) == 0 {
+		return
+	}
+
+	id := anchorIdentity(trimmed, subsection)
+	if id == "" {
+		return
+	}
+
+	cleaned := trimTrailingBlankStrings(pending)
+	if len(cleaned) > 0 {
+		*anchors = append(*anchors, commentAnchor{comments: cleaned, identity: id})
+	}
+}
+
+func parseSubsectionHeader(trimmed string) (string, bool) {
+	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+		return strings.Trim(trimmed, "[] \t"), true
+	}
+
+	return "", false
+}
+
 func anchorIdentity(line, currentSubsection string) string {
 	trimmed := strings.TrimSpace(line)
 
-	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-		return strings.Trim(trimmed, "[] \t")
+	if name, ok := parseSubsectionHeader(trimmed); ok {
+		return name
 	}
 
 	if idx := strings.Index(trimmed, "="); idx > 0 {
@@ -356,6 +360,7 @@ func anchorIdentity(line, currentSubsection string) string {
 		if currentSubsection != "" {
 			return currentSubsection + "." + key
 		}
+
 		return key
 	}
 
@@ -370,16 +375,12 @@ func trimTrailingBlankStrings(lines []string) []string {
 	return lines[:end]
 }
 
-// injectSectionComments re-inserts comment anchors into regenerated section content.
 func injectSectionComments(newSection []byte, anchors []commentAnchor) []byte {
 	if len(anchors) == 0 {
 		return newSection
 	}
 
-	lookup := make(map[string][]string, len(anchors))
-	for _, a := range anchors {
-		lookup[a.identity] = a.comments
-	}
+	lookup := buildAnchorLookup(anchors)
 
 	var result bytes.Buffer
 	currentSubsection := ""
@@ -389,21 +390,11 @@ func injectSectionComments(newSection []byte, anchors []commentAnchor) []byte {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
 
-		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-			currentSubsection = strings.Trim(trimmed, "[] \t")
+		if name, ok := parseSubsectionHeader(trimmed); ok {
+			currentSubsection = name
 		}
 
-		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
-			id := anchorIdentity(trimmed, currentSubsection)
-			if comments, ok := lookup[id]; ok {
-				for _, c := range comments {
-					result.WriteString(c)
-					result.WriteString("\n")
-				}
-				delete(lookup, id)
-			}
-		}
-
+		writeAnchoredComments(&result, lookup, trimmed, currentSubsection)
 		result.WriteString(line)
 		result.WriteString("\n")
 	}
@@ -411,37 +402,65 @@ func injectSectionComments(newSection []byte, anchors []commentAnchor) []byte {
 	return result.Bytes()
 }
 
-// extractTrailingComments extracts comments and whitespace from the end of a section.
-// This preserves formatting between sections.
+func buildAnchorLookup(anchors []commentAnchor) map[string][]string {
+	lookup := make(map[string][]string, len(anchors))
+	for _, a := range anchors {
+		lookup[a.identity] = a.comments
+	}
+
+	return lookup
+}
+
+func writeAnchoredComments(result *bytes.Buffer, lookup map[string][]string, trimmed, subsection string) {
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return
+	}
+
+	id := anchorIdentity(trimmed, subsection)
+	comments, ok := lookup[id]
+	if !ok {
+		return
+	}
+
+	for _, c := range comments {
+		result.WriteString(c)
+		result.WriteString("\n")
+	}
+
+	delete(lookup, id)
+}
+
 func extractTrailingComments(sectionContent []byte) []byte {
 	lines := bytes.Split(sectionContent, []byte("\n"))
 
-	// Find where actual content ends (working backwards)
-	lastContentLine := -1
-	for i := len(lines) - 1; i >= 0; i-- {
-		trimmed := bytes.TrimSpace(lines[i])
-		// Skip empty lines and header lines
-		if len(trimmed) > 0 && !bytes.HasPrefix(trimmed, []byte("[")) {
-			// This is actual TOML content (not comment, not empty, not header)
-			if !bytes.HasPrefix(trimmed, []byte("#")) {
-				lastContentLine = i
-				break
-			}
-		}
-	}
-
-	// If no content found, or everything after is empty, return nothing
+	lastContentLine := findLastContentLine(lines)
 	if lastContentLine == -1 || lastContentLine >= len(lines)-1 {
 		return nil
 	}
 
-	// Extract everything after last content line
 	trailing := bytes.Join(lines[lastContentLine+1:], []byte("\n"))
 	if len(trailing) > 0 && !bytes.HasSuffix(trailing, []byte("\n")) {
 		trailing = append(trailing, '\n')
 	}
 
 	return trailing
+}
+
+func findLastContentLine(lines [][]byte) int {
+	for i := len(lines) - 1; i >= 0; i-- {
+		trimmed := bytes.TrimSpace(lines[i])
+		if isStructuralContent(trimmed) {
+			return i
+		}
+	}
+
+	return -1
+}
+
+func isStructuralContent(trimmed []byte) bool {
+	return len(trimmed) > 0 &&
+		!bytes.HasPrefix(trimmed, []byte("[")) &&
+		!bytes.HasPrefix(trimmed, []byte("#"))
 }
 
 // PreserveUserEdits merges user-added comments and formatting from original into new content.

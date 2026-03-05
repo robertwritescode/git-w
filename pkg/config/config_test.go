@@ -92,6 +92,17 @@ func (s *ConfigSuite) TestResolveDefaultBranch() {
 	}
 }
 
+func (s *ConfigSuite) TestResolveDefaultBranchWorktreeRepo() {
+	cfg := worktreeBranchConfig()
+	cfg.Workspace.DefaultBranch = "main"
+
+	// Worktree repos must return their own branch, not the workspace default.
+	s.Equal("dev", cfg.ResolveDefaultBranch("infra-dev"))
+	s.Equal("prod", cfg.ResolveDefaultBranch("infra-prod"))
+	// Plain repo names fall through to workspace default.
+	s.Equal("main", cfg.ResolveDefaultBranch("backend"))
+}
+
 func (s *ConfigSuite) TestWorktreeBranchForRepo() {
 	cfg := worktreeBranchConfig()
 
