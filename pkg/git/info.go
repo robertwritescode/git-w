@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -111,7 +112,7 @@ func workgroupRepos(cfgPath, wgName string, wg config.WorkgroupConfig) []repo.Re
 
 	for _, repoName := range wg.Repos {
 		path := workgroupWorktreePath(cfgPath, wgName, repoName)
-		if _, err := os.Stat(path); err != nil {
+		if _, err := os.Stat(path); err != nil && errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 
