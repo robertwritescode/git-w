@@ -59,6 +59,7 @@ Implemented via Cobra's `Aliases` field — both forms work identically.
 | Canonical | Alias |
 |---|---|
 | `repo list` | `repo ls` |
+| `commit` | `ci` |
 | `info` | `ll` |
 | `status` | `st` |
 | `fetch` | `f` |
@@ -327,3 +328,27 @@ errors print just the error message.
 Worktrees are stored at `<configDir>/.workgroup/<workgroupName>/<repoName>/`.
 `configDir` is the directory containing `.gitw` (not the CWD). This makes worktree paths stable
 regardless of where in the workspace the user runs commands from.
+
+Path computation lives in `config.WorkgroupWorktreePath(cfgPath, wgName, repoName)` — a single
+canonical function. `pkg/git` and `pkg/workgroup` both delegate to it.
+
+### Atomic Cross-Repo Commit (`git w commit`)
+Commits staged changes across resolved repos using the same message, with local atomicity:
+if any repo's commit fails, all repos that successfully committed are rolled back via
+`git reset --soft HEAD~1`, leaving their changes staged again.
+
+Design choices:
+- `-m` required; no interactive editor (keeps the command scriptable and consistent)
+- Pre-flight scan (`git diff --cached --quiet`) partitions repos into a commit set
+  and a skipped set before any commit is attempted
+- Commit and rollback both run in parallel via `RunParallel`
+- Rollback is best-effort: if `git reset --soft HEAD~1` fails, that repo is flagged
+  separately with manual recovery instructions
+- Pushing is deliberately excluded — `commit` + `push` is the intended two-step workflow
+- `--workgroup`/`-W` scopes the commit to a workgroup's worktree directories
+- `--workgroup` and positional repo args are mutually exclusive
+
+### `commit` Lives in `pkg/git/`
+`commit` follows the same pattern as `fetch`, `pull`, `push`, `status`: it is a cross-repo
+git operation registered directly on the root command. It uses the same `RunParallel` executor
+and `ExecResult`/`WriteResults` infrastructure. Alias: `ci`.

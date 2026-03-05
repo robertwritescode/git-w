@@ -115,57 +115,63 @@ func splitBySet(entries []TableEntry, sets []WorktreeSet) ([]TableEntry, map[str
 }
 
 func buildGroupedRows(standalone []TableEntry, grouped map[string][]TableEntry, sets []WorktreeSet) []groupedRow {
-	// Pre-render standalone entries once.
 	renderedStandalone := renderEntries(standalone)
-
 	rows := make([]groupedRow, 0, len(standalone)+len(grouped)*2)
 
-	// Merge standalone repos and worktree sets in lexicographic order by name.
 	iStandalone := 0
 	iSet := 0
 	for iStandalone < len(standalone) || iSet < len(sets) {
-		// Skip sets that have no matching entries.
-		for iSet < len(sets) && len(grouped[sets[iSet].SetName]) == 0 {
-			iSet++
-		}
+		iSet = skipEmptySets(sets, grouped, iSet)
 
-		hasStandalone := iStandalone < len(standalone)
-		hasSet := iSet < len(sets)
-
-		// Decide whether the next item in order is a standalone repo or a set.
-		useStandalone := false
-		if hasStandalone && !hasSet {
-			useStandalone = true
-		} else if hasStandalone && hasSet {
-			if standalone[iStandalone].Name < sets[iSet].SetName {
-				useStandalone = true
-			}
-		}
-
-		if useStandalone {
-			r := renderedStandalone[iStandalone]
-			rows = append(rows, groupedRow{renderedEntry: r, isSetHeader: false})
+		if pickStandalone(standalone, sets, iStandalone, iSet) {
+			rows = append(rows, groupedRow{renderedEntry: renderedStandalone[iStandalone]})
 			iStandalone++
 			continue
 		}
 
-		if !hasSet {
+		if iSet >= len(sets) {
 			break
 		}
 
-		// Render the next set header and its member entries.
-		set := sets[iSet]
-		rows = append(rows, groupedRow{
-			renderedEntry: renderedEntry{name: set.SetName},
-			isSetHeader:   true,
-		})
-		entries := grouped[set.SetName]
-		renderedSetEntries := renderEntries(entries)
-		for i, r := range renderedSetEntries {
-			r.name = "  └ " + branchDisplayName(set.SetName, entries[i].Name)
-			rows = append(rows, groupedRow{renderedEntry: r, isSetHeader: false})
-		}
+		rows = appendSetRows(rows, sets[iSet], grouped)
 		iSet++
+	}
+
+	return rows
+}
+
+func skipEmptySets(sets []WorktreeSet, grouped map[string][]TableEntry, i int) int {
+	for i < len(sets) && len(grouped[sets[i].SetName]) == 0 {
+		i++
+	}
+
+	return i
+}
+
+func pickStandalone(standalone []TableEntry, sets []WorktreeSet, iStandalone, iSet int) bool {
+	if iStandalone >= len(standalone) {
+		return false
+	}
+
+	if iSet >= len(sets) {
+		return true
+	}
+
+	return standalone[iStandalone].Name < sets[iSet].SetName
+}
+
+func appendSetRows(rows []groupedRow, set WorktreeSet, grouped map[string][]TableEntry) []groupedRow {
+	rows = append(rows, groupedRow{
+		renderedEntry: renderedEntry{name: set.SetName},
+		isSetHeader:   true,
+	})
+
+	entries := grouped[set.SetName]
+	renderedSetEntries := renderEntries(entries)
+
+	for i, r := range renderedSetEntries {
+		r.name = "  └ " + branchDisplayName(set.SetName, entries[i].Name)
+		rows = append(rows, groupedRow{renderedEntry: r})
 	}
 
 	return rows

@@ -300,6 +300,11 @@ func ConfigDir(configPath string) string {
 	return filepath.Dir(configPath)
 }
 
+// WorkgroupWorktreePath returns the absolute path to a repo's worktree within a workgroup.
+func WorkgroupWorktreePath(cfgPath, wgName, repoName string) string {
+	return filepath.Join(ConfigDir(cfgPath), ".workgroup", wgName, repoName)
+}
+
 func validateRepoPaths(cfgPath string, cfg *WorkspaceConfig) error {
 	for name, rc := range cfg.Repos {
 		if _, err := ResolveRepoPath(cfgPath, rc.Path); err != nil {
