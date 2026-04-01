@@ -30,12 +30,46 @@ capabilities that together necessitate a major version bump:
    branch with env subdirectories, modeled as multiple named worktrees from
    the same repo within a single workstream). Both patterns are first-class.
 
-Everything in the existing remote management spec is preserved. The vocabulary
-substitution throughout is `workgroup` to `workstream`, with paths changing from
-`workgroups/<n>/` to `workspaces/<workspace>/active/<n>/`. The hook mechanism,
-config merge semantics, branch rule engine, and fan-out executor are unchanged.
+The full remote management design is specified in
+`.planning/v2-remote-management.md`. The vocabulary substitution throughout is
+`workgroup` to `workstream`, with paths changing from `workgroups/<n>/` to
+`workspaces/<workspace>/active/<n>/`. The hook mechanism, config merge
+semantics, branch rule engine, and fan-out executor are unchanged.
 
 No new binary is introduced. Everything lives in git-w.
+
+---
+
+## How to work in this repo
+
+**Branch hierarchy (3 tiers):**
+
+- `main` — v1.6.x stable; receives only the final v2 cut-over PR.
+- `v2` — long-lived protected base for all v2 work; all milestone branches target this.
+- `v2-m<N>-<short-slug>` — one branch per milestone (e.g. `v2-m1-core-config`); created off `v2`, merged back into `v2`.
+- `<issue-number>-<kebab-description>` — one branch per GitHub issue (e.g. `42-add-workstream-model`); created off its milestone branch, merged back into that milestone branch.
+
+**Sequencing rule:** milestones run strictly in order M1 → M11. M12 (`git w migrate`) may run in parallel once M1 has merged into `v2`.
+
+**GSD workflow mapping:**
+
+The v2 effort is one GSD project. Each v2 milestone is one GSD milestone. Each GitHub issue is one GSD phase. Implementation tasks within an issue are GSD plans. GSD's `branching_strategy` is set to `none` — GSD commits directly to the active branch; all branch creation and PR management is done manually.
+
+Per-issue workflow:
+1. Create the issue branch off the milestone branch. **Use `.planning/v2-issue-map.md` for the exact branch name and issue number.**
+2. Optionally run `/gsd-discuss-phase` to refine scope.
+3. Run `/gsd-plan-phase` to generate the implementation plan.
+4. Run `/gsd-execute-phase` to implement.
+5. Verify: `mage testfast` and `go vet ./...` must pass.
+6. Open a PR targeting the milestone branch and merge it.
+7. Update the Active State section in `.planning/v2-strategy.md`.
+
+**Read before planning or branching:**
+
+- `.planning/v2-issue-map.md` — authoritative mapping of every GitHub issue number, issue title, milestone, branch name, and dependency. Use this to determine the correct branch name, issue number, and milestone scope for any unit of work.
+- `.planning/v2-strategy.md` — branching rules, naming conventions, active state, sequencing.
+- `.planning/v2-workflow.md` — GSD command invocations and step-by-step workflow.
+- `.planning/v2-remote-management.md` — detailed remote management design: `[[remote]]`, `[[sync_pair]]`, branch rule engine, pre-push hook protection, `git w remote` and `git w sync` multi-remote behaviour.
 
 ---
 
@@ -63,10 +97,10 @@ A developer working across a microservice-rich environment needs:
    environment, understand what worktrees are active, know what `git-w` commands
    are available, and understand what the tool handles on their behalf so they
    do not reinvent workspace management.
-6. **Multi-destination sync with push protection** — work in progress must not
-   accidentally reach org remotes. Personal backup remotes should mirror
-   everything. The protection must be enforced at the git level, not just
-   through `git w sync`.
+6. **Multi-destination sync with push protection** — When working on open source
+   projects, work in progress must not accidentally reach org remotes. Personal
+   backup remotes should mirror everything. The protection must be enforced at
+   the git level, not just through `git w sync`.
 7. **Discoverability of past work** — when a workstream closes, its planning
    documents and context must remain in the meta-repo in a known, searchable
    location.
@@ -314,8 +348,6 @@ git w workstream close [--no-archive]
 git w sync [--remote <n>] [--workspace <n>] [--workstream <n>]
            [--no-push] [--push-wip] [--dry-run]             (alias: s)
 git w status [--workspace <n>] [--workstream <n>] [--repo <n>] [--json]   (alias: st)
-git w checkout <branch> --from <remote>
-
 # Cross-repo operations
 git w branch checkout <branch> [repos...]    (alias: co)
 git w branch create <branch> [repos...]      (alias: c)
@@ -572,8 +604,9 @@ path   = "infra-prod"
 # scope  = "environments/prod"
 
 [ship]
-pr_urls    = []
-shipped_at = ""
+pr_urls             = []
+pre_ship_branches   = {}   # worktree-name -> "branch-name-pre-ship-<timestamp>" on personal
+shipped_at          = ""
 
 [context]
 summary       = ""
@@ -738,9 +771,11 @@ creation time, not at repo registration time.
 ### Sync behavior for Pattern A aliases
 
 `git w sync` on an alias repo fetches all refs from the remote, pulls
-`track_branch` into the local checkout, and mirror-pushes to personal under
-the alias name (e.g., `work-infra-dev`, `work-infra-test`, `work-infra-prod`).
-Each alias gets independent backup history on the personal remote.
+`track_branch` into the local checkout, and mirror-pushes all refs to a single
+personal backup repo named after the upstream (e.g., `infra`). All aliases that
+share the same upstream mirror-push to that one repo, so all branches
+(`work-infra-dev`, `work-infra-test`, `work-infra-prod`) are preserved together
+in a single 1-to-1 mirror of the upstream — not as separate backup repos per alias.
 
 ### `--env-group` in workstream create (Pattern A)
 
@@ -936,8 +971,10 @@ their multi-worktree structure is expressed through the `worktrees` array with
 
 ## Workstream push protection
 
-Identical mechanism to the workgroup push protection in the v1 remote management
-spec, with `workgroup` replaced by `workstream` throughout.
+Identical mechanism to the workgroup push protection described in
+`.planning/v2-remote-management.md`, with `workgroup` replaced by `workstream`
+throughout and worktree discovery using `.gitw-stream` manifest files instead of
+`[[workgroup.worktree]]` entries in root config.
 
 `reconcileHooks(repo RepoConfig)` installs and manages a `pre-push` hook on
 each repo whose worktrees appear in any protected workstream. The hook calls
@@ -1117,23 +1154,50 @@ is not provided.
 When provided alongside `--worktree-name`, a cross-modification warning is
 added to the workstream `AGENTS.md`.
 
-### `git w workstream ship [--push-all] [--open-prs] [--dry-run]`
+ ### `git w workstream ship [--push-all] [--open-prs] [--squash] [--dry-run]`
 
 1. Validates all worktrees; warns on uncommitted changes.
-2. Lifts push protection: adds `origin` to `[[workstream]] remotes` in
+2. **Optional squash pass** (`--squash` flag or prompted interactively when
+   unpushed-to-origin commits are detected): for each worktree that has commits
+   not yet present on `origin/<branch>`, git-w runs an interactive squash
+   flow before lifting push protection:
+   a. Detects the divergence point between the local branch and `origin/<branch>`
+      (or the branch base if origin has no copy yet).
+   b. Creates a pre-ship backup branch on the personal remote:
+      `<branch>-pre-ship-<timestamp>` (e.g.,
+      `feat/INFRA-42-secret-rotation-pre-ship-20260401`). This branch is pushed
+      to `personal` only and is never synced back to `origin`. Its purpose is to
+      preserve the full messy commit history before the squash.
+   c. Records the backup branch name in `.gitw-stream` under a new
+      `[ship] pre_ship_branches` array keyed by worktree name.
+   d. Prompts the user for a single squash commit message for that worktree
+      branch (pre-filled with the first commit subject in the range as a
+      starting point).
+   e. Performs a soft-reset to the divergence point and commits with the
+      provided message, producing one clean commit on the local branch.
+   f. Repeats steps a–e for each remaining worktree with unpushed commits.
+   The squash pass is skipped for any worktree whose branch is already clean
+   (no commits ahead of `origin/<branch>`). `--squash` forces the flow even on
+   clean branches (useful when the branch has no upstream tracking ref yet).
+3. Lifts push protection: adds `origin` to `[[workstream]] remotes` in
    `.git/.gitw`, calls `reconcileHooks` on all repos.
-3. `--push-all`: pushes all worktree branches to `origin` via scoped sync.
-4. `--open-prs`: opens one PR per worktree branch on the configured GitHub
+4. `--push-all`: pushes all worktree branches to `origin` via scoped sync.
+5. `--open-prs`: opens one PR per worktree branch on the configured GitHub
    remote. PR URLs written to `.gitw-stream [ship] pr_urls`. Records
    `shipped_at`.
-5. Updates workstream status to `"shipped"` in `.gitw-stream`.
-6. Commits updated `.gitw-stream`.
+6. Updates workstream status to `"shipped"` in `.gitw-stream`.
+7. Commits updated `.gitw-stream`.
 
 For env-group workstreams (Pattern A), one PR is opened per alias branch.
 For consolidated-infra workstreams (Pattern B), one PR is opened per named
 worktree entry even when multiple entries share the same underlying repo.
 Each PR description notes the scope if set. `--open-prs` requires a
 `kind = "github"` remote configured for the affected repos.
+
+**Pre-ship backup branches** on the personal remote are intentionally never
+included in `[[sync_pair]]` push rules and are never forwarded to `origin`.
+They exist solely as a safety net and can be pruned manually after the PR is
+merged.
 
 ### `git w workstream close [--no-archive]`
 
@@ -1181,18 +1245,19 @@ Unified status. Merges v1 `info` and `status` commands.
 Remote staleness from state file (no network calls). Available-branch hints
 from personal remote fetched refs.
 
-### `git w checkout <branch> --from <remote>`
-
-Creates local branch from fetched ref on named remote. Runs across all repos
-where the ref exists. Does not push automatically.
-
 ### `git w branch checkout <branch> [repos...] (alias: co)`
 
 Checks out a branch across repos, creating it locally if it doesn't exist.
 Scopes to all repos if no `repos` list is provided. Operates on repos in the
 current workstream context if one is active.
 
-Key flags: `--push/--no-push`, `--pull`, `--allow-upstream/--no-upstream`.
+Key flags: `--from <remote>`, `--push/--no-push`, `--pull`, `--allow-upstream/--no-upstream`.
+
+`--from <remote>`: fetches the ref from the named remote first, then creates
+the local branch from it. Useful for materializing a branch that exists on a
+remote (e.g., a personal mirror) without a separate `git w sync` step. When
+`--from` is omitted the branch is created from the local HEAD or current
+tracking state.
 
 `branch default` (v1) is cut. Use `git w exec checkout <default-branch>`.
 
@@ -1437,7 +1502,8 @@ Table-driven tests: all criteria combinations x all action tiers.
 
 ### `reconcileHooks`
 
-Identical to v1 spec. Managed block delimiters (exact strings):
+Full specification in `.planning/v2-remote-management.md`. Managed block
+delimiters (exact strings):
 ```
 # --- git-w managed block (do not edit) ---
 # --- end git-w managed block ---
@@ -1448,6 +1514,8 @@ Cleans up empty hook files.
 ---
 
 ## Milestones
+
+> **For the authoritative list of GitHub issue numbers, issue titles, exact branch names, and per-milestone issue assignments, see `.planning/v2-issue-map.md`.** The milestone descriptions below are design scope only — use the issue map for all branching and planning decisions.
 
 **Dependency note:** Milestones are numbered by logical dependency order, not
 required execution order. Milestone 12 (`git w migrate`) depends only on
@@ -1515,11 +1583,11 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
 - Gitea/Forgejo API provider
 - GitHub API provider
 - Generic no-op provider
-- `gitwbu-<n>` upsert on child repos including alias repos
+- `gitw-<n>` upsert on child repos including alias repos
 - Optional initial mirror push and `[[sync_pair]]` creation
 - `git w remote status`
 
-### Milestone 5 — `git w status` + `git w checkout --from`
+### Milestone 5 — `git w status` + `git w branch checkout --from`
 
 - Unified status merging v1 `info` and `status`
 - Env-group display: aliases grouped under upstream name with `(env)` annotation
@@ -1528,7 +1596,7 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
 - `--repo` with upstream name: matches all aliases, grouped output
 - Remote staleness section from state file
 - Available-branch hints
-- `git w checkout <branch> --from <remote>`
+- `git w branch checkout <branch> --from <remote>`
 - `--json` output
 
 ### Milestone 6 — workstream push protection
@@ -1615,9 +1683,11 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
 
 ### Milestone 10 — ship pipeline
 
-- `git w workstream ship`: dirty check, push protection lift, `--push-all`,
-  `--open-prs` (one PR per worktree branch), URL recording, `shipped_at`,
-  status update, auto-commit, `--dry-run`
+- `git w workstream ship`: dirty check, optional interactive squash pass
+  (`--squash`), pre-ship backup branch creation on personal remote,
+  `pre_ship_branches` recording in `.gitw-stream`, push protection lift,
+  `--push-all`, `--open-prs` (one PR per worktree branch), URL recording,
+  `shipped_at`, status update, auto-commit, `--dry-run`
 
 ### Milestone 11 — close and archival
 
