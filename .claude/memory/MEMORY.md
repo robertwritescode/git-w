@@ -6,9 +6,11 @@
 - **Language**: Go 1.26
 - **Inspired by**: [gita](https://github.com/nosarthur/gita) (Python multi-repo manager)
 - **Purpose**: Manage multiple git repos defined in a local `.gitw` TOML config
-- **Status**: Active development — atomic cross-repo commit (`git w commit`) and display improvements in progress on branch `18-atomic-commits`
+- **Status**: V2 development in progress — see [.planning/v2-strategy.md](../../.planning/v2-strategy.md) and [.planning/v2-spec.md](../../.planning/v2-spec.md)
 
 ## Documentation Index
+- [v2-strategy.md](../../.planning/v2-strategy.md) — V2 branching, milestone sequencing, and GSD implementation strategy
+- [v2-spec.md](../../.planning/v2-spec.md) — V2 consolidated feature specs
 - [architecture.md](architecture.md) — Directory structure, type definitions, command inventory, config schema
 - [decisions.md](decisions.md) — Design decisions and their rationale
 - [release.md](release.md) — Build (Mage), versioning, CI/CD (GitHub Actions), GoReleaser, Homebrew tap
