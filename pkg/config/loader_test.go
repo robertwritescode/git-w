@@ -431,6 +431,7 @@ func (s *LoaderSuite) TestInitializesWorkgroupsMap() {
 }
 
 func (s *LoaderSuite) TestWorkspacesBlocksParse() {
+
 	content := `[metarepo]
 name = "myws"
 
@@ -454,4 +455,92 @@ repos = ["k8s-config"]
 	s.Assert().Equal([]string{"api-service", "gateway"}, cfg.Workspaces[0].Repos)
 	s.Assert().Equal("infra", cfg.Workspaces[1].Name)
 	s.Assert().Equal([]string{"k8s-config"}, cfg.Workspaces[1].Repos)
+}
+
+func (s *LoaderSuite) TestAgenticFrameworksValidation() {
+	tests := []struct {
+		name        string
+		toml        string
+		wantErr     bool
+		errContains string
+		wantFWs     []string
+	}{
+		{
+			name:    "known value gsd",
+			toml:    "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"gsd\"]\n",
+			wantFWs: []string{"gsd"},
+		},
+		{
+			name:        "unknown value",
+			toml:        "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"speckit\"]\n",
+			wantErr:     true,
+			errContains: "speckit",
+		},
+		{
+			name:    "missing field defaults to gsd",
+			toml:    "[metarepo]\nname = \"ws\"\n",
+			wantFWs: []string{"gsd"},
+		},
+		{
+			name:    "multi-value known",
+			toml:    "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"gsd\", \"gsd\"]\n",
+			wantFWs: []string{"gsd", "gsd"},
+		},
+		{
+			name:        "multi-value with unknown",
+			toml:        "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"gsd\", \"badvalue\"]\n",
+			wantErr:     true,
+			errContains: "badvalue",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			cfg, err := config.Load(cfgPath)
+			if tt.wantErr {
+				s.Require().Error(err)
+				if tt.errContains != "" {
+					s.Assert().Contains(err.Error(), tt.errContains)
+				}
+				return
+			}
+			s.Require().NoError(err)
+			if tt.wantFWs != nil {
+				s.Assert().Equal(tt.wantFWs, cfg.Metarepo.AgenticFrameworks)
+			}
+		})
+	}
+}
+
+func (s *LoaderSuite) TestFullV2ConfigLoad() {
+	content := `[metarepo]
+name = "platform-work"
+default_remotes = ["origin"]
+agentic_frameworks = ["gsd"]
+
+[[workspace]]
+name = "payments-platform"
+description = "Payment processing and related services"
+repos = ["api-service", "payment-lib"]
+
+[[workspace]]
+name = "platform-infra"
+repos = ["infra-dev", "infra-test"]
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().Equal("platform-work", cfg.Metarepo.Name)
+	s.Assert().Equal([]string{"origin"}, cfg.Metarepo.DefaultRemotes)
+	s.Assert().Equal([]string{"gsd"}, cfg.Metarepo.AgenticFrameworks)
+	s.Require().Len(cfg.Workspaces, 2)
+	s.Assert().Equal("payments-platform", cfg.Workspaces[0].Name)
+	s.Assert().Equal("Payment processing and related services", cfg.Workspaces[0].Description)
+	s.Assert().Equal([]string{"api-service", "payment-lib"}, cfg.Workspaces[0].Repos)
+	s.Assert().Equal("platform-infra", cfg.Workspaces[1].Name)
 }
