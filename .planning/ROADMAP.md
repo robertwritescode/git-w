@@ -21,7 +21,7 @@ git-w v2 replaces the workgroup model with workspace/workstream hierarchy, adds 
 
 ## Phases
 
-- [ ] **Phase 1: Add `[[workspace]]` block** - Parse workspace blocks with name, description, repos list, and agentic_frameworks validation
+- [x] **Phase 1: Add `[[workspace]]` block** - Parse workspace blocks with name, description, repos list, and agentic_frameworks validation
 - [ ] **Phase 2: Add `track_branch` and `upstream` fields** - Env alias fields on `[[repo]]` for branch-per-env pattern
 - [ ] **Phase 3: Enforce `repos/<n>` path convention** - Load-time warning for v1 paths with migration suggestion
 - [ ] **Phase 4: Add `[[remote]]` and `[[remote.branch_rule]]`** - Remote config and branch rule block parsing
@@ -107,7 +107,7 @@ Milestone branch: `v2-m1-config-schema` | Depends on: none
 **Plans**: 3 plans
 - [x] 01-01-PLAN.md — Rename WorkspaceMeta → MetarepoConfig and add WorkspaceBlock struct in pkg/config
 - [x] 01-02-PLAN.md — Bootstrap pkg/agents with SpecFramework interface and GSDFramework implementation
-- [ ] 01-03-PLAN.md — Wire agentic_frameworks validation + defaulting into loader with full test coverage
+- [x] 01-03-PLAN.md — Wire agentic_frameworks validation + defaulting into loader with full test coverage
 
 ---
 
