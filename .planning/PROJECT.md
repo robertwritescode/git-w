@@ -8,6 +8,23 @@ A major version upgrade of git-w, the Go CLI tool that manages multiple git repo
 
 Multi-repo orchestration that keeps repos organized, synced, and safe from accidental pushes while giving AI agents full visibility into the workspace structure.
 
+## Current Milestone: M1 Config Schema + Loader
+
+**Goal:** Implement the complete v2 TOML config schema — new block types, two-file merge, field-level semantics, and v1 compatibility detection.
+
+**Target features:**
+- `[[workspace]]` block with name, description, repos list
+- `[[remote]]` and `[[remote.branch_rule]]` blocks with all specified fields
+- `[[sync_pair]]` blocks with cycle detection at load time
+- `[[workstream]]` root config blocks for remote overrides
+- Two-file merge (`.gitw` + `.git/.gitw`) with field-level semantics
+- `.gitw-stream` manifest with `[[worktree]]` entries (name, path, scope)
+- `[metarepo]` default_remotes cascade resolution (metarepo → workstream → repo)
+- v1 `[[workgroup]]` detection with actionable error directing to `git w migrate`
+- `agentic_frameworks` field validation against known registry
+- `UpdatePreservingComments` round-trip fidelity for all v2 fields
+- `repos/<n>` path convention enforcement with v1 warning
+
 ## Requirements
 
 ### Validated
@@ -120,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after initialization*
+*Last updated: 2026-04-02 — Milestone M1 started*
