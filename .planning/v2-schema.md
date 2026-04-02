@@ -23,16 +23,31 @@ explains where it must live.
 
 ---
 
-## `[workspace]` top-level block
+## `[metarepo]` top-level block
 
 ```toml
-[workspace]
-name            = "platform-work"
-default_remotes = ["origin", "personal"]
+[metarepo]
+name               = "platform-work"
+default_remotes    = ["origin", "personal"]
 # Names of [[remote]] blocks that all repos use by default.
 # An empty list means no workspace defaults — every repo declares its own.
-# A repo with no remotes field and no workspace default_remotes gets no
+# A repo with no remotes field and no [metarepo] default_remotes gets no
 # secondary remotes (only its own git-configured origin).
+
+agentic_frameworks = ["gsd"]
+# The spec-driven agentic frameworks active in this meta-repo.
+# A meta-repo may use more than one framework across its workspaces or
+# workstreams (e.g. GSD for one product area, speckit for another).
+# All declared frameworks are loaded at startup; their prohibition content
+# and init instructions are emitted in generated AGENTS.md files and in
+# `git w agent context --json` output.
+#
+# Valid values at v2 launch: "gsd"
+# Future values (not yet implemented): "speckit", "openspec"
+#
+# Each entry is validated at load time against the registry of known
+# frameworks. An unknown value produces a load-time error listing valid
+# options. Omitting this field defaults to ["gsd"] for backward compatibility.
 ```
 
 ---
@@ -63,7 +78,7 @@ upstream     = "infra"  # logical grouping name for aliases sharing a clone_url.
                          # git w status --repo infra matches all aliases.
                          # git w workstream create --env-group infra expands
                          # to all repos with this upstream value.
-remotes      = ["origin", "personal"]  # override workspace default_remotes
+remotes      = ["origin", "personal"]  # override [metarepo] default_remotes
 ```
 
 ### `[[repo.branch_override]]`
@@ -199,12 +214,12 @@ name    = "INFRA-42"
 remotes = ["personal"]    # replaces workspace defaults for this workstream's worktrees
 ```
 
-`remotes` on a `[[workstream]]` completely replaces workspace `default_remotes`
+`remotes` on a `[[workstream]]` completely replaces `[metarepo] default_remotes`
 for all worktrees in that workstream. Repo-level `remotes` overrides still take
 precedence over this.
 
 **Cascade resolution (innermost wins):**
-`[workspace] default_remotes` → `[[workstream]] remotes` → `[[repo]] remotes`
+`[metarepo] default_remotes` → `[[workstream]] remotes` → `[[repo]] remotes`
 
 ---
 
@@ -284,9 +299,10 @@ does not enforce them mechanically.
 ### `.gitw` (committed, shared)
 
 ```toml
-[workspace]
-name            = "platform-work"
-default_remotes = ["origin"]
+[metarepo]
+name               = "platform-work"
+default_remotes    = ["origin"]
+agentic_frameworks = ["gsd"]
 
 [[workspace]]
 name        = "payments-platform"
@@ -408,7 +424,7 @@ from = "origin"
 to   = "personal"
 refs = ["**"]
 
-[workspace]
+[metarepo]
 default_remotes = ["origin", "personal"]
 
 # WIP protection: personal only during active work
@@ -439,3 +455,7 @@ remotes = ["personal"]
 - Load-time detection of v1 `[[workgroup]]` blocks: actionable error message
   directing user to run `git w migrate` (detection only; no migration logic in
   config loader).
+- `agentic_frameworks` validation: load-time check of each entry against the
+  `pkg/agents` registry via `agents.FrameworkFor(name)`. Any unknown value
+  produces a named error listing valid framework identifiers. Missing field
+  defaults to `["gsd"]`.

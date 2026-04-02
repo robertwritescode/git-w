@@ -38,7 +38,7 @@ Milestone branch: `v2-m1-config-schema` · Depends on: none
 
 | Issue # | Title | Branch |
 |---------|-------|--------|
-| #36 | Add `[[workspace]]` block to config schema | `36-add-workspace-block` |
+| #36 | Add `[[workspace]]` block to config schema (includes `agentic_frameworks` field) | `36-add-workspace-block` |
 | #37 | Add `track_branch` and `upstream` fields to `[[repo]]` | `37-track-branch-upstream` |
 | #38 | Enforce `repos/<n>` path convention with v1 warning | `38-repos-path-convention` |
 | #39 | Add `[[remote]]` and `[[remote.branch_rule]]` parsing | `39-remote-branch-rule-parsing` |
@@ -46,7 +46,7 @@ Milestone branch: `v2-m1-config-schema` · Depends on: none
 | #41 | Add `[[workstream]]` root config block | `41-workstream-root-block` |
 | #42 | Implement two-file config merge with field-level semantics | `42-two-file-config-merge` |
 | #43 | Parse and validate `.gitw-stream` manifest | `43-gitw-stream-manifest` |
-| #44 | Add `[workspace]` default_remotes cascade resolution | `44-default-remotes-cascade` |
+| #44 | Add `[metarepo]` default_remotes cascade resolution | `44-default-remotes-cascade` |
 | #45 | Detect v1 `[[workgroup]]` blocks at load time | `45-detect-v1-workgroup` |
 | #46 | `UpdatePreservingComments` round-trip tests for all v2 fields | `46-round-trip-tests` |
 
@@ -157,9 +157,17 @@ Milestone branch: `v2-m9-agent-context` · Depends on: M8
 
 | Issue # | Title | Branch |
 |---------|-------|--------|
-| #83 | Add `pkg/agents` package with pure generator functions | `83-agents-pkg` |
+| #83 | Add `pkg/agents` package: `SpecFramework` interface, `GSDFramework`, and registry | `83-agents-pkg` |
 | #84 | Implement `git w context rebuild` | `84-context-rebuild` |
 | #85 | Implement `git w agent context` with `--json` output | `85-agent-context-json` |
+
+**Note on #83 scope:** This issue creates the `SpecFramework` interface,
+`GSDFramework` implementation, `FrameworkFor` / `FrameworksFor` registry
+functions, and the pure generator functions (`GenerateMetaRepoAgentsMD`,
+`GenerateWorkspaceAgentsMD`, `GenerateWorkstreamAgentsMD`, `GenerateContextMD`)
+that accept `[]SpecFramework`. All GSD-specific strings move into `GSDFramework`.
+The stub registry is designed for future frameworks (speckit, openspec, etc.) —
+adding one requires only implementing the interface and adding a registry entry.
 
 ---
 

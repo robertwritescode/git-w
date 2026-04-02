@@ -37,7 +37,7 @@ Fetch, pull, and push all repos against their `origin` remote.
 ### v2 behavior
 
 For each repo, resolve its effective remote list
-(`[workspace] default_remotes` → `[[workstream]] remotes` → `[[repo]] remotes`,
+(`[metarepo] default_remotes` → `[[workstream]] remotes` → `[[repo]] remotes`,
 innermost wins). Execute the `[[sync_pair]]` fan-out in parallel. Collect
 results and print a per-remote grouped summary.
 
@@ -397,7 +397,7 @@ Follow all existing git-w conventions exactly:
 ### `.gitw` (committed, shared with coworkers)
 
 ```toml
-[workspace]
+[metarepo]
 name = "platform-work"
 default_remotes = ["origin"]    # coworkers only see origin
 
@@ -477,7 +477,7 @@ to   = "personal"
 refs = ["**"]
 
 # Expand workspace defaults to include personal for all repos
-[workspace]
+[metarepo]
 default_remotes = ["origin", "personal"]
 
 # auth-refactor workstream: personal only during WIP phase

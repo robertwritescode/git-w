@@ -15,6 +15,11 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
 - `[[repo]]` v2 additions: `track_branch`, `upstream` fields
 - `[[repo]] path` convention: must be `repos/<n>`; load-time warning for v1
   paths with suggestion to run `git w migrate`
+- `[metarepo] agentic_frameworks` field: string slice validated at load time.
+  Each entry is checked against the `pkg/agents` framework registry
+  (`agents.FrameworkFor(name)`). Any unknown value produces a named error
+  listing valid framework identifiers. Missing field defaults to `["gsd"]`.
+  The loader does not import framework behavior — it only validates names.
 - `.gitw-stream` manifest parsing, validation, atomic write:
   - `name` field on `[[worktree]]`: unique-within-workstream key; defaults to
     repo name for single-occurrence repos; required when same repo appears more
@@ -32,11 +37,12 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
 - `[[workstream]]` root config block (lightweight remote override)
 - Two-file merge with field-level semantics
 - `private = true` enforcement
-- `[workspace] default_remotes` cascade resolution
+- `[metarepo] default_remotes` cascade resolution
 - Load-time detection of v1 `[[workgroup]]` blocks: actionable error message
   directing user to run `git w migrate` (detection only; no migration logic)
 - `UpdatePreservingComments` round-trip tests for all new fields
-- Full unit tests: merge, cascade, cycle detection, v1 `[[workgroup]]` detection
+- Full unit tests: merge, cascade, cycle detection, v1 `[[workgroup]]` detection,
+  `agentic_frameworks` validation (known value, unknown value, missing value, multi-value)
 
 ## Milestone 2 — branch rule engine
 
@@ -175,10 +181,16 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
 ## Milestone 9 — agent context layer
 
 - `pkg/agents` package with pure generator functions
+- `SpecFramework` Go interface and `GSDFramework` implementation
+- `FrameworkFor(name string) (SpecFramework, error)` — single name lookup
+- `FrameworksFor(names []string) ([]SpecFramework, error)` — resolves the
+  `agentic_frameworks` slice from config; error on first unknown name
 - `git w context rebuild`: `CONTEXT.md`, three-level `AGENTS.md` generation,
-  env-group summary, auto-commit
+  env-group summary, auto-commit; prohibition content and init instructions
+  generated from all active frameworks in declaration order
 - `git w agent context` with CWD-based scope resolution and `--json`
 - `capabilities`, `commands`, `env_groups` blocks in JSON output
+- `agentic_frameworks` array in JSON output (not a single string)
 - `create_hint` field per env group
 - `scope` field per worktree entry in `worktrees` JSON array
 - `name` field per worktree entry (present always; equals repo name for
@@ -187,7 +199,9 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
   any repo appears more than once; warning lists each `name`, `branch`, and
   `scope` explicitly
 - Tests: generator functions produce required prohibition strings, command
-  references, env-group create_hints, and scope-boundary warnings for Pattern B
+  references, env-group create_hints, scope-boundary warnings for Pattern B,
+  framework init instructions, and `agentic_frameworks` slice in JSON
+- Registry tests: `FrameworkFor`, `FrameworksFor`, `GSDFramework` contract
 
 ## Milestone 10 — ship pipeline
 
@@ -243,7 +257,7 @@ unit tests.
 | Worktree ephemerality | Ephemeral; `.planning/`, `AGENTS.md`, `.gitw-stream` committed |
 | `.planning/` on close | Always preserved; archived with workstream directory |
 | Scope selection | Filter flags at call site; no ambient scope command |
-| Agent interop | Generated `AGENTS.md` + `git w agent context --json`; no GSD API coupling |
+| Agent interop | Generated `AGENTS.md` + `git w agent context --json`; no framework API coupling; `SpecFramework` interface isolates framework-specific behavior; `agentic_frameworks` is a slice — multiple frameworks may be active |
 | GSD workspace creation | Prohibited by `AGENTS.md`; git-w creates workstreams |
 | Ship command | `git w workstream ship`; agents must not push or open PRs directly |
 | Ref routing | Explicit `[[sync_pair]]` blocks |

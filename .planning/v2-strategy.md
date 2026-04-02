@@ -142,7 +142,7 @@ When all 12 milestones are merged to `v2`:
 | 41 | Add `[[workstream]]` root config block |
 | 42 | Implement two-file config merge with field-level semantics |
 | 43 | Parse and validate `.gitw-stream` manifest |
-| 44 | Add `[workspace]` default_remotes cascade resolution |
+| 44 | Add `[metarepo]` default_remotes cascade resolution |
 | 45 | Detect v1 `[[workgroup]]` blocks at load time |
 | 46 | `UpdatePreservingComments` round-trip tests for all v2 fields |
 
