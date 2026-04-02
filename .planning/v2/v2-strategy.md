@@ -66,7 +66,7 @@ Issue branches use the same naming convention as v1 feature branches — consist
 
 ## GSD Issue Workflow (per issue)
 
-**Before branching or planning any issue, read `.planning/v2-issue-map.md`.** It is the authoritative source for every issue number, issue title, exact branch name, milestone branch, and dependency. Do not invent branch names or issue numbers — use only what is listed there.
+**Before branching or planning any issue, read `.planning/v2/v2-issue-map.md`.** It is the authoritative source for every issue number, issue title, exact branch name, milestone branch, and dependency. Do not invent branch names or issue numbers — use only what is listed there.
 
 1. **Branch**: create issue branch off the active milestone branch using the exact name from `v2-issue-map.md`
    - e.g. `git checkout -b 36-add-workspace-block` from `v2-m1-config-schema`
@@ -127,7 +127,7 @@ When all 12 milestones are merged to `v2`:
 
 ## Milestone & Issue Map
 
-> **This section is a summary for orientation only.** The authoritative source with exact branch names, issue numbers, and per-milestone issue lists is `.planning/v2-issue-map.md`. Read that file before branching or planning any issue.
+> **This section is a summary for orientation only.** The authoritative source with exact branch names, issue numbers, and per-milestone issue lists is `.planning/v2/v2-issue-map.md`. Read that file before branching or planning any issue.
 
 ### V2 M1: Config schema + loader (milestone #1)
 11 issues — foundational; all other milestones depend on this.

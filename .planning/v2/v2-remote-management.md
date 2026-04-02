@@ -5,7 +5,7 @@ the `git w sync` fan-out executor, `git w remote` subcommand, workstream push
 protection, the `pre-push` hook mechanism, and the state file.
 
 Schema for `[[remote]]`, `[[sync_pair]]`, `[[repo]]` remote additions, and
-`[[workstream]]` remote overrides is in `.planning/v2-schema.md`.
+`[[workstream]]` remote overrides is in `.planning/v2/v2-schema.md`.
 
 ---
 

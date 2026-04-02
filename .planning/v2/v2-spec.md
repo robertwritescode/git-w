@@ -31,7 +31,7 @@ capabilities that together necessitate a major version bump:
    the same repo within a single workstream). Both patterns are first-class.
 
 The full remote management design is specified in
-`.planning/v2-remote-management.md`. The vocabulary substitution throughout is
+`.planning/v2/v2-remote-management.md`. The vocabulary substitution throughout is
 `workgroup` to `workstream`, with paths changing from `workgroups/<n>/` to
 `workspaces/<workspace>/active/<n>/`. The hook mechanism, config merge
 semantics, branch rule engine, and fan-out executor are unchanged.
@@ -56,20 +56,20 @@ No new binary is introduced. Everything lives in git-w.
 The v2 effort is one GSD project. Each v2 milestone is one GSD milestone. Each GitHub issue is one GSD phase. Implementation tasks within an issue are GSD plans. GSD's `branching_strategy` is set to `none` — GSD commits directly to the active branch; all branch creation and PR management is done manually.
 
 Per-issue workflow:
-1. Create the issue branch off the milestone branch. **Use `.planning/v2-issue-map.md` for the exact branch name and issue number.**
+1. Create the issue branch off the milestone branch. **Use `.planning/v2/v2-issue-map.md` for the exact branch name and issue number.**
 2. Optionally run `/gsd-discuss-phase` to refine scope.
 3. Run `/gsd-plan-phase` to generate the implementation plan.
 4. Run `/gsd-execute-phase` to implement.
 5. Verify: `mage testfast` and `go vet ./...` must pass.
 6. Open a PR targeting the milestone branch and merge it.
-7. Update the Active State section in `.planning/v2-strategy.md`.
+7. Update the Active State section in `.planning/v2/v2-strategy.md`.
 
 **Read before planning or branching:**
 
-- `.planning/v2-issue-map.md` — authoritative mapping of every GitHub issue number, issue title, milestone, branch name, and dependency. Use this to determine the correct branch name, issue number, and milestone scope for any unit of work.
-- `.planning/v2-strategy.md` — branching rules, naming conventions, active state, sequencing.
-- `.planning/v2-workflow.md` — GSD command invocations and step-by-step workflow.
-- `.planning/v2-remote-management.md` — detailed remote management design: `[[remote]]`, `[[sync_pair]]`, branch rule engine, pre-push hook protection, `git w remote` and `git w sync` multi-remote behaviour.
+- `.planning/v2/v2-issue-map.md` — authoritative mapping of every GitHub issue number, issue title, milestone, branch name, and dependency. Use this to determine the correct branch name, issue number, and milestone scope for any unit of work.
+- `.planning/v2/v2-strategy.md` — branching rules, naming conventions, active state, sequencing.
+- `.planning/v2/v2-workflow.md` — GSD command invocations and step-by-step workflow.
+- `.planning/v2/v2-remote-management.md` — detailed remote management design: `[[remote]]`, `[[sync_pair]]`, branch rule engine, pre-push hook protection, `git w remote` and `git w sync` multi-remote behaviour.
 
 ---
 
@@ -526,7 +526,7 @@ agentic_frameworks  = ["gsd"]
 # A slice — multiple frameworks may be present (e.g. ["gsd", "speckit"]).
 # Valid values at v2 launch: "gsd"
 # Omitting defaults to ["gsd"]. Unknown values are a load-time error.
-# See .planning/v2-agent-interop.md for the SpecFramework interface design.
+# See .planning/v2/v2-agent-interop.md for the SpecFramework interface design.
 ```
 
 ### `[[workspace]]` named workspace block
@@ -988,7 +988,7 @@ their multi-worktree structure is expressed through the `worktrees` array with
 ## Workstream push protection
 
 Identical mechanism to the workgroup push protection described in
-`.planning/v2-remote-management.md`, with `workgroup` replaced by `workstream`
+`.planning/v2/v2-remote-management.md`, with `workgroup` replaced by `workstream`
 throughout and worktree discovery using `.gitw-stream` manifest files instead of
 `[[workgroup.worktree]]` entries in root config.
 
@@ -1347,7 +1347,7 @@ The agent interop layer is designed to support **multiple spec frameworks**
 in `[metarepo] agentic_frameworks` in `.gitw`. At v2 launch, only `"gsd"` is
 supported. Framework-specific behavior is isolated behind the `SpecFramework`
 Go interface in `pkg/agents` — adding support for a new framework requires only
-implementing that interface. See `.planning/v2-agent-interop.md` for the full
+implementing that interface. See `.planning/v2/v2-agent-interop.md` for the full
 interface design and registry contract.
 
 Explicit prohibitions with alternatives ("do not do X, instead call Y") are
@@ -1534,7 +1534,7 @@ Table-driven tests: all criteria combinations x all action tiers.
 
 ### `reconcileHooks`
 
-Full specification in `.planning/v2-remote-management.md`. Managed block
+Full specification in `.planning/v2/v2-remote-management.md`. Managed block
 delimiters (exact strings):
 ```
 # --- git-w managed block (do not edit) ---
@@ -1547,7 +1547,7 @@ Cleans up empty hook files.
 
 ## Milestones
 
-> **For the authoritative list of GitHub issue numbers, issue titles, exact branch names, and per-milestone issue assignments, see `.planning/v2-issue-map.md`.** The milestone descriptions below are design scope only — use the issue map for all branching and planning decisions.
+> **For the authoritative list of GitHub issue numbers, issue titles, exact branch names, and per-milestone issue assignments, see `.planning/v2/v2-issue-map.md`.** The milestone descriptions below are design scope only — use the issue map for all branching and planning decisions.
 
 **Dependency note:** Milestones are numbered by logical dependency order, not
 required execution order. Milestone 12 (`git w migrate`) depends only on

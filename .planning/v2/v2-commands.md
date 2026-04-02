@@ -151,7 +151,7 @@ missing on disk via `git worktree repair`.
 ### `git w migrate [--apply]`
 
 v1 to v2 upgrade. Always prints migration report. Requires `--apply` to
-execute. Does not auto-commit results. See `.planning/v2-migration.md` for
+execute. Does not auto-commit results. See `.planning/v2/v2-migration.md` for
 full spec.
 
 ### `git w repo add <url> [flags]`

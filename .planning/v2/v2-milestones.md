@@ -1,6 +1,6 @@
 # git-w v2: milestones
 
-> **For the authoritative list of GitHub issue numbers, issue titles, exact branch names, and per-milestone issue assignments, see `.planning/v2-issue-map.md`.** The milestone descriptions below are design scope only — use the issue map for all branching and planning decisions.
+> **For the authoritative list of GitHub issue numbers, issue titles, exact branch names, and per-milestone issue assignments, see `.planning/v2/v2-issue-map.md`.** The milestone descriptions below are design scope only — use the issue map for all branching and planning decisions.
 
 **Dependency note:** Milestones are numbered by logical dependency order, not
 required execution order. Milestone 12 (`git w migrate`) depends only on
@@ -223,7 +223,7 @@ in parallel with Milestones 2–11. All milestones ship together as v2.0.
 **Dependency:** Milestone 1 must be code-complete (config types and loader
 exist). Can be developed concurrently with Milestones 2–11.
 
-See `.planning/v2-migration.md` for full spec of the `pkg/migrate` package,
+See `.planning/v2/v2-migration.md` for full spec of the `pkg/migrate` package,
 detection logic, pre-flight conditions, `--apply` execution sequence, and
 unit tests.
 
