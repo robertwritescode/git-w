@@ -1,363 +1,610 @@
 # Pitfalls Research
 
-**Domain:** Go CLI multi-repo management tool (git-w v2)
-**Researched:** 2026-04-01
+**Domain:** v2 config schema and loader — adding new TOML block types to an existing Go CLI
+**Researched:** 2026-04-02
 **Confidence:** HIGH
+
+Sources: direct reading of `pkg/toml/preserve.go`, `pkg/config/loader.go`, `pkg/config/config.go`,
+`.planning/v2/v2-schema.md`, `.planning/v2/v2-migration.md`, `.planning/codebase/CONCERNS.md`,
+`.planning/REQUIREMENTS.md` (CFG-01 through CFG-12).
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Worktree `.git` File Breakage After Migration Directory Moves
+### Pitfall 1: `UpdatePreservingComments` Silently Swallows Failures on New Block Types
 
 **What goes wrong:**
-v2 migration moves repo directories from `~/code/repo` to `~/code/workspace/repo`. Git worktrees store absolute paths in their `.git` files (e.g., `gitdir: /Users/x/code/repo/.git/worktrees/feature`). After the parent directory moves, every worktree's `.git` file points to a stale path. The worktree appears broken — `git status` fails, commits fail, work is stranded.
+`applySmartUpdate` in `pkg/toml/preserve.go:77-83` already has a known silent-failure path: when
+`smartUpdate` returns an error, the function returns `newBytes, nil` — discarding comments with no
+user-visible warning. This was acceptable when only `[workspace]`, `[repos]`, `[groups]` existed.
+v2 adds `[[workspace]]`, `[[remote]]`, `[[remote.branch_rule]]`, `[[sync_pair]]`, `[[workstream]]`
+— array-of-tables (AoT) types the existing string-matching algorithm has never seen. Every one of
+these will cause `smartUpdate` to fail silently, stripping all user comments from the config file on
+the first write after M1.
 
 **Why it happens:**
-Git worktrees use a bidirectional link: the worktree's `.git` file points to the main repo's `.git/worktrees/<name>/` directory, and the main repo's `.git/worktrees/<name>/gitdir` file points back to the worktree. Moving either side without running `git worktree repair` breaks both directions.
+The current `findSectionBounds` uses a regex that matches `[section]` headers (`^\[section\]\s*$`).
+TOML array-of-tables uses `[[section]]` headers. These are distinct patterns; the existing regex
+does not match AoT headers. When any of the new block types are written and then `Save` is called,
+the `smartUpdate` path fails to locate the section, falls through to the silent-return branch, and
+the caller gets `newBytes` — correctly structured TOML, but all user comments gone.
 
 **How to avoid:**
-The migration spec (v2-migration.md) correctly includes `git worktree repair` as a post-move step. Enforce this as a hard requirement: the migration function MUST call `git worktree repair` after every directory move, and MUST verify the repair succeeded by checking that all worktree `.git` files resolve. Never treat repair as optional cleanup.
+Before writing a single line of the new schema structs, add AoT handling to `findSectionBounds` and
+test it explicitly. The regex `^\[\[` + `regexp.QuoteMeta(section)` + `\]\]` must be tried
+alongside the existing `^\[` variant. Also fix the silent error: when `smartUpdate` fails, log at
+minimum a debug-level warning rather than silently discarding the failure. The fix is two lines
+(add `fmt.Fprintf(os.Stderr, "warning: comment preservation failed for %s\n", ...)`) but must be
+done before any AoT sections are introduced.
+
+Write a golden-file test: load a fixture `.gitw` that contains comments above `[[remote]]` and
+`[[workspace]]` blocks, run `UpdatePreservingComments`, and assert the output matches the expected
+file byte-for-byte. Fail loudly on mismatch rather than `assert.Contains`.
 
 **Warning signs:**
-- Tests that move directories but skip `git worktree repair`
-- `git worktree list` showing worktrees with `[prunable]` status after migration
-- Integration tests that only test repos without worktrees
+- Any `[[double-bracket]]` block in the new schema without a corresponding `TestUpdatePreservingComments_AoT*` test
+- The phrase `return newBytes, nil` in `applySmartUpdate` without a preceding warning/log
+- Tests for `UpdatePreservingComments` that only use `assert.Contains` (not golden-file comparison)
 
 **Phase to address:**
-M2 (Config v2 + Migration) — migration implementation must include repair as atomic with the move
+Phase 11 (CFG-12: `UpdatePreservingComments`) — but the AoT regex fix must land before or alongside
+Phase 4 (CFG-04: `[[remote]]`) because that is the first AoT block to be written. If CFG-12 is
+Phase 11 and CFG-04 is Phase 4, the executor must either fix the regex in Phase 4 or document that
+comment preservation is broken until Phase 11.
 
 ---
 
-### Pitfall 2: TOML Comment Loss at Scale With v2 Schema Expansion
+### Pitfall 2: `[[remote.branch_rule]]` Comment Anchors Collide When Multiple Remotes Exist
 
 **What goes wrong:**
-v1 already has a fragile 525-line custom TOML parser (`applySmartUpdate`) that silently swallows errors to preserve comments. v2 adds `[remotes]`, `[sync_pairs]`, `[workstreams]`, `[branch_rules]`, and nested tables like `[remotes.origin.branch_rules]`. Each new section type multiplies the surface area for comment preservation bugs. Users lose carefully maintained comments on config update, or worse, the parser silently corrupts config structure.
+`extractCommentAnchors` builds an identity for each comment from `anchorIdentity`, which for
+subsection headers returns the subsection name and for key-value lines returns
+`currentSubsection + "." + key`. When two `[[remote]]` blocks both have `[[remote.branch_rule]]`
+entries with the same field names (e.g., `pattern`, `action`), all anchor identities for the second
+remote's `branch_rule` entries collide with the first remote's. Comments from `origin`'s
+`[[remote.branch_rule]]` get injected into `personal`'s `[[remote.branch_rule]]` output, or
+disappear entirely after the second one consumes the anchor from the lookup table.
+
+The `buildAnchorLookup` function uses a flat `map[string][]string` keyed by anchor identity.
+`delete(lookup, id)` is called after the first injection. So the second block with the same key
+gets no comment injected. For `[[remote.branch_rule]]` entries, the anchor identity is something
+like `personal.pattern` — which is the same string regardless of which `[[remote]]` block the rule
+belongs to.
 
 **Why it happens:**
-TOML libraries parse-then-serialize, destroying comments. The custom smart-update approach does string-level manipulation to preserve them, but every new table type needs its own handling. The complexity grows combinatorially with nested tables.
+The algorithm was designed around a single instance of each section. TOML arrays-of-tables
+(repeated `[[block]]` headers) are structurally different: the same key name appears multiple times
+in different instances of the same block type. The flat anchor identity map has no mechanism to
+distinguish "the `pattern` key in the first `[[remote]]`" from "the `pattern` key in the second
+`[[remote]]`."
 
 **How to avoid:**
-Two strategies, choose one early:
-1. **Accept comment loss on programmatic writes.** Document that `git w` commands that modify config may strip comments. Keep a `.gitw.bak` before writes. This is the pragmatic choice.
-2. **Use a comment-preserving TOML library** (e.g., `github.com/pelletier/go-toml/v2` with its AST-level manipulation). This is the correct long-term fix but requires replacing the custom parser.
+The anchor algorithm needs to namespace identities by AoT index. Instead of
+`currentSubsection + "." + key`, use `currentSubsection + "[" + index + "]" + "." + key` where
+index is the ordinal position of the enclosing `[[block]]` header. This is a non-trivial change to
+`extractCommentAnchors` and `injectSectionComments` that requires tracking `[[block]]` headers as
+context-switching markers, not just ordinary subsection headers.
 
-Either way: never silently swallow parse errors. If the smart-update fails, abort the write and tell the user.
+Alternatively (simpler): accept that comment preservation for repeated AoT blocks is best-effort,
+document this limitation explicitly, and only preserve comments on single-instance blocks
+(`[metarepo]`, top-level `[[workspace]]`) and on entire AoT sections as a unit (preserve the
+region between `[[remote]]` headers, not individual keys within).
+
+Write a test: two `[[remote]]` blocks each with a comment on `pattern`, call
+`UpdatePreservingComments`, assert both comments survive.
 
 **Warning signs:**
-- `applySmartUpdate` growing past 800+ lines with v2 sections
-- Bug reports about lost comments appearing after sync operations
-- Tests that only verify key-value correctness but never check comment preservation
+- `anchorIdentity` returning the same string for keys in different AoT instances
+- Comment preservation tests that only have a single `[[remote]]` block
+- `delete(lookup, id)` consuming an anchor before the second AoT instance processes it
 
 **Phase to address:**
-M1 (Foundation) — decide the comment strategy before M2 adds new config sections. If replacing the parser, do it in M1 so M2 builds on solid ground.
+Phase 11 (CFG-12) — but must be evaluated early. Recommend: define the limitation in Phase 4 tests,
+implement the fix (or explicit limitation documentation) in Phase 11.
 
 ---
 
-### Pitfall 3: Concurrent Config File Writes (Race Condition)
+### Pitfall 3: Two-File Merge Treats Absent Fields as Zero-Value Overrides
 
 **What goes wrong:**
-Two `git w sync` processes run simultaneously (e.g., user runs sync in two terminals, or a hook triggers sync while manual sync is running). Both read `.gitw`, both compute updates, both write. Last write wins — the first process's changes are silently lost. v2 makes this worse because `sync` now writes config state AND hook files AND potentially `.gitw-state.json`.
+The spec says `.git/.gitw` wins on field-level conflicts (innermost wins). The natural implementation
+is `MergeRemote(base, override Remote) Remote` where for each exported field, if the override value
+is non-zero, use it; otherwise use base. This is correct for strings and booleans, but wrong for
+pointer types, slices, and deliberately-zero values.
+
+Example: `critical = false` is a deliberate choice in `.git/.gitw`. But `false` is the Go zero
+value for bool. The merge function can't distinguish "user explicitly set critical=false in private
+config" from "critical was not set in private config." The result: the field is always taken from
+the base `.gitw`, ignoring the override. The user's private config value is silently discarded.
+
+Same problem for `direction = ""` (empty string) in `.git/.gitw` — a deliberately reset field
+vs. an absent field. And for `refs = []` in `[[sync_pair]]` — an empty slice could mean "sync
+nothing" (intentional override) or "field not set" (defer to base).
 
 **Why it happens:**
-v1 has no file locking on config writes. This was acceptable when writes were rare (manual `repo add`). v2 adds `sync` as a frequent operation that writes config as a side effect, and hooks that trigger sync-like behavior, dramatically increasing write frequency and concurrency risk.
+Go's zero-value conflation is the classic config-merge trap. It is easy to write
+`if override.Critical { result.Critical = override.Critical }` but this is wrong: it treats
+`false` as "not set." The correct check is "is this field present in the source file?" which
+requires either a TOML decoder with presence tracking, or pointer types.
 
 **How to avoid:**
-Implement advisory file locking using `flock(2)` (via `syscall.Flock` on Unix) on a `.gitw.lock` file. Acquire lock before any config read-modify-write cycle. Use a short timeout (5s) with a clear error message: "Another git-w process is updating config. Retry in a moment."
+Use pointer types (`*bool`, `*string`) for all fields where the zero value is semantically valid in
+`.git/.gitw`. When a pointer is `nil`, the field was absent in that file and the base value wins.
+When a pointer is non-nil (even pointing to a zero value), the override file's value wins. This is
+the pattern already used in `WorkspaceMeta` (`AutoGitignore *bool`, `SyncPush *bool`) — apply it
+consistently to all mergeable fields in `Remote`, `Repo`, `SyncPair`, `Workstream`.
 
-Keep the lock scope minimal — lock only around the read-modify-write, not the entire command execution. This prevents deadlocks from long-running operations.
+Slice fields (`refs`, `remotes`, `branch_rules`) are trickier: a `nil` slice vs. an empty slice
+must be distinguishable. Use `*[]string` and treat `nil` as "not set."
+
+Write table-driven tests for every merge case: base-only, override-only, both-present, both-absent,
+and especially "override explicitly sets zero value" (`false`, `""`, `[]`).
 
 **Warning signs:**
-- Config files that "lose" repos intermittently
-- State file (`gitw-state.json`) with stale timestamps after concurrent syncs
-- Tests that never exercise concurrent command execution
+- `MergeRemote` (or equivalent) using `if override.Field != zero { result.Field = override.Field }`
+- Config structs for mergeable types using `string` instead of `*string` for optional fields
+- Tests for two-file merge that never test "override sets a field to false/empty"
 
 **Phase to address:**
-M1 (Foundation) — file locking is infrastructure that every subsequent milestone depends on
+Phase 7 (CFG-07: two-file merge) — but the struct design decision (pointer vs. value types) must be
+made in Phase 1 (CFG-01, `[[workspace]]` struct) and applied consistently throughout M1. Changing
+from `string` to `*string` after several phases are implemented requires touching all test
+fixtures.
 
 ---
 
-### Pitfall 4: Hook Scripts That Break in Worktree Context
+### Pitfall 4: Cycle Detection Misses Indirect Cycles in `[[sync_pair]]` Graph
 
 **What goes wrong:**
-The `pre-push` hook installed in `.git/hooks/` applies to ALL worktrees from that repo. But `$GIT_DIR` inside a worktree points to `.git/worktrees/<name>/`, not the main `.git/`. If the hook script uses `$GIT_DIR` to find config or resolve paths, it gets the wrong location in worktree contexts. The hook silently does nothing, or worse, errors out and blocks pushes.
+A `[[sync_pair]]` graph with only direct cycles is easy to detect: if `from="A" to="B"` and
+`from="B" to="A"` both exist, that is a direct 2-cycle. But the spec says cycle detection runs at
+load time on the full graph, and users can construct indirect cycles:
 
-**How to avoid:**
-The hook script must use `git rev-parse --git-common-dir` to find the shared `.git/` directory (where hooks actually live), and `git rev-parse --show-toplevel` to find the working tree root. Never rely on `$GIT_DIR` for path resolution in hook scripts.
+```toml
+[[sync_pair]]
+from = "origin"
+to   = "personal"
 
-Test hooks explicitly in worktree contexts — create a repo, add a worktree, install hooks, push from the worktree. This must be an integration test, not just a unit test of the hook template.
+[[sync_pair]]
+from = "personal"
+to   = "backup"
+
+[[sync_pair]]
+from = "backup"
+to   = "origin"    # indirect cycle: origin → personal → backup → origin
+```
+
+A naive implementation that checks only direct `(from, to)` pairs misses the 3-node cycle. Worse,
+sync fans out in parallel: if the cycle is detected only at runtime (not load time), a sync
+operation triggers `origin → personal`, `personal → backup`, and `backup → origin` simultaneously
+— potentially creating a mirroring loop until storage is exhausted.
 
 **Why it happens:**
-Developers test hooks in the main working tree where `$GIT_DIR` == `.git/` and everything works. The worktree case is only discovered in production when a user pushes from a worktree for the first time.
+Developers test cycle detection with the simple 2-node case and declare it done. The indirect case
+requires graph traversal (DFS or topological sort), which is non-obvious to write for a config
+loader where cycles are typically impossible.
+
+**How to avoid:**
+Implement load-time cycle detection using DFS with a visited-and-on-stack set (standard directed
+graph cycle detection). The graph nodes are remote names; edges are `(from, to)` pairs from
+`[[sync_pair]]` blocks. If DFS visits a node already on the current path stack, a cycle exists.
+Include the full cycle path in the error message:
+
+```
+config error: [[sync_pair]] creates a sync cycle: origin → personal → backup → origin
+Remove the pair that closes the loop.
+```
+
+Edge cases to test: single-node self-loop (`from="A" to="A"`), 2-node direct, 3-node indirect,
+a graph with no cycle but multiple paths (DAG), and a graph with a cycle where one remote is never
+a `from` (it's only a destination — valid).
 
 **Warning signs:**
-- Hook script using `$GIT_DIR` or hardcoded `.git/` paths
-- No integration tests that exercise hooks from within worktrees
-- Users reporting "hook does nothing" but only when pushing from worktrees
+- Cycle detection implemented as `seenPairs[from+to]` without graph traversal
+- Tests with only 2-node cycles
+- Missing test case: `A→B→C→A` indirect cycle with 3 pairs
 
 **Phase to address:**
-M5 (Hook Management) — hook implementation must test in worktree context from day one
+Phase 5 (CFG-05: `[[sync_pair]]` with cycle detection). The algorithm must be graph-based from
+the start, not patchable from a simple pair-check later.
 
 ---
 
-### Pitfall 5: Migration Partial Failure Leaves Inconsistent State
+### Pitfall 5: v1 `[[workgroup]]` Detection Fires on Partially-Migrated Configs
 
 **What goes wrong:**
-Migration moves directories, rewrites config, repairs worktrees, and installs hooks across potentially dozens of repos. If it fails midway (disk full, permission error, power loss), some repos are in the new v2 layout and some are in v1. The config may reference paths that don't exist. The tool can't operate in either v1 or v2 mode.
+The v1 detection check fires when `[[workgroup]]` blocks exist. The spec says the error must be
+"actionable" — it directs users to `git w migrate`. But users who are mid-migration (have run
+`git w migrate --apply` partially) may have a config that is in transition: some workgroups
+converted to workstreams, some still in `[[workgroup]]` format. The error fires on every `git w`
+invocation, making the tool unusable during migration.
+
+A second failure mode: the TOML key for v1 workgroups is `[workgroup]` (as a map, matching the
+existing `WorkgroupConfig` struct and the `localDiskConfig.Workgroups` field) or `[[workgroup]]`
+(as AoT). If the detection check uses `toml.Unmarshal` into a struct with a `Workgroups` field, it
+silently succeeds for `.gitw.local` configs (which legitimately have `[workgroup.*]` keys in v1).
+The detection logic must check the shared `.gitw` file only, not the local override.
 
 **Why it happens:**
-The migration spec describes 5 distinct path cases and 2 abort conditions, but filesystem operations aren't transactional. `os.Rename` succeeds or fails per-directory, not atomically across all repos.
+v1 detection is written as a simple "does this field exist" check without considering which file
+is being checked, or what partial-migration state looks like. The error is designed for a clean
+pre-migration state; it becomes an obstacle post-migration.
 
 **How to avoid:**
-Implement migration as a two-phase process:
-1. **Plan phase:** Validate all moves are possible (check disk space, permissions, path collisions, bare repos). Write a migration plan file (`.gitw-migration.json`) listing all operations.
-2. **Execute phase:** Perform moves one-by-one, updating the plan file with completion status after each. If interrupted, re-running migration reads the plan and resumes from where it left off.
+The detection check must:
+1. Run only on the primary `.gitw` file, not `.git/.gitw` or `.gitw.local`.
+2. Distinguish between `[[workgroup]]` (v1 AoT syntax for workgroups in shared config) and
+   `[workgroup.name]` (v1 map-of-tables syntax). Both should trigger the error.
+3. Include the specific workgroup names in the error message so the user knows exactly what to
+   migrate: `"v1 config detected: [[workgroup]] blocks found: auth-refactor, data-pipeline — run
+   'git w migrate' to upgrade."`
+4. During migration itself (inside `ApplyPlan`), the detection check must be bypassed or the tool
+   cannot write the config mid-migration.
 
-The plan file acts as a write-ahead log. `git w` startup should check for an incomplete migration plan and prompt the user to resume or rollback.
+Write tests: v1 workgroup in `.gitw` (should error), v1 workgroup only in `.gitw.local` (should NOT
+error — .local is separate concern), partially-migrated (1 workgroup removed of 2, should still
+error naming only the remaining one).
 
 **Warning signs:**
-- Migration function that does moves in a loop without tracking progress
-- No resume capability after interruption
-- Tests that only test successful full migration, never partial failure
+- Detection using `cfg.Workgroups != nil` rather than scanning the raw TOML for the key
+- No test for detection running on `.gitw.local` without error
+- Error message that says "v1 config detected" without naming which workgroups remain
 
 **Phase to address:**
-M2 (Config v2 + Migration) — migration implementation must be resumable from day one
+Phase 10 (CFG-10: v1 detection). Detection logic must be strictly scoped to the primary config
+file. M12 (`git w migrate`) depends on this detection being accurate without side effects.
 
 ---
 
-### Pitfall 6: Provider API Differences Leaking Through the Abstraction
+### Pitfall 6: `repos/<n>` Path Convention Enforcement Breaks Existing Fixture Configs
 
 **What goes wrong:**
-The `Provider` interface abstracts GitHub and Gitea, but their APIs differ in fundamental ways: GitHub uses org-scoped endpoints (`/orgs/{org}/repos`), Gitea uses user-scoped. GitHub has fine-grained rate limiting with `X-RateLimit-*` headers, Gitea has simpler throttling. GitHub returns different error codes. Pagination differs (GitHub uses Link headers, Gitea supports both Link headers and `?page=N`). The abstraction either becomes so thin it's useless, or so thick it hides important differences.
+CFG-03 enforces the `repos/<n>` path convention: repos not at `repos/<n>` produce a warning.
+The existing codebase's test fixtures — both in `pkg/config/loader_test.go` and scattered across
+command-level tests — use paths like `apps/frontend`, `services/backend`, `./myrepo`, `./repo1`,
+`infra/dev`, `infra/test`. If CFG-03 enforcement turns the warning into a hard error, or if the
+warning fires as output noise during other tests, every existing test that uses non-`repos/<n>`
+paths breaks.
+
+Even as a warning-only check: if the warning is written to `cmd.OutOrStdout()` inside `Load`,
+tests that assert exact stdout output will fail. If the warning goes to stderr, tests using
+`s.ExecuteCmd` that don't capture stderr will silently pass while hiding the warning.
 
 **Why it happens:**
-The initial Provider interface is designed around one provider's API shape (usually GitHub, since it's more familiar), then the other provider is awkwardly shoe-horned in. Provider-specific behavior leaks through error messages, rate limiting strategies, and pagination patterns.
+Path convention enforcement feels like a simple string-prefix check, so it gets added to `Load`
+as a validate step. But `Load` is called by every command in every test, and the existing test
+fixtures predate `repos/<n>`. The validator doesn't distinguish "old v1 path we need to warn
+about" from "v2 test fixture that happened to use an arbitrary path."
 
 **How to avoid:**
-Design the `Provider` interface from the Gitea side first — it's the simpler API. GitHub can always be constrained to match Gitea's capabilities. The interface should expose:
-- `ListRepos(ctx, owner string) ([]Repo, error)` — provider handles org vs user distinction internally
-- `GetRepo(ctx, owner, name string) (Repo, error)`
-- Rate limiting should be internal to each provider implementation, not exposed in the interface
+Separate concerns:
+- `validateRepoPaths` (existing, in `Load`) rejects clearly wrong paths (absolute, escaping root).
+  Do not change this.
+- `warnV1Paths` is a new, separate function called only by the `Load` caller when displaying
+  output to users — not from inside the loader itself. Commands can call `config.WarnV1Paths(cfg,
+  cfgPath, cmd.ErrOrStderr())` after loading.
+- Test fixtures that intentionally use non-`repos/<n>` paths should get a comment: `// v1-style
+  path; convention warning expected`. New fixtures must use `repos/<n>`.
 
-Use a `ProviderError` type that wraps provider-specific errors with a uniform code (NotFound, RateLimited, AuthFailed, NetworkError). Never expose raw HTTP status codes through the interface.
+This keeps `Load` side-effect-free (no warnings, just errors) and makes the warning testable in
+isolation.
 
 **Warning signs:**
-- Interface methods that take GitHub-specific parameters (e.g., `orgName` vs `userName`)
-- Error handling that switches on HTTP status codes outside the provider package
-- Rate limiting logic in the command layer instead of the provider layer
+- `validateRepoPaths` or `Load` calling `fmt.Fprintf` / `output.Writef` to print a warning
+- Existing loader tests failing after CFG-03 with "unexpected output" assertion failures
+- A single function doing both "validate correctness" and "emit convention warnings"
 
 **Phase to address:**
-M6 (Remote Management: Sync) — design the Provider interface, but M10 (Gitea + GitHub Providers) implements both. The interface must be validated against both APIs before M6 ships.
+Phase 3 (CFG-03: `repos/<n>` enforcement). Must not couple the warning to `Load` internals.
 
 ---
 
-### Pitfall 7: Context Cancellation Ignored in Network Operations
+### Pitfall 7: `[metarepo] default_remotes` Cascade Returns Wrong Winner When All Three Levels Are Absent
 
 **What goes wrong:**
-v1 already uses `context.Background()` in places where `cmd.Context()` should be used (documented in CONCERNS.md). v2 adds long-running network operations: API calls to GitHub/Gitea for repo listing, sync fan-out across multiple remotes, hook reconciliation. If these operations ignore context cancellation, `Ctrl+C` hangs the CLI while HTTP requests complete, or worse, partial writes occur without cleanup.
+The cascade is `[metarepo] default_remotes` → `[[workstream]] remotes` → `[[repo]] remotes`
+(innermost wins). The typical implementation computes "effective remotes" as:
+```go
+if repo.Remotes != nil { return repo.Remotes }
+if workstream.Remotes != nil { return workstream.Remotes }
+return metarepo.DefaultRemotes
+```
+This looks correct but fails when none of the three levels are set. The spec says: "A repo with no
+remotes field and no `[metarepo] default_remotes` gets no secondary remotes — only its own
+git-configured origin." The implementation must return an empty list, not `nil`, and callers must
+handle an empty list as "use git's own remote config" rather than "no remotes (skip sync)."
+
+Second bug: `[metarepo] default_remotes` field in `.git/.gitw` should override (add to) the base.
+If `.gitw` has `default_remotes = ["origin"]` and `.git/.gitw` has `default_remotes = ["origin",
+"personal"]`, the private config wins and the effective list is `["origin", "personal"]`. But if
+the merging logic does field-level replace (private wins on non-zero), then specifying `["origin",
+"personal"]` in the private file means the user must repeat "origin" even though it was already in
+the base. If the merging does field-level append, then repeating "origin" causes duplicate remotes
+in the effective list.
 
 **Why it happens:**
-`context.Background()` works fine in tests and short operations. The problem only surfaces when operations take seconds (network calls) or when users interrupt mid-operation. Since v1 was all local git operations (fast), this was a minor annoyance. v2's network operations make it a UX disaster.
+The cascade spec does not explicitly define "what does absent mean at each level" or "replace vs
+append semantics for list fields." Implementors fill in the gap with an assumption that turns out
+wrong for at least one user scenario.
 
 **How to avoid:**
-Establish a rule in M1: every function that does I/O or subprocess calls takes `context.Context` as its first parameter (this is already in AGENTS.md coding standards). Enforce with a linter or code review checklist. Specifically:
-- All `http.NewRequest` calls must use `http.NewRequestWithContext`
-- All `exec.Command` calls must use `exec.CommandContext`
-- Replace existing `context.Background()` usages in v1 code as encountered
+Define semantics explicitly before writing code:
+- `[[repo]] remotes` replaces cascade defaults entirely for that repo (spec confirms: "override
+  `[metarepo] default_remotes`").
+- `[[workstream]] remotes` replaces cascade defaults entirely for that workstream's repos.
+- `[metarepo] default_remotes` in `.git/.gitw` replaces the base `.gitw` value entirely (standard
+  field-level merge: private file wins).
+- Absent at all levels returns `[]string{}` (empty, not nil). Callers treat empty as "no
+  git-w-managed remotes; git's own origin is the only remote."
+- Write `ResolveEffectiveRemotes(metarepo, workstream, repo)` as a pure function with a
+  table-driven test covering all 8 combinations of present/absent at each level, plus the
+  deduplication case.
 
 **Warning signs:**
-- `context.Background()` appearing in new code
-- `http.NewRequest` without `WithContext` variant
-- Integration tests that don't test cancellation mid-operation
+- `ResolveEffectiveRemotes` returning `nil` instead of `[]string{}`
+- No test for the "all three levels absent" case
+- No test for "repo specifies remotes; workstream also specifies — repo wins"
 
 **Phase to address:**
-M1 (Foundation) — fix existing context issues, establish the pattern. Every subsequent milestone must follow it.
+Phase 9 (CFG-09: `[metarepo]` cascade). The pure function must have exhaustive tests covering all
+8 combinations before any command code uses it.
 
 ---
 
-### Pitfall 8: `.gitw-stream` Manifest Drift From Disk Reality
+### Pitfall 8: `.gitw-stream` Loading Does Not Validate `name`/`path` Uniqueness Constraints
 
 **What goes wrong:**
-`.gitw-stream` manifests are committed to the repo (they describe workstream composition), but the worktrees they reference are ephemeral local state. A user clones a repo with a `.gitw-stream`, but the worktrees described in it don't exist on their machine. Or a user deletes worktrees manually without updating the manifest. `git w restore` must reconcile this, but if the manifest is treated as truth, restore tries to create worktrees that conflict with existing directories, or fails silently when source branches don't exist.
+The spec defines two uniqueness constraints for `.gitw-stream` manifests:
+- `name` must be unique within the workstream (it is the primary key).
+- `path` must be unique within the workstream (it is the on-disk key).
+- When the same repo appears more than once, `name` is required on all entries for that repo.
+
+A naive `toml.Unmarshal` into a `StreamManifest` struct with a `[]WorktreeEntry` field loads the
+data but does nothing to enforce uniqueness. Two `[[worktree]]` entries with the same `name` parse
+successfully. The duplicate-name case only surfaces at runtime when a command tries to look up a
+worktree by name and gets the wrong one — difficult to debug.
+
+Also: the spec says `name` defaults to `repo` when omitted and the repo appears once. But if the
+same repo appears twice and both entries omit `name`, the defaulting logic silently assigns the
+same name to both entries — violating uniqueness without an error.
 
 **Why it happens:**
-The manifest conflates "what this workstream should look like" (intent) with "what exists on disk" (state). Without a clear separation, code treats the manifest as both, leading to confusion about whether to create, skip, or error when reality doesn't match.
+Struct-based TOML unmarshaling validates TOML syntax, not application-level constraints. The
+uniqueness check is business logic that must be added explicitly, but it is easy to write a
+"working" parser that accepts duplicate names and only notice the bug when lookup returns wrong
+data.
 
 **How to avoid:**
-Treat the manifest as pure intent (declarative), and disk state as separate. `git w restore` computes a diff between intent and reality:
-- Worktree in manifest but not on disk → create it
-- Worktree on disk but not in manifest → leave it (warn, don't delete)
-- Worktree in manifest AND on disk → verify paths match, repair if needed
+`LoadStream(path string) (*StreamManifest, error)` must run a post-parse validation step:
+1. Build a `map[string]int` of name occurrences. Any name appearing more than once is an error.
+2. Build a `map[string]int` of path occurrences. Any path appearing more than once is an error.
+3. For repos appearing more than once: verify all their entries have explicit `name` set.
+4. Apply the default: for repos appearing exactly once with `name` omitted, set `name = repo`.
+5. After defaulting, re-check uniqueness (the default could create a collision if another entry
+   explicitly used the repo name as its `name`).
 
-Never delete worktrees that exist on disk just because the manifest changed. Deletion is always an explicit user action.
+Table-driven tests: single worktree (valid), two different repos (valid), two entries for same repo
+with names (valid), two entries for same repo without names (error), duplicate name across different
+repos (error), duplicate path (error), name-default collides with explicit entry (error).
 
 **Warning signs:**
-- `restore` implementation that doesn't check disk state before creating worktrees
-- Tests that always start from a clean state (no pre-existing worktrees)
-- No handling for "branch doesn't exist yet" when restoring
+- `LoadStream` that only calls `toml.Unmarshal` without a post-parse validation function
+- No test with two `[[worktree]]` entries referencing the same `repo`
+- `name` defaulting logic in display code (not in the loader)
 
 **Phase to address:**
-M4 (Worktree Lifecycle) — restore implementation must handle all mismatch cases
+Phase 8 (CFG-08: `.gitw-stream` manifest). All constraints must be enforced at load time, not at
+use time.
 
 ---
 
-### Pitfall 9: Branch Rule Evaluation Order Ambiguity
+### Pitfall 9: `private = true` Enforcement Checks the Wrong Config-File Path
 
 **What goes wrong:**
-Branch rules have three levels (repo-level overrides → remote-level rules → default allow) and three criteria per rule (pattern, untracked, explicit). The spec says "first-match-wins in declaration order." But TOML maps are unordered — `[remotes.origin.branch_rules]` as a TOML map has no guaranteed key order. If rules are stored as a map, "declaration order" is meaningless. Users write rules expecting top-to-bottom evaluation but get random order.
+The spec says: remotes with `private = true` must live in `.git/.gitw`, never in `.gitw`. The
+enforcement logic must check which file a remote was loaded from. The natural implementation
+checks the field at the final merged config level — but the merged config doesn't remember which
+file each `[[remote]]` block came from. The check fires on the merged result, where all remotes
+are present regardless of source. The loader cannot tell "this remote came from `.gitw`" vs.
+"this remote came from `.git/.gitw`."
+
+Two failure modes:
+1. Check always passes (no error) because it runs on the merged config where `private = true`
+   remotes are already present and the loader can't distinguish source.
+2. Check fires incorrectly because a `private = true` remote defined in `.git/.gitw` gets flagged
+   when it should not.
 
 **Why it happens:**
-TOML tables (maps) are unordered by spec. Developers assume the parser preserves insertion order (some do, some don't, and it's not guaranteed). The v2 schema uses `[[branch_rules]]` (array of tables) which IS ordered, but the nesting under `[remotes.origin]` could lead to confusion about where the array boundary is.
+The merge-then-validate pattern loses provenance. The validator needs per-source data, but the
+merged struct has thrown that away.
 
 **How to avoid:**
-Use `[[remotes.origin.branch_rules]]` (array of tables, not map) and verify that the TOML library preserves array order (go-toml/v2 does). Document explicitly that rules are evaluated in file order. Add a `git w config validate` command that prints rule evaluation order so users can verify their intent.
+Run the `private = true` check before merging, on the raw parsed content of each file separately.
+The sequence is:
+1. Parse `.gitw` into `publicCfg`. Check: any `[[remote]]` with `private = true` in `publicCfg`
+   is an error. Name the remote: `"remote 'personal' has private=true but is defined in .gitw —
+   move it to .git/.gitw"`.
+2. Parse `.git/.gitw` into `privateCfg`. No `private` check here.
+3. Merge `publicCfg` and `privateCfg` into final config.
 
-Write tests that specifically verify evaluation order with 3+ rules where order matters (e.g., rule 1 allows `main`, rule 2 denies `*` — reversing them changes behavior).
+The key discipline: **validate each file before merging, not after.** This is a general principle
+for all per-file constraints (not just `private`).
 
 **Warning signs:**
-- Branch rules stored as `map[string]Rule` instead of `[]Rule`
-- Tests with only 1-2 rules that don't exercise ordering
-- No way for users to see effective rule evaluation order
+- `validatePrivateRemotes` called on the merged `*Config` rather than on the raw parsed
+  `publicConfig`
+- No test that places `private = true` in `.gitw` (should error) vs. `.git/.gitw` (should not)
+- The merge function receiving only one merged config (no per-file types)
 
 **Phase to address:**
-M3 (Schema Expansion) — schema must use ordered arrays. M7 (Branch Rules) — evaluation engine must respect order and provide debugging tools.
+Phase 7 (CFG-07: two-file merge). The merge sequence must preserve per-file validation checkpoints.
 
 ---
 
-### Pitfall 10: Two-File Config Merge Produces Surprising Overrides
+### Pitfall 10: `[[sync_pair]]` Merged by `(from, to)` Pair — Undefined Behavior When Only One Field Matches
 
 **What goes wrong:**
-`.gitw` (shared) and `.git/.gitw` (private) merge at field level, matched by `name` key. A user adds `private = true` to a remote in `.gitw` instead of `.git/.gitw`. The remote's URL is now committed to version control. Or worse: `.git/.gitw` overrides a field that the user expected to come from `.gitw`, and they can't figure out why their shared config change isn't taking effect.
+The spec says `[[sync_pair]]` blocks are merged by `(from, to)` pair — both fields together form
+the merge key. If `.gitw` has a pair `from="origin" to="personal"` with `refs = ["main"]` and
+`.git/.gitw` has a pair `from="origin" to="personal"` with `refs = ["**"]`, the private config
+wins for `refs`. That is the intended behavior.
+
+But what if `.git/.gitw` has `from="origin" to="archive"` (a pair not in `.gitw`)? The spec is
+silent on this case. Two interpretations:
+- Private file can add new pairs not in the shared config (additive).
+- Private file can only override existing pairs (non-additive).
+
+If additive, a user on a shared machine can add private sync routes that route all refs to a
+personal archive remote — this may be desirable (privacy backup) or undesirable (security concern
+for shared workspaces).
+
+A second ambiguity: what if only `from` matches but `to` does not? The pair is treated as a new
+entry (no match) under the `(from, to)` composite key. This is correct, but the implementation
+must use composite key equality, not partial matching.
 
 **Why it happens:**
-Two-file merge is inherently confusing. Users don't have a mental model for which file "wins" for which fields. The merge happens at load time with no visibility into the merge result. Debugging requires manually reading both files and mentally computing the merge.
+Composite merge keys are unusual in config systems. Implementors often implement merge by looping
+through the override's items and replacing matching items, but use single-field matching by
+accident. A sync pair `from="origin" to="personal"` in `.git/.gitw` would then wrongly match and
+replace any pair where `from="origin"`, even if `to` is different.
 
 **How to avoid:**
-1. **Enforce `private` placement at load time:** If a remote has `private = true`, it MUST be in `.git/.gitw`. If found in `.gitw`, emit a warning: "Private remote 'origin' should be in .git/.gitw to avoid committing credentials."
-2. **Add `git w config show --merged`:** Display the effective merged config with annotations showing which file each value came from.
-3. **Document the merge rules prominently:** Not buried in a spec — in the `git w config --help` output.
+Use a `syncPairKey` struct `{ From, To string }` as the map key in the merge function. Never
+use a single field as the lookup key. The merge function:
+```go
+func mergeSyncPairs(base, override []SyncPair) []SyncPair {
+    index := make(map[syncPairKey]SyncPair, len(base))
+    for _, p := range base { index[syncPairKey{p.From, p.To}] = p }
+    for _, p := range override { index[syncPairKey{p.From, p.To}] = p } // override wins
+    // rebuild ordered slice from index...
+}
+```
+Write tests: same `(from, to)` pair in both files (override wins), different `to` same `from`
+(both survive, independent), pair only in private file (additive, included in result).
 
 **Warning signs:**
-- No validation of which file contains `private` remotes
-- No way to see the merged config result
-- User confusion reports about "config changes not taking effect"
+- Merge loop using `pair.From` as the only lookup key
+- No test where two pairs share `from` but differ in `to`
+- Spec ambiguity on additive-vs-non-additive not resolved before Phase 7
 
 **Phase to address:**
-M3 (Schema Expansion) — implement merge validation. M6 (Remote Management) — enforce `private` placement.
+Phase 7 (CFG-07) for the merge function; Phase 5 (CFG-05) must define the struct with a
+`compositeKey()` method so Phase 7 can use it without retrofitting.
+
+---
 
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Skip file locking on config writes | Faster M1 delivery | Silent data loss in concurrent usage; debugging nightmare | Never — implement in M1 |
-| Use `context.Background()` for new network code | Less plumbing | Ctrl+C hangs, partial writes, untestable timeouts | Never — always pass `cmd.Context()` |
-| Hardcode GitHub as the only provider initially | Ship sync faster | Provider interface shaped to GitHub's API; Gitea integration requires rewrite | Acceptable if interface is designed for both, only GitHub implemented |
-| Skip comment preservation (always rewrite TOML) | Eliminate 525-line parser | Users lose config comments on every write; frustration and manual fixups | Acceptable if `.gitw.bak` is created before writes |
-| Store branch rules as maps instead of arrays | Simpler parsing | Evaluation order is undefined; subtle bugs in rule matching | Never — use `[[array_of_tables]]` from the start |
-| Embed provider credentials in config instead of credential helper | Quick setup | Credentials in plaintext on disk; security liability | Never — use git credential helper or keychain |
-| Test hooks only in main worktree | Faster test suite | Hooks break silently in worktree contexts; users discover in production | Only during initial development; worktree tests required before release |
+| Skip AoT handling in `UpdatePreservingComments` until CFG-12 | Defer preserve.go changes | Comments silently lost from Phase 4 onwards; user confusion; hard to debug | Acceptable only if documented as a known limitation and the silent-swallow error path is fixed to emit a warning |
+| Use concrete `bool` instead of `*bool` in mergeable fields | Simpler struct | Zero-value false is indistinguishable from absent; two-file merge silently discards explicit `false` overrides | Never — use `*bool` for all fields where false is a valid override |
+| Validate `private = true` on merged config instead of per-file | One validation pass | `private` remotes in `.gitw` are never caught; credentials committed to version control | Never |
+| Cycle detection as `seenPairs[from+to]` string check | One-liner | Misses all indirect cycles (3+ nodes); sync loop runs until storage exhausted | Never — use DFS |
+| Run `warnV1Paths` inside `Load` | Simpler call site | Warning fires in all tests; breaks tests with exact-output assertions; couples loader to output | Never — warn at call site, not inside loader |
+| Skip `(from, to)` composite key for sync pair merge | Simpler map | Single-field match replaces wrong pairs; sync routes silently misconfigured | Never — use composite key from day one |
+| Default `agentic_frameworks` silently to `["gsd"]` without surfacing | Fewer required fields | Users don't know the framework is active; surprises on `context rebuild` | Acceptable — but document it in config comments when generating a new `.gitw` |
+
+---
 
 ## Integration Gotchas
 
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| GitHub REST API | Using unauthenticated requests (60 req/hour limit) | Always require a token; detect rate limiting via `X-RateLimit-Remaining` header and back off proactively |
-| Gitea API | Assuming same endpoints as GitHub | Gitea's repo listing is `/api/v1/repos/search?owner=X`, not `/orgs/X/repos`; verify each endpoint against Gitea's Swagger docs |
-| Git worktree repair | Calling repair on the worktree directory | `git worktree repair` must be run from the main working tree, not from inside the worktree being repaired |
-| Git hooks (pre-push) | Forgarding only `$@` args | Pre-push hook receives remote name + URL as args AND ref data on stdin; must forward both `"$@"` and stdin to the handler |
-| TOML config merge | Assuming deep merge (nested table override) | Merge is field-level per block matched by `name` key; a `.git/.gitw` block replaces the entire matching block, not individual nested fields |
-| Git credential helper | Storing tokens directly in config | Use `git credential fill` to retrieve tokens at runtime; never persist tokens in `.gitw` or `.git/.gitw` |
-| Agent interop (`.gitw-stream`) | Assuming agent reads the same config as CLI | Agents read `.gitw-stream` manifest only; CLI must ensure manifest is self-contained with all info the agent needs |
+The "existing system" gotchas specific to adding v2 to this codebase:
+
+| Integration Point | Common Mistake | Correct Approach |
+|-------------------|----------------|------------------|
+| `pkg/toml/preserve.go` — existing AoT blind spot | Writing new `[[block]]` types and assuming `UpdatePreservingComments` handles them | Verify AoT regex support before adding any `[[block]]`; add a dedicated AoT test in `pkg/toml/` first |
+| `pkg/config/loader.go` — `loadMainConfig` | Adding v2 fields to `WorkspaceConfig` and expecting they survive the `prepareDiskConfig` round-trip | `diskConfig` struct controls what gets written; new v2 fields must be added to `diskConfig` AND `WorkspaceConfig` or they are silently dropped on `Save` |
+| `pkg/config/config.go` — `ensureWorkspaceMaps` | Forgetting to initialize new v2 slice/map fields to empty non-nil values | Every new `[]Slice` or `map[K]V` field in the merged config must be initialized in `ensureWorkspaceMaps` or nil-pointer panics happen downstream |
+| `mergeLocalConfig` — existing local merge | The v2 two-file merge uses `.git/.gitw`, not `.gitw.local`. These are different files with different semantics | `.gitw.local` is for workgroups/context (v1). `.git/.gitw` is for private remotes/sync pairs (v2). Do not reuse `mergeLocalConfig` for the new private-file merge |
+| `validateRepoPaths` — called on every `Save` | Adding `[[repo]]` (AoT) to config structs while `validateRepoPaths` iterates `cfg.Repos` (a map) | New AoT `[[repo]]` entries must populate the same `cfg.Repos` map after parsing, or `validateRepoPaths` silently skips them |
+| `go-toml/v2` marshal output — key ordering | `UpdatePreservingComments` assumes a stable marshal key order (uses it for section bounds detection) | Pin `go-toml/v2` version in `go.mod`; add a golden-file test for marshal output of the v2 schema structs so version bumps are caught |
+| `agentic_frameworks` registry — `pkg/agents` package | Validating `agentic_frameworks` in `Load` before `pkg/agents` is implemented | Phase 1 (CFG-01 + CFG-11) must stub `agents.FrameworkFor` before `Load` calls it, or create a circular dependency or load-time panic |
+
+---
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Sequential API calls during sync fan-out | `git w sync` takes 30+ seconds with 5 remotes | Parallelize API calls per-remote with `errgroup`; respect per-provider rate limits | >3 remotes or >50 repos per remote |
-| Full repo list fetch on every sync | Sync re-fetches all repos from API even if nothing changed | Use `If-None-Match` / ETag headers; cache in `.gitw-state.json` with TTL | >100 repos across remotes |
-| Spawning git subprocess per-repo for status checks | `git w status` across 30 repos takes 10+ seconds | Batch status checks; use `git -C <path> status --porcelain` which is faster than full status | >20 repos in workspace |
-| Loading full config on every command invocation | Startup latency grows with config size | Lazy-load config sections; only parse `[repos]` for repo commands, not `[remotes]` and `[branch_rules]` | >50 repos with complex branch rules |
-| Re-running `git worktree repair` on every sync | Repair is slow when many worktrees exist | Only repair after directory moves; track "needs repair" flag in migration state | >10 worktrees per repo |
-| Unbounded concurrent git subprocess spawning | OS file descriptor exhaustion; system slowdown | Use a semaphore (bounded `chan struct{}`) to limit concurrent git operations (already in v1 as `RunParallel`) | >50 concurrent repos |
+| `validateRepoPaths` running on every `Save` with 20+ `[[repo]]` blocks | `Save` noticeably slow; each write does 1 `os.Stat` per repo | Acceptable for typical workspaces; do not add additional I/O to the validate path | >50 repos with slow filesystem (network mounts) |
+| Cycle detection running full DFS on every `Load` | Load latency increases with many `[[sync_pair]]` blocks | DFS is O(nodes + edges); fine for <100 pairs. No mitigation needed. | Pathological: >500 sync pairs (never realistic) |
+| `mapsEqual` in `detectChanges` marshaling every value to compare | `UpdatePreservingComments` is slow on configs with many `[[repo]]` entries | `mapsEqual` calls `Marshal` twice per comparison; for 50 repos this is 100 marshal calls per save | >50 repos, frequent saves (e.g., `repo add` loop) |
+| Loading `.gitw-stream` manifest on every command invocation | Startup latency when workstream has many `[[worktree]]` entries | Only load `.gitw-stream` when the command is workstream-scoped | Manifest with >20 worktrees and non-workstream commands |
+
+---
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Storing API tokens in `.gitw` (shared config) | Tokens committed to version control; exposed to anyone with repo access | Tokens must only live in `.git/.gitw` (private) or OS keychain; validate at load time |
-| Hook scripts with world-writable permissions | Malicious local user injects code into hook; runs on next push | Install hooks with `0755` permissions; verify permissions on hook load |
-| Sync fetching repos over HTTP instead of HTTPS | Credentials transmitted in plaintext | Default to HTTPS; warn if any remote URL uses `http://`; refuse to sync over HTTP without `--insecure` flag |
-| Shell injection in hook scripts via repo names | Repo name containing `$(...)` or backticks executes arbitrary code in hook | Always quote variables in hook scripts; use `exec` instead of shell evaluation where possible |
-| Migration moving directories outside workspace root | Path traversal via crafted repo paths (e.g., `../../etc/passwd`) | Validate all target paths are within the workspace root before any move; reject paths containing `..` |
-| Provider error messages exposing tokens | Error log contains `Authorization: Bearer <token>` from failed HTTP request | Scrub authorization headers from error messages; never log raw HTTP requests |
+| Accepting `private = true` in `.gitw` (committed file) | API tokens or private remote URLs committed to version control | Error at load time if `private = true` remote is found in `.gitw`; name the remote and tell user which file it must live in |
+| Storing `token_env` value directly instead of env var name | If user accidentally copies a token value instead of var name, it is written to `.git/.gitw` which may be logged or displayed | Validate that `token_env` values do not look like token values (no `ghp_`, no 40-char hex strings); warn but do not reject |
+| `.git/.gitw` readable by other users on shared machines | Private remotes (tokens, personal remote URLs) exposed to other system users | `Save` for the private config file should write with `0600` permissions; warn if file found with looser permissions at load time |
 
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Migration with no dry-run | User runs migration on 30 repos and can't predict what will happen | `git w migrate --dry-run` shows all planned moves; require confirmation for actual migration |
-| Silent hook installation | User doesn't know hooks were installed; surprised when push is intercepted | Print "Installed pre-push hook for [repo]" during sync; `git w hook list` to see installed hooks |
-| Sync deletes repos removed from remote | User loses local work in repos that were archived upstream | Sync never deletes local repos; only adds new ones. Show "Remote removed: [repo] (still local)" |
-| Branch rule blocks push with no explanation | User gets "push rejected" with no indication of which rule matched | Error message must include: which rule matched, from which file, and how to override (`--force-push` or adjust rules) |
-| Config validation errors reference TOML line numbers | Line numbers are meaningless to non-technical users | Reference by repo name and field: "Remote 'origin' in repo 'api' is missing 'url'" |
-| `git w restore` recreates worktrees without asking | User had intentionally removed worktrees; restore puts them back | `restore` shows diff between manifest and disk, asks for confirmation; `--yes` flag for automation |
+---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Migration:** Often missing resume-after-interruption — verify migration can be re-run safely after partial failure
-- [ ] **Hook installation:** Often missing worktree context testing — verify hooks work when pushing from a worktree, not just the main working tree
-- [ ] **Provider interface:** Often missing rate limit handling — verify sync degrades gracefully when rate-limited, not just when API returns 200
-- [ ] **Config merge:** Often missing conflict visibility — verify users can see which file each config value came from
-- [ ] **Branch rules:** Often missing order-dependent test cases — verify 3+ rules where declaration order changes behavior
-- [ ] **Sync fan-out:** Often missing partial failure handling — verify that one failed remote doesn't abort sync for all remotes
-- [ ] **Worktree restore:** Often missing "branch doesn't exist" handling — verify restore behavior when manifest references branches that were deleted upstream
-- [ ] **State file (`.gitw-state.json`):** Often missing concurrent write protection — verify state file has same locking as config
-- [ ] **Error messages:** Often missing actionable next steps — verify every error tells the user what to do, not just what went wrong
-- [ ] **Context cancellation:** Often missing cleanup on cancel — verify that Ctrl+C during sync doesn't leave config in a half-written state
+- [ ] **CFG-07 (two-file merge):** Often missing zero-value override tests — verify that `critical = false` in `.git/.gitw` overrides `critical = true` in `.gitw`
+- [ ] **CFG-05 (cycle detection):** Often missing indirect cycle test — verify that `A→B→C→A` (3-pair cycle) is detected at load time with a useful error naming the cycle path
+- [ ] **CFG-08 (`.gitw-stream`):** Often missing duplicate-name validation — verify that two `[[worktree]]` entries with same `name` produce a load error, not silent data corruption
+- [ ] **CFG-09 (cascade):** Often missing "all levels absent" test — verify that a repo with no `remotes`, in a workstream with no `remotes`, and a metarepo with no `default_remotes`, returns `[]string{}` (empty, not nil, not panic)
+- [ ] **CFG-10 (v1 detection):** Often missing "detection on `.gitw.local`" test — verify that `[[workgroup]]` in `.gitw.local` does NOT trigger the v1 error (that file is separate from the v2 private config)
+- [ ] **CFG-12 (`UpdatePreservingComments`):** Often missing AoT test — verify that comments above `[[remote]]` and `[[workspace]]` blocks survive a round-trip through `Save`
+- [ ] **CFG-03 (path convention):** Often breaks existing tests — verify that existing fixtures using `apps/frontend`-style paths do not produce errors (only warnings, at the command layer, not in `Load`)
+- [ ] **`private` enforcement:** Often runs on merged config — verify that a remote with `private = true` in `.gitw` produces an error even when the same remote is also in `.git/.gitw`
+- [ ] **`diskConfig` coverage:** Often misses new fields — verify that every new v2 field on the config struct appears in `prepareDiskConfig` output and round-trips through `Save`/`Load`
+- [ ] **`ensureWorkspaceMaps`:** Often missed for new fields — verify that loading an empty `.gitw` (just `[metarepo]`) produces non-nil slices/maps for all new v2 collection fields
+
+---
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Broken worktree links after migration | LOW | Run `git worktree repair` from main working tree; `git worktree prune` to clean stale entries |
-| Lost comments in TOML config | LOW | Restore from `.gitw.bak` (if strategy implemented) or `git checkout -- .gitw` if committed |
-| Concurrent write data loss | MEDIUM | Restore `.gitw` from git history; re-run `git w sync` to regenerate state; cannot recover uncommitted local-only changes |
-| Partial migration failure | HIGH | Read `.gitw-migration.json` plan file; manually move remaining repos or re-run migration with resume; verify all paths with `git worktree list` |
-| Hook script causing push failures | LOW | `git push --no-verify` as immediate workaround; `git w hook uninstall` to remove; debug hook with `GIT_TRACE=1 git push` |
-| Provider token exposed in logs | HIGH | Rotate token immediately on provider (GitHub/Gitea); audit git history for committed tokens; force-push to remove if committed |
-| Branch rules blocking legitimate pushes | LOW | `git push --no-verify` bypasses pre-push hook; edit `.gitw` to adjust rules; `git w config validate` to check rule order |
-| Manifest/disk drift in workstreams | MEDIUM | `git w restore --dry-run` to see diff; manually reconcile by either updating manifest or creating missing worktrees |
+| Comments lost from TOML after AoT write | LOW | `git checkout -- .gitw` if file is committed; `.gitw.bak` if backup strategy implemented |
+| Two-file merge discards explicit `false` override | MEDIUM | Use pointer types (`*bool`) in struct definition; migrate existing field values; update all test fixtures |
+| Indirect sync cycle not caught at load | HIGH | Stop `git w sync`; add missing check to DFS; meanwhile, add a `break` guard to the sync fan-out loop to detect runtime cycles |
+| `.gitw-stream` duplicate names cause lookup corruption | MEDIUM | Add uniqueness validation to `LoadStream`; existing manifests with duplicates need manual fix |
+| `private` remote committed to `.gitw` | HIGH | Rotate the token immediately; rewrite git history with `git filter-repo`; add load-time enforcement going forward |
+| `warnV1Paths` firing in tests (output noise) | LOW | Move warning out of `Load` into command layer; update tests to capture and assert on stderr separately |
+
+---
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| TOML comment loss at scale | M1 (Foundation) | Decide comment strategy; test with v2 schema sections; verify no silent error swallowing |
-| Concurrent config writes | M1 (Foundation) | File locking implemented; test two simultaneous writes don't lose data |
-| Context cancellation ignored | M1 (Foundation) | Lint or review check for `context.Background()` in new code; Ctrl+C test for every network operation |
-| Worktree `.git` breakage on migration | M2 (Migration) | Integration test: move repo dir, verify worktree repair, verify worktree is functional |
-| Migration partial failure | M2 (Migration) | Test: interrupt migration mid-way, re-run, verify clean completion |
-| Two-file config merge surprises | M3 (Schema Expansion) | `git w config show --merged` works; `private` in `.gitw` produces warning |
-| Branch rule evaluation order | M3 (Schema) + M7 (Branch Rules) | Ordered array in schema (M3); order-dependent tests pass (M7) |
-| Manifest/disk drift | M4 (Worktree Lifecycle) | `restore` handles: missing worktrees, extra worktrees, missing branches, path conflicts |
-| Hook scripts break in worktrees | M5 (Hook Management) | Integration test: install hook on main repo, push from worktree, verify hook executes correctly |
-| Provider API differences | M6 (Sync) + M10 (Providers) | Interface designed (M6); both GitHub and Gitea pass same integration test suite (M10) |
-| Sync deleting local repos | M6 (Remote Sync) | Test: remove repo from remote, sync, verify local repo still exists with warning |
-| Branch rules block with no explanation | M7 (Branch Rules) | Blocked push error message includes: rule text, source file, override instructions |
-| Shell injection via repo names | M5 (Hook Management) | Test: repo name containing `$(rm -rf /)` doesn't execute; all hook vars quoted |
-| Provider token exposure in logs | M10 (Providers) | Test: failed API call with token doesn't include token in error output |
-| Agent interop manifest completeness | M11 (Workstreams) | Agent can reconstruct workspace from `.gitw-stream` alone without reading `.gitw` |
+| `UpdatePreservingComments` silent failure on AoT blocks | Phase 4 (CFG-04, first AoT block) or Phase 11 (CFG-12) | Golden-file test: round-trip `.gitw` with `[[remote]]` comments; assert output matches expected byte-for-byte |
+| AoT comment anchor collisions (same key in multiple blocks) | Phase 11 (CFG-12) | Test: two `[[remote]]` blocks each with comment on `pattern` field; verify both comments survive round-trip |
+| Two-file merge treats absent fields as zero-value overrides | Phase 7 (CFG-07) | Table-driven test: 8 combinations of present/absent per merge field; verify `critical=false` override wins |
+| Cycle detection misses indirect cycles | Phase 5 (CFG-05) | Test: 3-pair indirect cycle produces error naming full cycle path; 2-pair direct cycle caught; valid DAG passes |
+| v1 detection fires on `.gitw.local` | Phase 10 (CFG-10) | Test: `[[workgroup]]` in `.gitw` → error; in `.gitw.local` → no error |
+| `repos/<n>` warning fires inside `Load` | Phase 3 (CFG-03) | Existing loader tests pass without modification; warning only fires via new `WarnV1Paths` call at command layer |
+| Cascade returns wrong winner / nil vs empty | Phase 9 (CFG-09) | Table-driven test: all 8 combinations of metarepo/workstream/repo remotes; nil return is a test failure |
+| `.gitw-stream` missing uniqueness validation | Phase 8 (CFG-08) | Test: duplicate `name` produces error with the duplicate value named in the message |
+| `private = true` enforcement checks wrong file | Phase 7 (CFG-07) | Test: `private=true` in `.gitw` → error naming remote; in `.git/.gitw` → no error |
+| `[[sync_pair]]` partial-key merge | Phase 7 (CFG-07) | Test: two pairs sharing `from` but different `to`; both survive merge independently |
+| `diskConfig` missing new v2 fields | Every phase adding new struct fields | `Save` + `Load` round-trip test for every new field; any field not in `diskConfig` is caught by the round-trip test failing to see the value after reload |
+| `ensureWorkspaceMaps` missing new collection fields | Every phase adding new slice/map fields | Load-empty-config test: assert all new fields are non-nil after loading a minimal `.gitw` |
+
+---
 
 ## Sources
 
-- `.planning/codebase/CONCERNS.md` — documented v1 tech debt (comment preservation, context.Background usage)
-- `.planning/v2/v2-migration.md` — migration spec with path cases and abort conditions
-- `.planning/v2/v2-remote-management.md` — sync fan-out, hook mechanism, provider interface design
-- `.planning/v2/v2-schema.md` — config schema including branch_rules and workstream manifests
-- `.planning/v2/v2-milestones.md` — milestone definitions M1-M12
-- Git official documentation: `git-worktree(1)` — worktree path resolution, repair semantics
-- Git official documentation: `githooks(5)` — pre-push hook contract (args + stdin)
-- Gitea SDK documentation — API endpoint differences from GitHub
-- GitHub REST API documentation — rate limiting, pagination, org-scoped endpoints
+- `pkg/toml/preserve.go` — direct inspection of `applySmartUpdate` silent-return at line 80,
+  `anchorIdentity` flat-key logic, `extractCommentAnchors` subsection-tracking
+- `pkg/config/loader.go` — `loadMainConfig`, `mergeLocalConfig`, `prepareDiskConfig`,
+  `ensureWorkspaceMaps` — all checked for v2 extension points
+- `pkg/config/config.go` — `WorkspaceConfig`, `WorkspaceMeta` pointer-field pattern
+- `.planning/v2/v2-schema.md` — canonical schema for all v2 block types and merge semantics
+- `.planning/v2/v2-migration.md` — v1 detection triggers and partial-migration state
+- `.planning/codebase/CONCERNS.md` — documented silent error swallow, `interface{}` usage,
+  TOML comment preservation fragility
+- `.planning/REQUIREMENTS.md` — CFG-01 through CFG-12 traceability to phases
 
 ---
-*Pitfalls research for: git-w v2 (Go CLI multi-repo management)*
-*Researched: 2026-04-01*
+*Pitfalls research for: git-w v2 M1 — config schema and loader expansion*
+*Researched: 2026-04-02*

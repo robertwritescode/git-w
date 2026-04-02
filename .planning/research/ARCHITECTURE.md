@@ -1,8 +1,197 @@
 # Architecture Research
 
 **Domain:** Go CLI tool evolution (v1 to v2)
-**Researched:** 2026-04-01
+**Researched:** 2026-04-01 | Updated: 2026-04-02 (M1 integration detail added)
 **Confidence:** HIGH
+
+---
+
+## M1 Integration Architecture (Config Schema + Loader)
+
+This section answers the M1-specific question: which packages to modify vs. create, where
+cascade/cycle/merge logic lives, and in what order the 11 phases should be executed.
+
+### M1 Package Map: Modify vs. Create
+
+| File | Action | Phase | Reason |
+|------|--------|-------|--------|
+| `pkg/config/config.go` | **MODIFY** | 1-6 | Add all v2 struct types: `V2Config`, `MetarepoConfig`, `WorkspaceBlock`, `RemoteConfig`, `BranchRule`, `SyncPair`, `WorkstreamBlock`. Keep existing v1 types — existing commands still depend on `WorkspaceConfig`. |
+| `pkg/config/loader.go` | **MODIFY** | 1, 3, 7, 10 | Wire new load-time behaviors: two-file merge entry point, v1 detection, path convention warning, `agentic_frameworks` validation. Add `LoadV2Config(cmd)` as a new function; keep `LoadConfig` signature unchanged. |
+| `pkg/config/merge.go` | **CREATE** | 7 | Two-file field-level merge: `MergeRemote`, `MergeRepo`, `MergeWorkstream`, `MergeSyncPair`. Extracted to own file — loader.go is already 501 lines and merge logic is a coherent 50–80 line unit. |
+| `pkg/config/stream.go` | **CREATE** | 8 | `.gitw-stream` manifest: `StreamConfig`, `WorktreeEntry` types, `LoadStream(path)`, `DiscoverStream(cwd)`, `validateStream`. Independent of root config load — the hook subcommand (M6) uses it without root config context. |
+| `pkg/config/cascade.go` | **CREATE** | 9 | `ResolveDefaultRemotes(cfg *V2Config, workstreamName, repoName string) []string`. Pure function — not called during load, called at command runtime. Kept separate so sync (M3) and status (M5) can import a named, testable function. |
+| `pkg/config/validate.go` | **CREATE** | 5 | `DetectCycles(pairs []SyncPair) error` — DFS cycle check at load time. Also houses `validatePathConvention(repos []RepoConfig) []string` (warning, not error). Extracted for testability — cycle detection and path checking are independent units. |
+| `pkg/config/detect.go` | **CREATE** | 10 | `DetectV1(raw []byte) error` — checks for `[[workgroup]]` blocks before TOML unmarshal into V2Config (workgroup is not a valid v2 field; detection must happen on raw TOML or via a v1-schema parse). Returns actionable error directing user to `git w migrate`. |
+| `pkg/toml/preserve.go` | **MODIFY** | 11 | Extend `UpdatePreservingComments` to cover array-of-tables patterns used by `[[remote]]`, `[[workspace]]`, `[[sync_pair]]`, `[[workstream]]`. Add golden-file tests for each new shape. Fix the silent-fallback bug (CONCERNS.md) as part of this phase. |
+| `pkg/agents/registry.go` | **CREATE** | 1 | Minimal stub: `FrameworkFor(name string) error` + `var knownFrameworks = []string{"gsd"}`. Required by Phase 1 for `agentic_frameworks` validation. Phase 48 (M9) expands this into the full `SpecFramework` interface without changing this function's signature. |
+
+**No other packages change in M1.** All 11 phases are confined to `pkg/config/`, `pkg/toml/`, and the `pkg/agents/` stub.
+
+### Why Not a Separate `pkg/configv2/` Package?
+
+A `pkg/configv2/` package would require touching every existing domain command (all call
+`config.LoadConfig`). That's unnecessary churn for a config-layer milestone. The v2 types live
+in the same `pkg/config/` package as v1 types. A parallel `LoadV2Config(cmd)` entry point lets
+new v2-aware commands (starting M3) opt in without breaking anything.
+
+### Where Each Logic Category Lives
+
+| Logic Category | Package | File | Called From |
+|----------------|---------|------|-------------|
+| v2 struct types | `pkg/config` | `config.go` | All config consumers |
+| Two-file field-level merge | `pkg/config` | `merge.go` | `loader.go` (`LoadV2Config`) |
+| `.gitw-stream` manifest | `pkg/config` | `stream.go` | M6 hook, M7 workstream commands |
+| Cascade resolution | `pkg/config` | `cascade.go` | M3 sync, M4 remote, M5 status (runtime, not load time) |
+| Cycle detection | `pkg/config` | `validate.go` | `loader.go` (load time, after merge) |
+| Path convention warning | `pkg/config` | `validate.go` | `loader.go` (load time, non-fatal) |
+| v1 `[[workgroup]]` detection | `pkg/config` | `detect.go` | `loader.go` (load time, before unmarshal) |
+| `agentic_frameworks` validation | `pkg/config` | `loader.go` | Calls `agents.FrameworkFor()` (load time) |
+| Framework registry | `pkg/agents` | `registry.go` | `loader.go` (M1 stub); expanded M9 |
+| Comment-preserving round-trip | `pkg/toml` | `preserve.go` | `loader.go` via `config.Save` |
+
+### M1 Load-Time Data Flow
+
+```
+config.LoadV2Config(cmd)
+    │
+    ▼
+loadRawConfig(".gitw")
+    │
+    ├── DetectV1(rawBytes)          ← Phase 10: error on [[workgroup]] (raw scan before parse)
+    │
+    ▼
+toml.Unmarshal(rawBytes, &shared)   ← produces V2Config (shared fields only)
+    │
+    ├── validatePathConvention(cfg) ← Phase 3: warning (not error) on non-repos/<n>
+    ├── validateAgenticFrameworks() ← Phase 1: agents.FrameworkFor() per entry
+    │
+    ▼
+loadRawConfig(".git/.gitw")         ← optional; missing = no overrides
+    │
+    ▼
+mergeConfigs(shared, private)       ← Phase 7: MergeRemote/Repo/Workstream/SyncPair
+    │
+    ├── validatePrivacy(merged)     ← Phase 7: error if private=true found in .gitw
+    │
+    ▼
+DetectCycles(merged.SyncPairs)      ← Phase 5: DFS at load time
+    │
+    ▼
+return *V2Config, cfgPath, nil
+```
+
+**Key design decision:** `ResolveDefaultRemotes` (Phase 9 / cascade) is NOT called here.
+Cascade resolution depends on which workstream is currently active — that is a per-command
+runtime concern, not a load-time concern. Commands call `cascade.ResolveDefaultRemotes(cfg, wsName, repoName)`
+when they need the effective remote list.
+
+### M1 Phase Build Order
+
+The 11 phases must be executed in this order. Each phase's dependency is stated explicitly.
+
+```
+Phase 1: [[workspace]] block + agentic_frameworks validation
+    Creates: WorkspaceBlock type, MetarepoConfig with AgenticFrameworks field,
+             pkg/agents stub (FrameworkFor + knownFrameworks)
+    Dependency: nothing (first phase)
+
+Phase 2: track_branch + upstream on [[repo]]
+    Adds: RepoConfig.TrackBranch, RepoConfig.Upstream
+    Dependency: Phase 1 (RepoConfig type must exist in config.go)
+
+Phase 3: repos/<n> path convention warning
+    Adds: validatePathConvention() in validate.go
+    Dependency: Phase 2 (RepoConfig has all fields needed for path check)
+
+Phase 4: [[remote]] + [[remote.branch_rule]]
+    Creates: RemoteConfig type, BranchRule type (declaration-order slices)
+    Dependency: Phase 3 (RepoConfig stable; merge in Phase 7 needs RemoteConfig)
+
+Phase 5: [[sync_pair]] + cycle detection
+    Creates: SyncPair type, DetectCycles() in validate.go
+    Dependency: Phase 4 (graph nodes are RemoteConfig.Name values — type must exist)
+
+Phase 6: [[workstream]] root block
+    Creates: WorkstreamBlock type (name + remotes fields)
+    Dependency: Phase 5 (all root-config block types defined; workstream is the last one)
+
+Phase 7: Two-file config merge
+    Creates: merge.go (MergeRemote, MergeRepo, MergeWorkstream, MergeSyncPair)
+    Wires: LoadV2Config in loader.go to perform the merge
+    Dependency: Phases 1-6 (ALL block types must exist before merge functions can be written)
+
+Phase 8: .gitw-stream manifest
+    Creates: stream.go (StreamConfig, WorktreeEntry, LoadStream, DiscoverStream, validateStream)
+    Dependency: Phase 7 (V2Config is stable; stream is a separate file format but its types
+                          must be consistent with the merged V2Config types)
+
+Phase 9: Default remotes cascade
+    Creates: cascade.go (ResolveDefaultRemotes pure function)
+    Dependency: Phase 6 (WorkstreamBlock.Remotes must exist),
+                Phase 7 (merged V2Config is the input to the cascade resolver)
+
+Phase 10: Detect v1 [[workgroup]] blocks
+    Creates: detect.go (DetectV1 — raw scan before TOML unmarshal)
+    Wires: detect.go call into LoadV2Config in loader.go
+    Dependency: Phase 7 (the load path is established; hook insertion point is clear)
+
+Phase 11: UpdatePreservingComments round-trip
+    Modifies: pkg/toml/preserve.go (extend for array-of-tables shapes)
+    Adds: golden-file test fixtures for all new block types
+    Fixes: silent-fallback bug from CONCERNS.md
+    Dependency: Phases 1-10 (all types must exist and load correctly before round-trip
+                              correctness can be verified end-to-end)
+```
+
+### Why This Order Is Correct
+
+**Phases 1-6 are strictly sequential** because each adds a type that subsequent phases require.
+You cannot write `MergeRemote` (Phase 7) before `RemoteConfig` exists (Phase 4). You cannot
+write `DetectCycles` (Phase 5) before `SyncPair` exists. The type dependency chain forces the order.
+
+**Phase 7 is the integration point** for all block types. It is the first phase that touches
+multiple type families simultaneously (merger must know about all of them). All phases before it
+are additive (new type, new field); Phase 7 is the first phase that spans the whole type space.
+
+**Phase 8 (stream) can technically start any time after Phase 7** because stream is a separate
+file format. It is placed after 7 to keep the milestone sequential and to ensure stream types
+are defined against the stable V2Config rather than a moving target.
+
+**Phase 9 (cascade)** depends on Phase 6 for `WorkstreamBlock.Remotes` and on Phase 7 to have a
+merged `V2Config` as input. It is a pure function with no load-time wiring, so it does not affect
+the loader integration work in Phase 7.
+
+**Phase 10 (v1 detection)** is placed last among the loader-wiring phases because it modifies
+`loader.go` at the top of the load pipeline (before unmarshal). Doing this earlier would require
+repeatedly adjusting the load entry point as types are added. Placing it at Phase 10 means
+`loader.go` gets one final structural change.
+
+**Phase 11 (round-trip tests)** is a test-only phase. No new production code. It is last because
+it can only be complete when all block types exist and load correctly. It can be started earlier
+as a running accumulation of golden-file tests, but the "done" criterion requires all types.
+
+### Phases That Could Be Parallelized (but shouldn't be)
+
+Phases 7-10 are logically independent concerns (merge, stream, cascade, detection) and could be
+developed in parallel. They are kept sequential because:
+
+1. All four modify or create files in `pkg/config/`, including `loader.go`. Parallel development
+   on the same file creates merge conflicts.
+2. The sequential chain ensures each phase has a clean baseline to build from.
+3. The milestone is 11 phases across one sprint — parallelization adds coordination overhead that
+   outweighs the time saved.
+
+### Cross-Milestone Dependencies Created in M1
+
+M1 creates exactly **one** forward dependency: `pkg/agents/registry.go` with `FrameworkFor()`.
+This function signature must remain stable when M9 expands `pkg/agents/` into the full
+`SpecFramework` interface. The stub returns `error` (nil for known, descriptive error for unknown)
+— that signature is compatible with M9's expanded registry.
+
+No other M1 changes create dependencies that constrain future milestones. The v2 types added to
+`config.go` are additive; existing v1 types remain until M7 retires workgroups.
+
+---
 
 ## v1 Current State
 
