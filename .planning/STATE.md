@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Multi-repo orchestration that keeps repos organized, synced, and safe from accidental pushes while giving AI agents full visibility into the workspace structure.
-**Current focus:** Defining requirements — Milestone M1: Config Schema + Loader
+**Current focus:** Phase 1 — Add `[[workspace]]` block (M1: Config Schema + Loader)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-02 — Milestone M1 started
+Phase: 1 of 63 (Add `[[workspace]]` block)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-04-02 — Milestone M1 initialized
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -57,5 +57,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Milestone M1 started; defining requirements
+Stopped at: Milestone M1 initialized; ready to plan Phase 1
 Resume file: None
