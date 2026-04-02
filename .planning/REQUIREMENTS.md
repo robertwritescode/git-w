@@ -19,7 +19,7 @@ Requirements for v2.0 release. Each maps to roadmap phases (GSD phases = GitHub 
 - [ ] **CFG-08**: User can define `.gitw-stream` manifest with `[[worktree]]` entries including `name`, `path`, `scope` fields
 - [ ] **CFG-09**: Tool resolves `[metarepo] default_remotes` cascade: metarepo -> workstream -> repo (innermost wins)
 - [ ] **CFG-10**: Tool detects v1 `[[workgroup]]` blocks at load time with actionable error directing to `git w migrate`
-- [ ] **CFG-11**: Tool validates `[metarepo] agentic_frameworks` field against known framework registry
+- [x] **CFG-11**: Tool validates `[metarepo] agentic_frameworks` field against known framework registry
 - [ ] **CFG-12**: `UpdatePreservingComments` round-trips all v2 fields without losing comments or field order
 
 ### Branch Rules
@@ -151,7 +151,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CFG-08 | Phase 8 (M1 #43) | Pending |
 | CFG-09 | Phase 9 (M1 #44) | Pending |
 | CFG-10 | Phase 10 (M1 #45) | Pending |
-| CFG-11 | Phase 1 (M1 #36) | Pending |
+| CFG-11 | Phase 1 (M1 #36) | Complete |
 | CFG-12 | Phase 11 (M1 #46) | Pending |
 | BRULE-01 | Phase 12 (M2 #47) | Pending |
 | BRULE-02 | Phase 13 (M2 #48) | Pending |

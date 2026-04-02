@@ -106,7 +106,7 @@ Milestone branch: `v2-m1-config-schema` | Depends on: none
 **Canonical refs**: `.planning/v2/v2-schema.md`, `.planning/v2/v2-milestones.md` (M1), `.planning/v2/v2-agent-interop.md` (agentic_frameworks)
 **Plans**: 3 plans
 - [x] 01-01-PLAN.md — Rename WorkspaceMeta → MetarepoConfig and add WorkspaceBlock struct in pkg/config
-- [ ] 01-02-PLAN.md — Bootstrap pkg/agents with SpecFramework interface and GSDFramework implementation
+- [x] 01-02-PLAN.md — Bootstrap pkg/agents with SpecFramework interface and GSDFramework implementation
 - [ ] 01-03-PLAN.md — Wire agentic_frameworks validation + defaulting into loader with full test coverage
 
 ---
