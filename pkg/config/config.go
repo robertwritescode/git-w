@@ -10,7 +10,8 @@ import (
 // WorkspaceConfig is the merged result of `.gitw` and `.gitw.local`.
 // Repos and Groups maps are always non-nil after loading.
 type WorkspaceConfig struct {
-	Workspace  WorkspaceMeta              `toml:"workspace"`
+	Metarepo   MetarepoConfig             `toml:"metarepo"`
+	Workspaces []WorkspaceBlock           `toml:"workspace"`
 	Context    ContextConfig              `toml:"context"` // sourced from .gitw.local
 	Repos      map[string]RepoConfig      `toml:"repos"`
 	Groups     map[string]GroupConfig     `toml:"groups"`
@@ -25,15 +26,24 @@ type WorkgroupConfig struct {
 	Created string   `toml:"created,omitempty"`
 }
 
-// WorkspaceMeta holds top-level workspace settings.
-type WorkspaceMeta struct {
-	Name              string `toml:"name"`
-	AutoGitignore     *bool  `toml:"auto_gitignore"` // nil means true (default on)
-	SyncPush          *bool  `toml:"sync_push"`      // nil means true (default on)
-	DefaultBranch     string `toml:"default_branch,omitempty"`
-	BranchSyncSource  *bool  `toml:"branch_sync_source"`  // nil means true (default on)
-	BranchSetUpstream *bool  `toml:"branch_set_upstream"` // nil means true (default on)
-	BranchPush        *bool  `toml:"branch_push"`         // nil means true (default on)
+// MetarepoConfig holds top-level metarepo settings (formerly WorkspaceMeta, TOML key: metarepo).
+type MetarepoConfig struct {
+	Name              string   `toml:"name"`
+	DefaultRemotes    []string `toml:"default_remotes,omitempty"`
+	AgenticFrameworks []string `toml:"agentic_frameworks,omitempty"`
+	AutoGitignore     *bool    `toml:"auto_gitignore"` // nil means true (default on)
+	SyncPush          *bool    `toml:"sync_push"`      // nil means true (default on)
+	DefaultBranch     string   `toml:"default_branch,omitempty"`
+	BranchSyncSource  *bool    `toml:"branch_sync_source"`  // nil means true (default on)
+	BranchSetUpstream *bool    `toml:"branch_set_upstream"` // nil means true (default on)
+	BranchPush        *bool    `toml:"branch_push"`         // nil means true (default on)
+}
+
+// WorkspaceBlock is one entry in the [[workspace]] array-of-tables.
+type WorkspaceBlock struct {
+	Name        string   `toml:"name"`
+	Description string   `toml:"description,omitempty"`
+	Repos       []string `toml:"repos,omitempty"`
 }
 
 // RepoConfig represents one tracked repository.
@@ -64,32 +74,32 @@ type ContextConfig struct {
 
 // AutoGitignoreEnabled reports whether auto-gitignore is on (nil means default true).
 func (c WorkspaceConfig) AutoGitignoreEnabled() bool {
-	return c.Workspace.AutoGitignore == nil || *c.Workspace.AutoGitignore
+	return c.Metarepo.AutoGitignore == nil || *c.Metarepo.AutoGitignore
 }
 
 // SyncPushEnabled reports whether sync runs push by default (nil means true).
 func (c WorkspaceConfig) SyncPushEnabled() bool {
-	return c.Workspace.SyncPush == nil || *c.Workspace.SyncPush
+	return c.Metarepo.SyncPush == nil || *c.Metarepo.SyncPush
 }
 
 // BranchSyncSourceEnabled reports whether branch creation syncs the source branch (nil means true).
 func (c WorkspaceConfig) BranchSyncSourceEnabled() bool {
-	return c.Workspace.BranchSyncSource == nil || *c.Workspace.BranchSyncSource
+	return c.Metarepo.BranchSyncSource == nil || *c.Metarepo.BranchSyncSource
 }
 
 // BranchSetUpstreamEnabled reports whether branch creation sets upstream (nil means true).
 func (c WorkspaceConfig) BranchSetUpstreamEnabled() bool {
-	return c.Workspace.BranchSetUpstream == nil || *c.Workspace.BranchSetUpstream
+	return c.Metarepo.BranchSetUpstream == nil || *c.Metarepo.BranchSetUpstream
 }
 
 // BranchPushEnabled reports whether branch creation pushes by default (nil means true).
 func (c WorkspaceConfig) BranchPushEnabled() bool {
-	return c.Workspace.BranchPush == nil || *c.Workspace.BranchPush
+	return c.Metarepo.BranchPush == nil || *c.Metarepo.BranchPush
 }
 
 // ResolveDefaultBranch returns the source branch for a repo.
 func (c WorkspaceConfig) ResolveDefaultBranch(repoName string) string {
-	// Worktree repos use their own branch as the source (e.g. infra-dev → dev).
+	// Worktree repos use their own branch as the source (e.g. infra-dev -> dev).
 	if branch, ok := c.WorktreeBranchForRepo(repoName); ok {
 		return branch
 	}
@@ -98,8 +108,8 @@ func (c WorkspaceConfig) ResolveDefaultBranch(repoName string) string {
 		return repoCfg.DefaultBranch
 	}
 
-	if c.Workspace.DefaultBranch != "" {
-		return c.Workspace.DefaultBranch
+	if c.Metarepo.DefaultBranch != "" {
+		return c.Metarepo.DefaultBranch
 	}
 
 	return "main"

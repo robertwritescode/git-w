@@ -113,7 +113,7 @@ func (s *RestoreSuite) TestRestoreIdempotent() {
 
 	s.Require().NoError(os.WriteFile(
 		filepath.Join(wsDir, ".gitw"),
-		[]byte(fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n", url)),
+		[]byte(fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n", url)),
 		0o644,
 	))
 
@@ -133,7 +133,7 @@ func (s *RestoreSuite) TestRestoreEmpty() {
 
 	s.Require().NoError(os.WriteFile(
 		filepath.Join(wsDir, ".gitw"),
-		[]byte("[workspace]\nname = \"testws\"\n"),
+		[]byte("[metarepo]\nname = \"testws\"\n"),
 		0o644,
 	))
 
@@ -155,7 +155,7 @@ func (s *RestoreSuite) TestRestorePartialFailure() {
 	invalidURL := "file:///nonexistent/path/repo.git"
 
 	toml := fmt.Sprintf(
-		"[workspace]\nname = \"testws\"\n\n"+
+		"[metarepo]\nname = \"testws\"\n\n"+
 			"[repos.validrepo]\npath = \"validrepo\"\nurl = %q\n\n"+
 			"[repos.badrepo]\npath = \"badrepo\"\nurl = %q\n",
 		validURL, invalidURL,
@@ -179,7 +179,7 @@ func (s *RestoreSuite) TestRestore_WorktreeMaterializationPaths() {
 	devRel := filepath.Join("infra", "dev")
 	testRel := filepath.Join("infra", "test")
 
-	toml := fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n", remoteURL, bareRel, devRel, testRel)
+	toml := fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n", remoteURL, bareRel, devRel, testRel)
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
 
 	out, err := s.ExecuteCmd("restore")
@@ -211,7 +211,7 @@ func (s *RestoreSuite) TestRestore_WorktreeExistingBareMissingOneTree() {
 	s.RunGit(devAbs, "add", ".")
 	s.RunGit(devAbs, "commit", "-m", "marker commit")
 
-	toml := fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n", remoteURL, filepath.Join("infra", ".bare"), filepath.Join("infra", "dev"), filepath.Join("infra", "test"))
+	toml := fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n", remoteURL, filepath.Join("infra", ".bare"), filepath.Join("infra", "dev"), filepath.Join("infra", "test"))
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
 
 	out, err := s.ExecuteCmd("restore")
@@ -233,7 +233,7 @@ func (s *RestoreSuite) TestRestore_MixedWorkspace() {
 	wtURL := s.MakeRemoteWithBranches([]string{"dev", "test"})
 
 	toml := fmt.Sprintf(
-		"[workspace]\nname = \"testws\"\n\n"+
+		"[metarepo]\nname = \"testws\"\n\n"+
 			"[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n\n"+
 			"[worktrees.infra]\nurl = %q\nbare_path = %q\n\n"+
 			"[worktrees.infra.branches]\ndev = %q\ntest = %q\n",
@@ -268,7 +268,7 @@ func (s *RestoreSuite) TestRestore_WorktreeNoURL() {
 	wsDir := s.T().TempDir()
 	s.ChangeToDir(wsDir)
 
-	toml := "[workspace]\nname = \"testws\"\n\n" +
+	toml := "[metarepo]\nname = \"testws\"\n\n" +
 		"[worktrees.infra]\n" +
 		"bare_path = \"infra/.bare\"\n\n" +
 		"[worktrees.infra.branches]\n" +
@@ -287,7 +287,7 @@ func (s *RestoreSuite) TestRestore_WorktreeSetsUpstreamTracking() {
 
 	remoteURL := s.MakeRemoteWithBranches([]string{"dev", "test"})
 
-	toml := fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n",
+	toml := fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = %q\ntest = %q\n",
 		remoteURL,
 		filepath.Join("infra", ".bare"),
 		filepath.Join("infra", "dev"),
@@ -306,8 +306,8 @@ func (s *RestoreSuite) TestRestore_WorktreeSetsUpstreamTracking() {
 
 func buildRestoreConfig(url string, hasURL bool) string {
 	if hasURL {
-		return fmt.Sprintf("[workspace]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n", url)
+		return fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n", url)
 	}
 
-	return "[workspace]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\n"
+	return "[metarepo]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\n"
 }

@@ -87,7 +87,7 @@ func (s *CloneSuite) TestCloneErrorAlreadyRegistered() {
 	wsDir := s.T().TempDir()
 	s.Require().NoError(os.WriteFile(
 		filepath.Join(wsDir, ".gitw"),
-		[]byte("[workspace]\nname = \"testws\"\n"), 0o644,
+		[]byte("[metarepo]\nname = \"testws\"\n"), 0o644,
 	))
 
 	s.ChangeToDir(wsDir)

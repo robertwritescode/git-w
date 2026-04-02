@@ -80,7 +80,7 @@ func (s *ListSuite) TestListEdgeCases() {
 			dir := s.T().TempDir()
 			s.Require().NoError(os.WriteFile(
 				filepath.Join(dir, ".gitw"),
-				[]byte("[workspace]\nname = \"testws\"\n"), 0o644,
+				[]byte("[metarepo]\nname = \"testws\"\n"), 0o644,
 			))
 			s.ChangeToDir(dir)
 

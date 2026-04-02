@@ -28,7 +28,7 @@ func makeWorkspaceWithRemoteRepos(s *testutil.CmdSuite, n int) (string, []string
 
 func rewriteConfigWithDefaultBranch(s *testutil.CmdSuite, wsDir string, names []string, branch string) {
 	s.T().Helper()
-	sb := fmt.Sprintf("[workspace]\nname = \"test\"\ndefault_branch = %q\n\n", branch)
+	sb := fmt.Sprintf("[metarepo]\nname = \"test\"\ndefault_branch = %q\n\n", branch)
 	for _, name := range names {
 		sb += fmt.Sprintf("[repos.%s]\npath = %q\n\n", name, name)
 	}

@@ -166,7 +166,7 @@ func (s *SyncSuite) TestSync_WorktreeSetBranchFailureDoesNotBlockSibling() {
 	s.RunGit("", "clone", "--bare", remoteURL, bareAbs)
 	s.RunGit("", "-C", bareAbs, "worktree", "add", filepath.Join(wsDir, "infra", "test"), "test")
 
-	cfg := fmt.Sprintf("[workspace]\nname=\"ws\"\n\n[worktrees.infra]\nurl=%q\nbare_path=\"infra/.bare\"\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", remoteURL)
+	cfg := fmt.Sprintf("[metarepo]\nname=\"ws\"\n\n[worktrees.infra]\nurl=%q\nbare_path=\"infra/.bare\"\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", remoteURL)
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(cfg), 0o644))
 
 	out, err := s.ExecuteCmd("sync", "--no-push")
@@ -206,7 +206,7 @@ func (s *SyncSuite) setupInfraWorktreeSet(wsDir string) string {
 	s.RunGit("", "-C", bareAbs, "worktree", "add", filepath.Join(wsDir, "infra", "dev"), "dev")
 	s.RunGit("", "-C", bareAbs, "worktree", "add", filepath.Join(wsDir, "infra", "test"), "test")
 
-	cfg := fmt.Sprintf("[workspace]\nname=\"ws\"\n\n[worktrees.infra]\nurl=%q\nbare_path=\"infra/.bare\"\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", remoteURL)
+	cfg := fmt.Sprintf("[metarepo]\nname=\"ws\"\n\n[worktrees.infra]\nurl=%q\nbare_path=\"infra/.bare\"\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", remoteURL)
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(cfg), 0o644))
 	return remoteURL
 }
@@ -237,7 +237,7 @@ func (s *SyncSuite) makeWorkspaceWithRemoteRepoAndSyncPush(syncPush *bool) (stri
 		syncLine = fmt.Sprintf("sync_push = %t\n", *syncPush)
 	}
 
-	cfg := fmt.Sprintf("[workspace]\nname = \"test\"\n%s\n[repos.%s]\npath = %q\n", syncLine, names[0], names[0])
+	cfg := fmt.Sprintf("[metarepo]\nname = \"test\"\n%s\n[repos.%s]\npath = %q\n", syncLine, names[0], names[0])
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(cfg), 0o644))
 	return wsDir, names[0]
 }
