@@ -104,7 +104,10 @@ Milestone branch: `v2-m1-config-schema` | Depends on: none
   3. Missing `agentic_frameworks` defaults to `["gsd"]`
   4. Multi-value `agentic_frameworks` slices parse and validate correctly
 **Canonical refs**: `.planning/v2/v2-schema.md`, `.planning/v2/v2-milestones.md` (M1), `.planning/v2/v2-agent-interop.md` (agentic_frameworks)
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 01-01-PLAN.md — Rename WorkspaceMeta → MetarepoConfig and add WorkspaceBlock struct in pkg/config
+- [ ] 01-02-PLAN.md — Bootstrap pkg/agents with SpecFramework interface and GSDFramework implementation
+- [ ] 01-03-PLAN.md — Wire agentic_frameworks validation + defaulting into loader with full test coverage
 
 ---
 
