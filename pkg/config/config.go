@@ -13,7 +13,7 @@ type WorkspaceConfig struct {
 	Metarepo   MetarepoConfig             `toml:"metarepo"`
 	Workspaces []WorkspaceBlock           `toml:"workspace"`
 	Context    ContextConfig              `toml:"context"` // sourced from .gitw.local
-	Repos      map[string]RepoConfig      `toml:"repos"`
+	Repos      map[string]RepoConfig      // in-memory only; populated from [[repo]] list by loader
 	Groups     map[string]GroupConfig     `toml:"groups"`
 	Worktrees  map[string]WorktreeConfig  `toml:"worktrees"`
 	Workgroups map[string]WorkgroupConfig `toml:"workgroup"` // sourced from .gitw.local
@@ -48,10 +48,18 @@ type WorkspaceBlock struct {
 
 // RepoConfig represents one tracked repository.
 type RepoConfig struct {
+	Name          string   `toml:"name"`
 	Path          string   `toml:"path"`
-	URL           string   `toml:"url,omitempty"`
+	CloneURL      string   `toml:"clone_url,omitempty"`
 	Flags         []string `toml:"flags,omitempty"`
 	DefaultBranch string   `toml:"default_branch,omitempty"`
+	TrackBranch   string   `toml:"track_branch,omitempty"`
+	Upstream      string   `toml:"upstream,omitempty"`
+}
+
+// IsAlias reports whether this repo is an env alias (has track_branch set).
+func (r RepoConfig) IsAlias() bool {
+	return r.TrackBranch != ""
 }
 
 // WorktreeConfig describes one shared bare-repo + branch worktree set.
@@ -70,6 +78,12 @@ type GroupConfig struct {
 // ContextConfig holds the active context (stored in .gitw.local).
 type ContextConfig struct {
 	Active string `toml:"active"`
+}
+
+// RepoByName returns the RepoConfig for the given name and whether it was found.
+func (c *WorkspaceConfig) RepoByName(name string) (RepoConfig, bool) {
+	rc, ok := c.Repos[name]
+	return rc, ok
 }
 
 // AutoGitignoreEnabled reports whether auto-gitignore is on (nil means default true).

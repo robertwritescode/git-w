@@ -521,7 +521,7 @@ func (s *BranchCheckoutSuite) writeWorkspaceConfig(wsDir string, names []string,
 	sb.WriteString("\n")
 
 	for _, name := range names {
-		fmt.Fprintf(&sb, "[repos.%s]\npath = %q\n\n", name, name)
+		fmt.Fprintf(&sb, "[[repo]]\nname = %q\npath = %q\n\n", name, name)
 		if defaults, ok := repoDefaults[name]; ok {
 			sb.WriteString(defaults)
 		}

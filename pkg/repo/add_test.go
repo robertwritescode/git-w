@@ -107,8 +107,8 @@ func (s *AddSuite) TestDetectsRemoteURL() {
 	s.Require().NoError(err)
 
 	name := filepath.Base(repoDir)
-	s.Assert().NotEmpty(cfg.Repos[name].URL)
-	s.Assert().Contains(cfg.Repos[name].URL, "fake-origin")
+	s.Assert().NotEmpty(cfg.Repos[name].CloneURL)
+	s.Assert().Contains(cfg.Repos[name].CloneURL, "fake-origin")
 }
 
 func (s *AddSuite) TestRecursiveAdd() {
@@ -152,7 +152,7 @@ func (s *AddSuite) TestRecursiveAdd() {
 			setup: func(wsDir string) []string {
 				repoDir := s.MakeGitRepoAt(wsDir, "repos", "myrepo")
 				relPath, _ := filepath.Rel(wsDir, repoDir)
-				toml := fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[repos.myrepo]\npath = %q\n", relPath)
+				toml := fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[[repo]]\nname = \"myrepo\"\npath = %q\n", relPath)
 				s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
 				return []string{"repo", "add", "-r", filepath.Join(wsDir, "repos")}
 			},

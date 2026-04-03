@@ -325,7 +325,7 @@ func (s *BranchDefaultSuite) writeDefaultConfig(wsDir string, names []string, ov
 		fmt.Fprintf(&sb, "default_branch = %q\n", defaultBranch)
 	}
 	for _, n := range names {
-		fmt.Fprintf(&sb, "\n[repos.%s]\npath = %q\n", n, n)
+		fmt.Fprintf(&sb, "\n[[repo]]\nname = %q\npath = %q\n", n, n)
 		if b, ok := overrides[n]; ok {
 			fmt.Fprintf(&sb, "default_branch = %q\n", b)
 		}

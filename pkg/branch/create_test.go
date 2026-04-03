@@ -516,7 +516,7 @@ func workspaceBuilder(workspaceExtra string) *strings.Builder {
 
 func appendRepoEntries(builder *strings.Builder, names []string, repoDefaults map[string]string) {
 	for _, name := range names {
-		fmt.Fprintf(builder, "[repos.%s]\npath = %q\n", name, name)
+		fmt.Fprintf(builder, "[[repo]]\nname = %q\npath = %q\n", name, name)
 		if branch, ok := repoDefaults[name]; ok && branch != "" {
 			fmt.Fprintf(builder, "default_branch = %q\n", branch)
 		}

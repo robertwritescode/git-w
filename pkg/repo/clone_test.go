@@ -57,7 +57,7 @@ func (s *CloneSuite) TestClone() {
 				break
 			}
 
-			s.Assert().Equal(fileURL, repoCfg.URL)
+			s.Assert().Equal(fileURL, repoCfg.CloneURL)
 
 			cloneDest := filepath.Join(wsDir, repoCfg.Path)
 			s.Assert().True(repo.IsGitRepo(cloneDest))

@@ -151,7 +151,7 @@ func makeWorkspaceWithRepoNames(t *testing.T, repoNames []string, extraTOML stri
 	sb := newWorkspaceTOML("test")
 
 	for _, name := range repoNames {
-		fmt.Fprintf(sb, "[repos.%s]\npath = %q\n\n", name, name)
+		fmt.Fprintf(sb, "[[repo]]\nname = %q\npath = %q\n\n", name, name)
 	}
 
 	if extraTOML != "" {
@@ -170,12 +170,12 @@ func newWorkspaceTOML(name string) *strings.Builder {
 }
 
 // appendRepoTOML computes the path of absPath relative to wsDir and appends a
-// [repos.<name>] TOML entry to sb.
+// [[repo]] TOML entry to sb.
 func appendRepoTOML(t testing.TB, sb *strings.Builder, wsDir, name, absPath string) {
 	t.Helper()
 	relPath, err := filepath.Rel(wsDir, absPath)
 	require.NoError(t, err)
-	fmt.Fprintf(sb, "[repos.%s]\npath = %q\n\n", name, relPath)
+	fmt.Fprintf(sb, "[[repo]]\nname = %q\npath = %q\n\n", name, relPath)
 }
 
 // finalizeWorkspace writes the .gitw config from sb into wsDir, changes the

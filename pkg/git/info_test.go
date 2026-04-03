@@ -152,7 +152,8 @@ bare_path = "infra/.bare"
 dev = "infra/dev"
 prod = "infra/prod"
 
-[repos.service-a]
+[[repo]]
+name = "service-a"
 path = "service-a"
 `
 
@@ -201,7 +202,8 @@ func (s *InfoSuite) TestInfo_WorkgroupSection() {
 	cfgContent := `[metarepo]
 name = "test"
 
-[repos.regular-repo]
+[[repo]]
+name = "regular-repo"
 path = "regular-repo"
 
 [workgroup.fix-auth]
@@ -304,7 +306,8 @@ bare_path = "infra/.bare"
 dev = "infra/dev"
 prod = "infra/prod"
 
-[repos.regular-repo]
+[[repo]]
+name = "regular-repo"
 path = "regular-repo"
 
 [workgroup.fix-auth]

@@ -71,7 +71,7 @@ func registerClonedRepo(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath
 		return "", err
 	}
 
-	cfg.Repos[name] = config.RepoConfig{Path: relPath, URL: url}
+	cfg.Repos[name] = config.RepoConfig{Path: relPath, CloneURL: url}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, group)
 

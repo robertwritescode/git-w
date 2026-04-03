@@ -113,7 +113,7 @@ func (s *RestoreSuite) TestRestoreIdempotent() {
 
 	s.Require().NoError(os.WriteFile(
 		filepath.Join(wsDir, ".gitw"),
-		[]byte(fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n", url)),
+		[]byte(fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[[repo]]\nname = \"myrepo\"\npath = \"myrepo\"\nclone_url = %q\n", url)),
 		0o644,
 	))
 
@@ -156,8 +156,8 @@ func (s *RestoreSuite) TestRestorePartialFailure() {
 
 	toml := fmt.Sprintf(
 		"[metarepo]\nname = \"testws\"\n\n"+
-			"[repos.validrepo]\npath = \"validrepo\"\nurl = %q\n\n"+
-			"[repos.badrepo]\npath = \"badrepo\"\nurl = %q\n",
+			"[[repo]]\nname = \"validrepo\"\npath = \"validrepo\"\nclone_url = %q\n\n"+
+			"[[repo]]\nname = \"badrepo\"\npath = \"badrepo\"\nclone_url = %q\n",
 		validURL, invalidURL,
 	)
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(toml), 0o644))
@@ -234,7 +234,7 @@ func (s *RestoreSuite) TestRestore_MixedWorkspace() {
 
 	toml := fmt.Sprintf(
 		"[metarepo]\nname = \"testws\"\n\n"+
-			"[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n\n"+
+			"[[repo]]\nname = \"myrepo\"\npath = \"myrepo\"\nclone_url = %q\n\n"+
 			"[worktrees.infra]\nurl = %q\nbare_path = %q\n\n"+
 			"[worktrees.infra.branches]\ndev = %q\ntest = %q\n",
 		repoURL,
@@ -306,8 +306,8 @@ func (s *RestoreSuite) TestRestore_WorktreeSetsUpstreamTracking() {
 
 func buildRestoreConfig(url string, hasURL bool) string {
 	if hasURL {
-		return fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\nurl = %q\n", url)
+		return fmt.Sprintf("[metarepo]\nname = \"testws\"\n\n[[repo]]\nname = \"myrepo\"\npath = \"myrepo\"\nclone_url = %q\n", url)
 	}
 
-	return "[metarepo]\nname = \"testws\"\n\n[repos.myrepo]\npath = \"myrepo\"\n"
+	return "[metarepo]\nname = \"testws\"\n\n[[repo]]\nname = \"myrepo\"\npath = \"myrepo\"\n"
 }

@@ -184,11 +184,11 @@ func restoreRepo(ctx context.Context, rc config.RepoConfig, absPath string) (str
 		return gitutil.Pull(ctx, absPath)
 	}
 
-	if rc.URL == "" {
+	if rc.CloneURL == "" {
 		return "skipped: no URL configured", nil
 	}
 
-	if err := gitutil.Clone(ctx, rc.URL, absPath); err != nil {
+	if err := gitutil.Clone(ctx, rc.CloneURL, absPath); err != nil {
 		return "", err
 	}
 
