@@ -17,6 +17,7 @@ type WorkspaceConfig struct {
 	Groups     map[string]GroupConfig     `toml:"groups"`
 	Worktrees  map[string]WorktreeConfig  `toml:"worktrees"`
 	Workgroups map[string]WorkgroupConfig `toml:"workgroup"` // sourced from .gitw.local
+	Warnings   []string                   // in-memory only; populated at load time
 }
 
 // WorkgroupConfig is a local workgroup entry (stored only in .gitw.local).

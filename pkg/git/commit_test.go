@@ -64,7 +64,7 @@ func setupWorkgroup(t *testing.T, wsDir, wgName string, repoNames []string) {
 
 	for _, name := range repoNames {
 		treePath := filepath.Join(wgDir, name)
-		testutil.RunGit(t, filepath.Join(wsDir, name), "worktree", "add", treePath, "-b", wgName)
+		testutil.RunGit(t, filepath.Join(wsDir, "repos", name), "worktree", "add", treePath, "-b", wgName)
 	}
 
 	appendWorkgroupConfig(t, wsDir, wgName, repoNames)
@@ -139,7 +139,7 @@ func (s *CommitSuite) TestCommit_CommitsStaged() {
 
 			repoPaths := make([]string, tc.nStaged)
 			for i := 0; i < tc.nStaged; i++ {
-				repoPaths[i] = filepath.Join(wsDir, names[i])
+				repoPaths[i] = filepath.Join(wsDir, "repos", names[i])
 				stageFile(s.T(), repoPaths[i], "change.txt", "content")
 			}
 
@@ -162,17 +162,17 @@ func (s *CommitSuite) TestCommit_SkipsUnstaged() {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(3)
 	s.ChangeToDir(wsDir)
 
-	stagedPath := filepath.Join(wsDir, names[0])
+	stagedPath := filepath.Join(wsDir, "repos", names[0])
 	stageFile(s.T(), stagedPath, "f.txt", "hello")
 	initialStaged := commitCount(s.T(), stagedPath)
-	initialOther := commitCount(s.T(), filepath.Join(wsDir, names[1]))
+	initialOther := commitCount(s.T(), filepath.Join(wsDir, "repos", names[1]))
 
 	out, err := s.ExecuteCmd("commit", "-m", "partial")
 	s.Require().NoError(err)
 
 	s.Assert().Equal(initialStaged+1, commitCount(s.T(), stagedPath))
-	s.Assert().Equal(initialOther, commitCount(s.T(), filepath.Join(wsDir, names[1])))
-	s.Assert().Equal(initialOther, commitCount(s.T(), filepath.Join(wsDir, names[2])))
+	s.Assert().Equal(initialOther, commitCount(s.T(), filepath.Join(wsDir, "repos", names[1])))
+	s.Assert().Equal(initialOther, commitCount(s.T(), filepath.Join(wsDir, "repos", names[2])))
 
 	s.Assert().Contains(out, "skipped")
 }
@@ -181,7 +181,7 @@ func (s *CommitSuite) TestCommit_DryRun() {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(2)
 	s.ChangeToDir(wsDir)
 
-	repo1Path := filepath.Join(wsDir, names[0])
+	repo1Path := filepath.Join(wsDir, "repos", names[0])
 	stageFile(s.T(), repo1Path, "f.txt", "hello")
 	initialCount := commitCount(s.T(), repo1Path)
 
@@ -197,8 +197,8 @@ func (s *CommitSuite) TestCommit_Rollback_OnFailure() {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(2)
 	s.ChangeToDir(wsDir)
 
-	goodPath := filepath.Join(wsDir, names[0])
-	badPath := filepath.Join(wsDir, names[1])
+	goodPath := filepath.Join(wsDir, "repos", names[0])
+	badPath := filepath.Join(wsDir, "repos", names[1])
 
 	stageFile(s.T(), goodPath, "f.txt", "hello")
 	stageFile(s.T(), badPath, "f.txt", "hello")
@@ -223,7 +223,7 @@ func (s *CommitSuite) TestCommit_NoVerify_BypassesHook() {
 	s.ChangeToDir(wsDir)
 
 	for _, name := range names {
-		p := filepath.Join(wsDir, name)
+		p := filepath.Join(wsDir, "repos", name)
 		stageFile(s.T(), p, "f.txt", "hello")
 		installFailHook(s.T(), p)
 	}
@@ -232,7 +232,7 @@ func (s *CommitSuite) TestCommit_NoVerify_BypassesHook() {
 	s.Require().NoError(err)
 
 	for _, name := range names {
-		s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, name)))
+		s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, "repos", name)))
 	}
 }
 
@@ -240,11 +240,11 @@ func (s *CommitSuite) TestCommit_Alias() {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(1)
 	s.ChangeToDir(wsDir)
 
-	stageFile(s.T(), filepath.Join(wsDir, names[0]), "f.txt", "hello")
+	stageFile(s.T(), filepath.Join(wsDir, "repos", names[0]), "f.txt", "hello")
 
 	_, err := s.ExecuteCmd("ci", "-m", "via alias")
 	s.Require().NoError(err)
-	s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, names[0])))
+	s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, "repos", names[0])))
 }
 
 func (s *CommitSuite) TestCommit_RespectsRepoFilter() {
@@ -252,15 +252,15 @@ func (s *CommitSuite) TestCommit_RespectsRepoFilter() {
 	s.ChangeToDir(wsDir)
 
 	for _, name := range names {
-		stageFile(s.T(), filepath.Join(wsDir, name), "f.txt", "hello")
+		stageFile(s.T(), filepath.Join(wsDir, "repos", name), "f.txt", "hello")
 	}
 
 	_, err := s.ExecuteCmd("commit", "-m", "filtered", names[0])
 	s.Require().NoError(err)
 
-	s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, names[0])))
-	s.Assert().Equal(1, commitCount(s.T(), filepath.Join(wsDir, names[1])))
-	s.Assert().Equal(1, commitCount(s.T(), filepath.Join(wsDir, names[2])))
+	s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, "repos", names[0])))
+	s.Assert().Equal(1, commitCount(s.T(), filepath.Join(wsDir, "repos", names[1])))
+	s.Assert().Equal(1, commitCount(s.T(), filepath.Join(wsDir, "repos", names[2])))
 }
 
 func (s *CommitSuite) TestCommit_ActiveContext_Scopes() {
@@ -271,14 +271,14 @@ func (s *CommitSuite) TestCommit_ActiveContext_Scopes() {
 	s.ChangeToDir(wsDir)
 
 	for _, name := range names {
-		stageFile(s.T(), filepath.Join(wsDir, name), "f.txt", "hello")
+		stageFile(s.T(), filepath.Join(wsDir, "repos", name), "f.txt", "hello")
 	}
 
 	_, err := s.ExecuteCmd("commit", "-m", "context scoped")
 	s.Require().NoError(err)
 
-	s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, names[0])))
-	s.Assert().Equal(1, commitCount(s.T(), filepath.Join(wsDir, names[1])))
+	s.Assert().Equal(2, commitCount(s.T(), filepath.Join(wsDir, "repos", names[0])))
+	s.Assert().Equal(1, commitCount(s.T(), filepath.Join(wsDir, "repos", names[1])))
 }
 
 func (s *CommitSuite) TestCommit_DryRun_NothingToCommit() {
@@ -294,7 +294,7 @@ func (s *CommitSuite) TestCommit_CommitMessage_Preserved() {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(1)
 	s.ChangeToDir(wsDir)
 
-	repoPath := filepath.Join(wsDir, names[0])
+	repoPath := filepath.Join(wsDir, "repos", names[0])
 	stageFile(s.T(), repoPath, "f.txt", "content")
 
 	_, err := s.ExecuteCmd("commit", "-m", "my unique message")
@@ -395,7 +395,7 @@ func (s *CommitSuite) TestCommit_Workgroup_SkipsMissingWorktrees() {
 
 	// Remove the second worktree directory to simulate a missing path.
 	missingPath := filepath.Join(wgDir, names[1])
-	testutil.RunGit(s.T(), filepath.Join(wsDir, names[1]), "worktree", "remove", missingPath)
+	testutil.RunGit(s.T(), filepath.Join(wsDir, "repos", names[1]), "worktree", "remove", missingPath)
 
 	out, err := s.ExecuteCmd("commit", "-m", "skip missing", "--workgroup", wgName)
 	s.Require().NoError(err)

@@ -24,18 +24,23 @@ func withTestGitIdentity(cmd *exec.Cmd) {
 
 // makeGitRepo creates an initialized git repo with an initial commit in a new temp dir.
 // If remoteURL is non-empty, it is added as the "origin" remote. Returns the absolute path.
+// When a .gitw file is found in the current working directory, the repo is created inside
+// the workspace under repos/ to follow the v2 path convention.
 func makeGitRepo(t testing.TB, remoteURL string) string {
 	t.Helper()
 	dir := t.TempDir()
 
 	if cwd, err := os.Getwd(); err == nil {
 		if _, statErr := os.Stat(filepath.Join(cwd, ".gitw")); statErr == nil {
-			for i := range 16 {
-				candidate := filepath.Join(cwd, fmt.Sprintf("repo-%d", time.Now().UnixNano()+int64(i)))
-				if mkErr := os.MkdirAll(candidate, 0o755); mkErr == nil {
-					dir = candidate
-					t.Cleanup(func() { _ = os.RemoveAll(candidate) })
-					break
+			reposDir := filepath.Join(cwd, "repos")
+			if mkErr := os.MkdirAll(reposDir, 0o755); mkErr == nil {
+				for i := range 16 {
+					candidate := filepath.Join(reposDir, fmt.Sprintf("repo-%d", time.Now().UnixNano()+int64(i)))
+					if mkErr := os.MkdirAll(candidate, 0o755); mkErr == nil {
+						dir = candidate
+						t.Cleanup(func() { _ = os.RemoveAll(candidate) })
+						break
+					}
 				}
 			}
 		}

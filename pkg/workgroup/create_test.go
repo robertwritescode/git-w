@@ -97,7 +97,7 @@ func (s *CreateSuite) TestCreate_CheckoutFlag_IdempotentOnLocalBranch() {
 	wsDir, names := makeWorkspaceWithLocalRepos(&s.CmdSuite, 1)
 	s.ChangeToDir(wsDir)
 
-	repoDir := filepath.Join(wsDir, names[0])
+	repoDir := filepath.Join(wsDir, "repos", names[0])
 	s.RunGit(repoDir, "checkout", "-b", "feat")
 	s.RunGit(repoDir, "checkout", "-")
 
