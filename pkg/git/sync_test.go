@@ -71,8 +71,8 @@ func (s *SyncSuite) TestSync_AllOk() {
 
 func (s *SyncSuite) TestSync_FetchFailureSkipsPullPush() {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(2)
-	repoGood := filepath.Join(wsDir, names[0])
-	repoBad := filepath.Join(wsDir, names[1])
+	repoGood := filepath.Join(wsDir, "repos", names[0])
+	repoBad := filepath.Join(wsDir, "repos", names[1])
 	s.makeRepoRemoteBacked(repoGood)
 	s.RunGit(repoBad, "remote", "add", "origin", "file:///definitely/missing/remote.git")
 	s.ChangeToDir(wsDir)
@@ -91,7 +91,7 @@ func (s *SyncSuite) TestSync_FetchFailureSkipsPullPush() {
 
 func (s *SyncSuite) TestSync_PullFailureSkipsPush() {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(1)
-	repoPath := filepath.Join(wsDir, names[0])
+	repoPath := filepath.Join(wsDir, "repos", names[0])
 	remoteURL := s.makeRepoRemoteBacked(repoPath)
 	s.makeRemoteCommit(remoteURL)
 	s.Require().NoError(os.WriteFile(filepath.Join(repoPath, "README.md"), []byte("dirty\n"), 0o644))
@@ -229,7 +229,7 @@ func (s *SyncSuite) makeRemoteCommit(remoteURL string) {
 
 func (s *SyncSuite) makeWorkspaceWithRemoteRepoAndSyncPush(syncPush *bool) (string, string) {
 	wsDir, names := s.MakeWorkspaceWithNLocalRepos(1)
-	repoPath := filepath.Join(wsDir, names[0])
+	repoPath := filepath.Join(wsDir, "repos", names[0])
 	s.makeRepoRemoteBacked(repoPath)
 
 	syncLine := ""
@@ -237,7 +237,7 @@ func (s *SyncSuite) makeWorkspaceWithRemoteRepoAndSyncPush(syncPush *bool) (stri
 		syncLine = fmt.Sprintf("sync_push = %t\n", *syncPush)
 	}
 
-	cfg := fmt.Sprintf("[metarepo]\nname = \"test\"\n%s\n[[repo]]\nname = %q\npath = %q\n", syncLine, names[0], names[0])
+	cfg := fmt.Sprintf("[metarepo]\nname = \"test\"\n%s\n[[repo]]\nname = %q\npath = %q\n", syncLine, names[0], "repos/"+names[0])
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(cfg), 0o644))
 	return wsDir, names[0]
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/config"
@@ -830,4 +831,140 @@ path = "svc-b"
 	s.Assert().Equal("", cfg.Repos["svc-b"].TrackBranch)
 	s.Assert().Equal("", cfg.Repos["svc-b"].Upstream)
 	s.Assert().False(cfg.Repos["svc-b"].IsAlias())
+}
+
+func (s *LoaderSuite) TestPathConventionWarnings() {
+	tests := []struct {
+		name         string
+		toml         string
+		wantWarnings int
+		wantContains []string
+	}{
+		{
+			name: "conforming repos/x",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api"
+path = "repos/api"
+`,
+			wantWarnings: 0,
+		},
+		{
+			name: "conforming with dot-slash",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api"
+path = "./repos/api"
+`,
+			wantWarnings: 0,
+		},
+		{
+			name: "conforming with trailing slash",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api"
+path = "repos/api/"
+`,
+			wantWarnings: 0,
+		},
+		{
+			name: "non-conforming apps/frontend",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "frontend"
+path = "apps/frontend"
+`,
+			wantWarnings: 1,
+			wantContains: []string{"apps/frontend", "repos/frontend", "git w migrate"},
+		},
+		{
+			name: "non-conforming three segments repos/org/repo",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "my-repo"
+path = "repos/org/my-repo"
+`,
+			wantWarnings: 1,
+			wantContains: []string{"repos/org/my-repo", "repos/my-repo"},
+		},
+		{
+			name: "non-conforming bare name",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api"
+path = "my-repo"
+`,
+			wantWarnings: 1,
+			wantContains: []string{"repos/my-repo"},
+		},
+		{
+			name: "multiple repos mixed",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "good"
+path = "repos/good"
+
+[[repo]]
+name = "bad"
+path = "apps/bad"
+`,
+			wantWarnings: 1,
+			wantContains: []string{"apps/bad"},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			cfg, err := config.Load(cfgPath)
+			s.Require().NoError(err)
+			s.Assert().Len(cfg.Warnings, tt.wantWarnings)
+
+			for _, want := range tt.wantContains {
+				found := false
+				for _, w := range cfg.Warnings {
+					if strings.Contains(w, want) {
+						found = true
+						break
+					}
+				}
+				s.Assert().Truef(found, "expected warning containing %q, got: %v", want, cfg.Warnings)
+			}
+		})
+	}
+}
+
+func (s *LoaderSuite) TestPathConventionWarnings_SkipsSynthesizedRepos() {
+	content := `[metarepo]
+name = "ws"
+
+[worktrees.infra]
+url = "https://github.com/org/infra"
+bare_path = "infra/.bare"
+
+[worktrees.infra.branches]
+dev = "infra/dev"
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().Empty(cfg.Warnings, "synthesized worktree repos should not produce path warnings")
 }

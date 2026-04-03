@@ -102,6 +102,7 @@ func makeWorkspaceFromPaths(t *testing.T, repos map[string]string) string {
 
 // makeWorkspaceWithNLocalRepos creates n local git repos, registers them in a
 // fresh workspace, and changes into the workspace dir.
+// Repos are created under repos/<name> to follow the v2 path convention.
 // Returns wsDir and the slice of repo names.
 func makeWorkspaceWithNLocalRepos(t *testing.T, n int) (string, []string) {
 	t.Helper()
@@ -111,7 +112,7 @@ func makeWorkspaceWithNLocalRepos(t *testing.T, n int) (string, []string) {
 
 	for i := range names {
 		name := fmt.Sprintf("%03d", i+1)
-		dir := makeGitRepoAt(t, wsDir, "", name)
+		dir := makeGitRepoAt(t, wsDir, "repos", name)
 		names[i] = name
 		appendRepoTOML(t, sb, wsDir, name, dir)
 	}
@@ -121,7 +122,8 @@ func makeWorkspaceWithNLocalRepos(t *testing.T, n int) (string, []string) {
 
 // makeWorkspaceWithNRemoteRepos creates n repos each backed by a bare remote
 // (so fetch/pull succeed), registers them in a fresh workspace, and changes
-// into the workspace dir. Returns wsDir and the slice of repo names.
+// into the workspace dir. Repos are created under repos/<name> to follow the
+// v2 path convention. Returns wsDir and the slice of repo names.
 func makeWorkspaceWithNRemoteRepos(t *testing.T, n int) (string, []string) {
 	t.Helper()
 	wsDir := t.TempDir()
@@ -132,7 +134,7 @@ func makeWorkspaceWithNRemoteRepos(t *testing.T, n int) (string, []string) {
 		remoteDir := t.TempDir()
 		initBareGitRepo(t, remoteDir)
 		name := fmt.Sprintf("%03d", i+1)
-		repoDir := makeGitRepoAt(t, wsDir, "", name)
+		repoDir := makeGitRepoAt(t, wsDir, "repos", name)
 		addOriginRemote(t, repoDir, "file://"+remoteDir)
 		pushToRemote(t, repoDir)
 		names[i] = name
@@ -143,15 +145,16 @@ func makeWorkspaceWithNRemoteRepos(t *testing.T, n int) (string, []string) {
 }
 
 // makeWorkspaceWithRepoNames creates a workspace listing the given repo names
-// (no actual git repos are created on disk). extraTOML is appended verbatim
-// after the repo entries. Changes CWD into the workspace dir. Returns wsDir.
+// (no actual git repos are created on disk). Paths are set to repos/<name> to
+// follow the v2 path convention. extraTOML is appended verbatim after the repo
+// entries. Changes CWD into the workspace dir. Returns wsDir.
 func makeWorkspaceWithRepoNames(t *testing.T, repoNames []string, extraTOML string) string {
 	t.Helper()
 	wsDir := t.TempDir()
 	sb := newWorkspaceTOML("test")
 
 	for _, name := range repoNames {
-		fmt.Fprintf(sb, "[[repo]]\nname = %q\npath = %q\n\n", name, name)
+		fmt.Fprintf(sb, "[[repo]]\nname = %q\npath = %q\n\n", name, "repos/"+name)
 	}
 
 	if extraTOML != "" {

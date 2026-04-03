@@ -120,7 +120,7 @@ When all 12 milestones are merged to `v2`:
 | Active milestone | V2 M1: Config schema + loader |
 | Milestone branch | `v2/m1-config-schema` |
 | Current issue branch | none |
-| Next issue to implement | #37 — Add `track_branch` and `upstream` fields to `[[repo]]` |
+| Next issue to implement | #38 — Enforce `repos/<n>` path convention with v1 warning |
 | M12 parallel unlock | not yet unlocked |
 
 ---

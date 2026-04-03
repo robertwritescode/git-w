@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/robertwritescode/git-w/pkg/agents"
+	"github.com/robertwritescode/git-w/pkg/output"
 	"github.com/robertwritescode/git-w/pkg/toml"
 	"github.com/spf13/cobra"
 )
@@ -84,6 +86,8 @@ func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
 		return err
 	}
 
+	warnNonConformingRepoPaths(cfg)
+
 	if err := validateAgenticFrameworks(cfg); err != nil {
 		return err
 	}
@@ -128,6 +132,30 @@ func validateAgenticFrameworks(cfg *WorkspaceConfig) error {
 	}
 
 	return nil
+}
+
+func warnNonConformingRepoPaths(cfg *WorkspaceConfig) {
+	synthIndex := WorktreeRepoToSetIndex(cfg)
+
+	for name, rc := range cfg.Repos {
+		if _, isSynth := synthIndex[name]; isSynth {
+			continue
+		}
+
+		clean := filepath.Clean(rc.Path)
+		parts := strings.Split(clean, string(filepath.Separator))
+		if len(parts) == 2 && parts[0] == "repos" && parts[1] != "" {
+			continue
+		}
+
+		suggested := "repos/" + filepath.Base(rc.Path)
+		cfg.Warnings = append(cfg.Warnings, fmt.Sprintf(
+			"warning: repo %q path %q does not follow repos/<n> convention; suggested: %q; run 'git w migrate' to update",
+			name, rc.Path, suggested,
+		))
+	}
+
+	sort.Strings(cfg.Warnings)
 }
 
 func ensureWorkspaceMaps(cfg *WorkspaceConfig) {
@@ -533,7 +561,16 @@ func LoadConfig(cmd *cobra.Command) (*WorkspaceConfig, string, error) {
 		return nil, "", err
 	}
 
-	return LoadCWD(override)
+	cfg, cfgPath, err := LoadCWD(override)
+	if err != nil {
+		return nil, "", err
+	}
+
+	for _, w := range cfg.Warnings {
+		output.Writef(cmd.ErrOrStderr(), "%s\n", w)
+	}
+
+	return cfg, cfgPath, nil
 }
 
 func synthesizeWorktreeTargets(cfg *WorkspaceConfig) error {
