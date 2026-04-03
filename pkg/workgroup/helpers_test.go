@@ -30,7 +30,7 @@ func rewriteConfigWithDefaultBranch(s *testutil.CmdSuite, wsDir string, names []
 	s.T().Helper()
 	sb := fmt.Sprintf("[metarepo]\nname = \"test\"\ndefault_branch = %q\n\n", branch)
 	for _, name := range names {
-		sb += fmt.Sprintf("[repos.%s]\npath = %q\n\n", name, name)
+		sb += fmt.Sprintf("[[repo]]\nname = %q\npath = %q\n\n", name, name)
 	}
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(sb), 0o644))
 }

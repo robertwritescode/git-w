@@ -189,12 +189,20 @@ func findSectionBounds(content []byte, section string) (start, end int, err erro
 		// e.g., no [groups] but we have [groups.web]
 		subsectionPattern := regexp.MustCompile(`(?m)^\[` + regexp.QuoteMeta(section) + `\.[^]]+\]\s*$`)
 		subsectionMatches := subsectionPattern.FindIndex(content)
-		if subsectionMatches == nil {
+		if subsectionMatches != nil {
+			matches = subsectionMatches
+		}
+	}
+
+	if matches == nil {
+		// Check for array-of-tables: [[section]] headers.
+		aotPattern := regexp.MustCompile(`(?m)^\[\[` + regexp.QuoteMeta(section) + `\]\]\s*$`)
+		aotMatches := aotPattern.FindIndex(content)
+		if aotMatches == nil {
 			return 0, 0, fmt.Errorf("section not found")
 		}
 
-		// Found a subsection, so use it as the starting point
-		matches = subsectionMatches
+		matches = aotMatches
 	}
 
 	start = matches[0]
@@ -212,7 +220,8 @@ func findSectionBounds(content []byte, section string) (start, end int, err erro
 }
 
 func findNextNonSubsection(content []byte, section string) int {
-	allSectionPattern := regexp.MustCompile(`(?m)^\[([^]]+)\]\s*$`)
+	// Matches both [section] and [[array-of-tables]] headers.
+	allSectionPattern := regexp.MustCompile(`(?m)^\[+([^]]+)\]+\s*$`)
 	subsectionPrefix := section + "."
 
 	matches := allSectionPattern.FindAllStringSubmatchIndex(string(content), -1)
@@ -220,10 +229,12 @@ func findNextNonSubsection(content []byte, section string) int {
 		// match[2] and match[3] are start and end of capture group 1 (the section name)
 		sectionName := string(content[match[2]:match[3]])
 
-		// If this section doesn't start with our prefix, it's not a subsection
-		if !strings.HasPrefix(sectionName, subsectionPrefix) {
-			return match[0] // Return start of the full match
+		// Skip the same section (additional array-of-tables entries) and subsections.
+		if sectionName == section || strings.HasPrefix(sectionName, subsectionPrefix) {
+			continue
 		}
+
+		return match[0] // Return start of the full match
 	}
 
 	return -1

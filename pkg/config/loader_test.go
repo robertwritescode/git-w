@@ -28,11 +28,13 @@ func (s *LoaderSuite) TestRoundTrip() {
 	content := `[metarepo]
 name = "myws"
 
-[repos.frontend]
+[[repo]]
+name = "frontend"
 path = "apps/frontend"
-url = "https://github.com/org/frontend"
+clone_url = "https://github.com/org/frontend"
 
-[repos.backend]
+[[repo]]
+name = "backend"
 path = "services/backend"
 
 [groups.web]
@@ -45,7 +47,7 @@ repos = ["frontend", "backend"]
 
 	s.Assert().Equal("myws", cfg.Metarepo.Name)
 	s.Assert().Equal("apps/frontend", cfg.Repos["frontend"].Path)
-	s.Assert().Equal("https://github.com/org/frontend", cfg.Repos["frontend"].URL)
+	s.Assert().Equal("https://github.com/org/frontend", cfg.Repos["frontend"].CloneURL)
 	s.Assert().Equal("services/backend", cfg.Repos["backend"].Path)
 	s.Assert().Equal([]string{"frontend", "backend"}, cfg.Groups["web"].Repos)
 }
@@ -167,7 +169,7 @@ test = "infra/test"
 	s.Require().Contains(cfg.Repos, "infra-test")
 	s.Assert().Equal("infra/dev", cfg.Repos["infra-dev"].Path)
 	s.Assert().Equal("infra/test", cfg.Repos["infra-test"].Path)
-	s.Assert().Equal("https://github.com/org/infra", cfg.Repos["infra-dev"].URL)
+	s.Assert().Equal("https://github.com/org/infra", cfg.Repos["infra-dev"].CloneURL)
 
 	s.Require().Contains(cfg.Groups, "infra")
 	s.Assert().Equal([]string{"infra-dev", "infra-test"}, cfg.Groups["infra"].Repos)
@@ -195,7 +197,7 @@ dev = "infra/dev"
 	text := string(data)
 
 	s.Assert().Contains(text, "[worktrees.infra]")
-	s.Assert().NotContains(text, "[repos.infra-dev]")
+	s.Assert().NotContains(text, `name = "infra-dev"`)
 	s.Assert().NotContains(text, "[groups.infra]")
 }
 
@@ -210,7 +212,8 @@ func (s *LoaderSuite) TestWorktreeSynthesizedNameConflicts() {
 			toml: `[metarepo]
 name = "ws"
 
-[repos.infra-dev]
+[[repo]]
+name = "infra-dev"
 path = "apps/infra-dev"
 
 [worktrees.infra]
@@ -264,7 +267,8 @@ func (s *LoaderSuite) TestRejectsInvalidRepoPaths() {
 			toml: `[metarepo]
 name = "ws"
 
-[repos.bad]
+[[repo]]
+name = "bad"
 path = "/tmp/repo"
 `,
 			wantErr: "path must be relative",
@@ -274,7 +278,8 @@ path = "/tmp/repo"
 			toml: `[metarepo]
 name = "ws"
 
-[repos.bad]
+[[repo]]
+name = "bad"
 path = ""
 `,
 			wantErr: "path is empty",
@@ -284,7 +289,8 @@ path = ""
 			toml: `[metarepo]
 name = "ws"
 
-[repos.bad]
+[[repo]]
+name = "bad"
 path = "../outside"
 `,
 			wantErr: "path resolves outside workspace root",
@@ -513,6 +519,128 @@ func (s *LoaderSuite) TestAgenticFrameworksValidation() {
 			}
 		})
 	}
+}
+
+func (s *LoaderSuite) TestRepoArrayOfTablesFormat() {
+	tests := []struct {
+		name    string
+		toml    string
+		wantErr string
+		check   func(*LoaderSuite, *config.WorkspaceConfig)
+	}{
+		{
+			name: "valid [[repo]] entries load into map",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api-service"
+path = "repos/api-service"
+clone_url = "https://github.com/org/api"
+
+[[repo]]
+name = "gateway"
+path = "repos/gateway"
+`,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Assert().Equal("repos/api-service", cfg.Repos["api-service"].Path)
+				s.Assert().Equal("https://github.com/org/api", cfg.Repos["api-service"].CloneURL)
+				s.Assert().Equal("repos/gateway", cfg.Repos["gateway"].Path)
+			},
+		},
+		{
+			name: "missing name field produces error",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+path = "repos/no-name"
+`,
+			wantErr: "missing required name field",
+		},
+		{
+			name: "duplicate name produces error",
+			toml: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api"
+path = "repos/api"
+
+[[repo]]
+name = "api"
+path = "repos/api2"
+`,
+			wantErr: "duplicate [[repo]] name",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			cfg, err := config.Load(cfgPath)
+			if tt.wantErr != "" {
+				s.Require().Error(err)
+				s.Assert().Contains(err.Error(), tt.wantErr)
+				return
+			}
+			s.Require().NoError(err)
+			if tt.check != nil {
+				tt.check(s, cfg)
+			}
+		})
+	}
+}
+
+func (s *LoaderSuite) TestRepoByName() {
+	toml := `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "frontend"
+path = "apps/frontend"
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(toml), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	rc, ok := cfg.RepoByName("frontend")
+	s.Assert().True(ok)
+	s.Assert().Equal("apps/frontend", rc.Path)
+
+	_, ok = cfg.RepoByName("missing")
+	s.Assert().False(ok)
+}
+
+func (s *LoaderSuite) TestSaveRoundTripsRepoList() {
+	toml := `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api"
+path = "repos/api"
+
+[[repo]]
+name = "frontend"
+path = "repos/frontend"
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(toml), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+	s.Require().NoError(config.Save(s.cfgPath, cfg))
+
+	data, err := os.ReadFile(s.cfgPath)
+	s.Require().NoError(err)
+	text := string(data)
+
+	s.Assert().Contains(text, "[[repo]]")
+	s.Assert().Contains(text, `name = "api"`)
+	s.Assert().Contains(text, `name = "frontend"`)
+	s.Assert().NotContains(text, "[repos.")
 }
 
 func (s *LoaderSuite) TestFullV2ConfigLoad() {

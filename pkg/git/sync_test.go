@@ -237,7 +237,7 @@ func (s *SyncSuite) makeWorkspaceWithRemoteRepoAndSyncPush(syncPush *bool) (stri
 		syncLine = fmt.Sprintf("sync_push = %t\n", *syncPush)
 	}
 
-	cfg := fmt.Sprintf("[metarepo]\nname = \"test\"\n%s\n[repos.%s]\npath = %q\n", syncLine, names[0], names[0])
+	cfg := fmt.Sprintf("[metarepo]\nname = \"test\"\n%s\n[[repo]]\nname = %q\npath = %q\n", syncLine, names[0], names[0])
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(cfg), 0o644))
 	return wsDir, names[0]
 }

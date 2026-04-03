@@ -28,15 +28,26 @@ func Load(configPath string) (*WorkspaceConfig, error) {
 }
 
 func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
-	cfg := &WorkspaceConfig{}
+	var dc diskConfig
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading config %s: %w", configPath, err)
 	}
 
-	if err := toml.Unmarshal(data, cfg); err != nil {
+	if err := toml.Unmarshal(data, &dc); err != nil {
 		return nil, fmt.Errorf("parsing config %s: %w", configPath, err)
+	}
+
+	cfg := &WorkspaceConfig{
+		Metarepo:   dc.Metarepo,
+		Workspaces: dc.Workspaces,
+		Groups:     dc.Groups,
+		Worktrees:  dc.Worktrees,
+	}
+
+	if err := buildReposIndex(cfg, dc.RepoList); err != nil {
+		return nil, err
 	}
 
 	ensureWorkspaceMaps(cfg)
@@ -57,6 +68,10 @@ func applyMetarepoDefaults(cfg *WorkspaceConfig) {
 }
 
 func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
+	if err := validateRepoNames(cfg); err != nil {
+		return err
+	}
+
 	if err := validateWorktreePaths(configPath, cfg); err != nil {
 		return err
 	}
@@ -96,6 +111,35 @@ func ensureWorkspaceMaps(cfg *WorkspaceConfig) {
 	if cfg.Workgroups == nil {
 		cfg.Workgroups = make(map[string]WorkgroupConfig)
 	}
+}
+
+// buildReposIndex converts a [[repo]] slice into the in-memory cfg.Repos map.
+func buildReposIndex(cfg *WorkspaceConfig, list []RepoConfig) error {
+	cfg.Repos = make(map[string]RepoConfig, len(list))
+
+	for _, rc := range list {
+		if rc.Name == "" {
+			return fmt.Errorf("missing required name field in [[repo]] entry")
+		}
+
+		if _, exists := cfg.Repos[rc.Name]; exists {
+			return fmt.Errorf("duplicate [[repo]] name %q", rc.Name)
+		}
+
+		cfg.Repos[rc.Name] = rc
+	}
+
+	return nil
+}
+
+func validateRepoNames(cfg *WorkspaceConfig) error {
+	for name := range cfg.Repos {
+		if name == "" {
+			return fmt.Errorf("missing required name field in [[repo]] entry")
+		}
+	}
+
+	return nil
 }
 
 // localDiskConfig is the schema for the .gitw.local file.
@@ -141,7 +185,7 @@ func Save(configPath string, cfg *WorkspaceConfig) error {
 type diskConfig struct {
 	Metarepo   MetarepoConfig            `toml:"metarepo"`
 	Workspaces []WorkspaceBlock          `toml:"workspace,omitempty"`
-	Repos      map[string]RepoConfig     `toml:"repos,omitempty"`
+	RepoList   []RepoConfig              `toml:"repo,omitempty"`
 	Groups     map[string]GroupConfig    `toml:"groups,omitempty"`
 	Worktrees  map[string]WorktreeConfig `toml:"worktrees,omitempty"`
 }
@@ -150,10 +194,24 @@ func prepareDiskConfig(cfg *WorkspaceConfig) diskConfig {
 	return diskConfig{
 		Metarepo:   cfg.Metarepo,
 		Workspaces: cfg.Workspaces,
-		Repos:      withoutSynthesizedRepos(cfg.Repos, cfg.Worktrees),
+		RepoList:   buildRepoList(cfg),
 		Groups:     withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
 		Worktrees:  cfg.Worktrees,
 	}
+}
+
+func buildRepoList(cfg *WorkspaceConfig) []RepoConfig {
+	plain := withoutSynthesizedRepos(cfg.Repos, cfg.Worktrees)
+	names := SortedStringKeys(plain)
+	list := make([]RepoConfig, 0, len(names))
+
+	for _, name := range names {
+		rc := plain[name]
+		rc.Name = name
+		list = append(list, rc)
+	}
+
+	return list
 }
 
 func SaveLocal(configPath string, ctx ContextConfig) error {
@@ -483,8 +541,8 @@ func synthesizeWorktreeRepos(cfg *WorkspaceConfig, setName string, setCfg Worktr
 		}
 
 		cfg.Repos[repoName] = RepoConfig{
-			Path: setCfg.Branches[branch],
-			URL:  setCfg.URL,
+			Path:     setCfg.Branches[branch],
+			CloneURL: setCfg.URL,
 		}
 		repoNames = append(repoNames, repoName)
 	}
