@@ -121,7 +121,9 @@ Milestone branch: `v2-m1-config-schema` | Depends on: none
   2. `track_branch` repos are recognized as env aliases during config load
   3. `upstream` field links alias repos to their upstream repo name
 **Canonical refs**: `.planning/v2/v2-schema.md` (repo block), `.planning/v2/v2-infra-patterns.md` (Pattern A)
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 02-01-PLAN.md — `[[repo]]` array-of-tables migration: Name + CloneURL fields, disk/in-memory split, test fixture cascade
+- [ ] 02-02-PLAN.md — `track_branch` + `upstream` fields on RepoConfig, IsAlias() method, validateAliasFields (D-01/D-02)
 
 ---
 
