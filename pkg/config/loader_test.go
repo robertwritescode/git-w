@@ -672,3 +672,162 @@ repos = ["infra-dev", "infra-test"]
 	s.Assert().Equal([]string{"api-service", "payment-lib"}, cfg.Workspaces[0].Repos)
 	s.Assert().Equal("platform-infra", cfg.Workspaces[1].Name)
 }
+
+func (s *LoaderSuite) TestAliasFieldValidation() {
+	tests := []struct {
+		name      string
+		content   string
+		wantErr   string
+		wantNoErr bool
+	}{
+		{
+			name: "both fields set is valid",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+track_branch = "main"
+upstream = "origin"
+`,
+			wantNoErr: true,
+		},
+		{
+			name: "neither field set is valid",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+`,
+			wantNoErr: true,
+		},
+		{
+			name: "track_branch without upstream is invalid",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+track_branch = "main"
+`,
+			wantErr: `"svc-a": track_branch and upstream must both be set or both be absent`,
+		},
+		{
+			name: "upstream without track_branch is invalid",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+upstream = "origin"
+`,
+			wantErr: `"svc-a": track_branch and upstream must both be set or both be absent`,
+		},
+		{
+			name: "duplicate track_branch in same upstream group is invalid",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+track_branch = "main"
+upstream = "origin"
+
+[[repo]]
+name = "svc-b"
+path = "svc-b"
+track_branch = "main"
+upstream = "origin"
+`,
+			wantErr: `track_branch "main" already used`,
+		},
+		{
+			name: "same track_branch in different upstream groups is valid",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+track_branch = "main"
+upstream = "origin"
+
+[[repo]]
+name = "svc-b"
+path = "svc-b"
+track_branch = "main"
+upstream = "upstream"
+`,
+			wantNoErr: true,
+		},
+		{
+			name: "multiple repos with different track_branches in same upstream is valid",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+track_branch = "main"
+upstream = "origin"
+
+[[repo]]
+name = "svc-b"
+path = "svc-b"
+track_branch = "dev"
+upstream = "origin"
+`,
+			wantNoErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.content), 0o644))
+
+			_, err := config.Load(cfgPath)
+
+			if tt.wantNoErr {
+				s.Assert().NoError(err)
+				return
+			}
+
+			s.Require().Error(err)
+			s.Assert().Contains(err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func (s *LoaderSuite) TestAliasFieldsRoundTrip() {
+	content := `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "svc-a"
+path = "svc-a"
+track_branch = "main"
+upstream = "origin"
+
+[[repo]]
+name = "svc-b"
+path = "svc-b"
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().Equal("main", cfg.Repos["svc-a"].TrackBranch)
+	s.Assert().Equal("origin", cfg.Repos["svc-a"].Upstream)
+	s.Assert().True(cfg.Repos["svc-a"].IsAlias())
+	s.Assert().Equal("", cfg.Repos["svc-b"].TrackBranch)
+	s.Assert().Equal("", cfg.Repos["svc-b"].Upstream)
+	s.Assert().False(cfg.Repos["svc-b"].IsAlias())
+}

@@ -53,6 +53,13 @@ type RepoConfig struct {
 	CloneURL      string   `toml:"clone_url,omitempty"`
 	Flags         []string `toml:"flags,omitempty"`
 	DefaultBranch string   `toml:"default_branch,omitempty"`
+	TrackBranch   string   `toml:"track_branch,omitempty"`
+	Upstream      string   `toml:"upstream,omitempty"`
+}
+
+// IsAlias reports whether this repo is an env alias (has track_branch set).
+func (r RepoConfig) IsAlias() bool {
+	return r.TrackBranch != ""
 }
 
 // WorktreeConfig describes one shared bare-repo + branch worktree set.

@@ -192,3 +192,23 @@ func worktreeIndexCases() []worktreeIndexCase {
 		},
 	}
 }
+
+type isAliasCase struct {
+	name        string
+	trackBranch string
+	want        bool
+}
+
+func (s *ConfigSuite) TestRepoConfigIsAlias() {
+	cases := []isAliasCase{
+		{name: "empty track_branch", trackBranch: "", want: false},
+		{name: "non-empty track_branch", trackBranch: "dev", want: true},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			rc := config.RepoConfig{TrackBranch: tc.trackBranch}
+			s.Assert().Equal(tc.want, rc.IsAlias())
+		})
+	}
+}

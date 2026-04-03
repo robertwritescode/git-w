@@ -84,7 +84,42 @@ func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
 		return err
 	}
 
-	return validateAgenticFrameworks(cfg)
+	if err := validateAgenticFrameworks(cfg); err != nil {
+		return err
+	}
+
+	return validateAliasFields(cfg)
+}
+
+func validateAliasFields(cfg *WorkspaceConfig) error {
+	// upstream -> track_branch -> first repo name that claimed it
+	seen := make(map[string]map[string]string)
+
+	for name, rc := range cfg.Repos {
+		hasTrack := rc.TrackBranch != ""
+		hasUp := rc.Upstream != ""
+
+		if hasTrack != hasUp {
+			return fmt.Errorf("repo %q: track_branch and upstream must both be set or both be absent", name)
+		}
+
+		if !hasTrack {
+			continue
+		}
+
+		if seen[rc.Upstream] == nil {
+			seen[rc.Upstream] = make(map[string]string)
+		}
+
+		if prior, dup := seen[rc.Upstream][rc.TrackBranch]; dup {
+			return fmt.Errorf("repo %q: track_branch %q already used by %q in upstream group %q",
+				name, rc.TrackBranch, prior, rc.Upstream)
+		}
+
+		seen[rc.Upstream][rc.TrackBranch] = name
+	}
+
+	return nil
 }
 
 func validateAgenticFrameworks(cfg *WorkspaceConfig) error {
