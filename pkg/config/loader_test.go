@@ -25,7 +25,7 @@ func TestLoaderSuite(t *testing.T) {
 }
 
 func (s *LoaderSuite) TestRoundTrip() {
-	content := `[workspace]
+	content := `[metarepo]
 name = "myws"
 
 [repos.frontend]
@@ -43,7 +43,7 @@ repos = ["frontend", "backend"]
 	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
-	s.Assert().Equal("myws", cfg.Workspace.Name)
+	s.Assert().Equal("myws", cfg.Metarepo.Name)
 	s.Assert().Equal("apps/frontend", cfg.Repos["frontend"].Path)
 	s.Assert().Equal("https://github.com/org/frontend", cfg.Repos["frontend"].URL)
 	s.Assert().Equal("services/backend", cfg.Repos["backend"].Path)
@@ -103,7 +103,7 @@ func (s *LoaderSuite) TestLocalFileMerge() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
-			s.Require().NoError(os.WriteFile(cfgPath, []byte("[workspace]\nname = \"test\"\n"), 0o644))
+			s.Require().NoError(os.WriteFile(cfgPath, []byte("[metarepo]\nname = \"test\"\n"), 0o644))
 
 			if tt.localContent != "" {
 				s.Require().NoError(os.WriteFile(cfgPath+".local", []byte(tt.localContent), 0o644))
@@ -118,12 +118,12 @@ func (s *LoaderSuite) TestLocalFileMerge() {
 }
 
 func (s *LoaderSuite) TestSaveAtomic() {
-	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"original\"\n"), 0o644))
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[metarepo]\nname = \"original\"\n"), 0o644))
 
 	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
-	cfg.Workspace.Name = "updated"
+	cfg.Metarepo.Name = "updated"
 	s.Require().NoError(config.Save(s.cfgPath, cfg))
 
 	_, err = os.Stat(s.cfgPath + ".tmp")
@@ -132,11 +132,11 @@ func (s *LoaderSuite) TestSaveAtomic() {
 	cfg2, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
-	s.Assert().Equal("updated", cfg2.Workspace.Name)
+	s.Assert().Equal("updated", cfg2.Metarepo.Name)
 }
 
 func (s *LoaderSuite) TestInitializesNilMaps() {
-	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"empty\"\n"), 0o644))
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[metarepo]\nname = \"empty\"\n"), 0o644))
 
 	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
@@ -147,7 +147,7 @@ func (s *LoaderSuite) TestInitializesNilMaps() {
 }
 
 func (s *LoaderSuite) TestSynthesizesWorktreeReposAndGroups() {
-	content := `[workspace]
+	content := `[metarepo]
 name = "myws"
 
 [worktrees.infra]
@@ -174,7 +174,7 @@ test = "infra/test"
 }
 
 func (s *LoaderSuite) TestSaveOmitsSynthesizedWorktreeTargets() {
-	content := `[workspace]
+	content := `[metarepo]
 name = "myws"
 
 [worktrees.infra]
@@ -207,7 +207,7 @@ func (s *LoaderSuite) TestWorktreeSynthesizedNameConflicts() {
 	}{
 		{
 			name: "repo name conflict",
-			toml: `[workspace]
+			toml: `[metarepo]
 name = "ws"
 
 [repos.infra-dev]
@@ -224,7 +224,7 @@ dev = "infra/dev"
 		},
 		{
 			name: "group name conflict",
-			toml: `[workspace]
+			toml: `[metarepo]
 name = "ws"
 
 [groups.infra]
@@ -261,7 +261,7 @@ func (s *LoaderSuite) TestRejectsInvalidRepoPaths() {
 	}{
 		{
 			name: "absolute repo path",
-			toml: `[workspace]
+			toml: `[metarepo]
 name = "ws"
 
 [repos.bad]
@@ -271,7 +271,7 @@ path = "/tmp/repo"
 		},
 		{
 			name: "empty repo path",
-			toml: `[workspace]
+			toml: `[metarepo]
 name = "ws"
 
 [repos.bad]
@@ -281,7 +281,7 @@ path = ""
 		},
 		{
 			name: "path escapes workspace root",
-			toml: `[workspace]
+			toml: `[metarepo]
 name = "ws"
 
 [repos.bad]
@@ -311,7 +311,7 @@ func (s *LoaderSuite) TestRejectsInvalidWorktreeBarePaths() {
 	}{
 		{
 			name: "absolute bare_path",
-			toml: `[workspace]
+			toml: `[metarepo]
 name = "ws"
 
 [worktrees.infra]
@@ -322,7 +322,7 @@ bare_path = "/tmp/.bare"
 		},
 		{
 			name: "bare_path escapes workspace root",
-			toml: `[workspace]
+			toml: `[metarepo]
 name = "ws"
 
 [worktrees.infra]
@@ -373,7 +373,7 @@ func (s *LoaderSuite) TestResolveRepoPath() {
 }
 
 func (s *LoaderSuite) TestSaveLocalWorkgroup_RoundTrip() {
-	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"test\"\n"), 0o644))
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[metarepo]\nname = \"test\"\n"), 0o644))
 
 	wg := config.WorkgroupConfig{
 		Repos:  []string{"svc-a", "svc-b"},
@@ -392,7 +392,7 @@ func (s *LoaderSuite) TestSaveLocalWorkgroup_RoundTrip() {
 }
 
 func (s *LoaderSuite) TestSaveLocal_PreservesWorkgroups() {
-	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"test\"\n"), 0o644))
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[metarepo]\nname = \"test\"\n"), 0o644))
 
 	wg := config.WorkgroupConfig{Repos: []string{"svc-a"}, Branch: "feat"}
 	s.Require().NoError(config.SaveLocalWorkgroup(s.cfgPath, "feat", wg))
@@ -407,7 +407,7 @@ func (s *LoaderSuite) TestSaveLocal_PreservesWorkgroups() {
 }
 
 func (s *LoaderSuite) TestRemoveLocalWorkgroup() {
-	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"test\"\n"), 0o644))
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[metarepo]\nname = \"test\"\n"), 0o644))
 
 	s.Require().NoError(config.SaveLocalWorkgroup(s.cfgPath, "feat-a", config.WorkgroupConfig{Repos: []string{"svc-a"}, Branch: "feat-a"}))
 	s.Require().NoError(config.SaveLocalWorkgroup(s.cfgPath, "feat-b", config.WorkgroupConfig{Repos: []string{"svc-b"}, Branch: "feat-b"}))
@@ -422,10 +422,125 @@ func (s *LoaderSuite) TestRemoveLocalWorkgroup() {
 }
 
 func (s *LoaderSuite) TestInitializesWorkgroupsMap() {
-	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname = \"empty\"\n"), 0o644))
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[metarepo]\nname = \"empty\"\n"), 0o644))
 
 	cfg, err := config.Load(s.cfgPath)
 	s.Require().NoError(err)
 
 	s.Assert().NotNil(cfg.Workgroups)
+}
+
+func (s *LoaderSuite) TestWorkspacesBlocksParse() {
+
+	content := `[metarepo]
+name = "myws"
+
+[[workspace]]
+name = "payments"
+description = "Payment services"
+repos = ["api-service", "gateway"]
+
+[[workspace]]
+name = "infra"
+repos = ["k8s-config"]
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg.Workspaces, 2)
+	s.Assert().Equal("payments", cfg.Workspaces[0].Name)
+	s.Assert().Equal("Payment services", cfg.Workspaces[0].Description)
+	s.Assert().Equal([]string{"api-service", "gateway"}, cfg.Workspaces[0].Repos)
+	s.Assert().Equal("infra", cfg.Workspaces[1].Name)
+	s.Assert().Equal([]string{"k8s-config"}, cfg.Workspaces[1].Repos)
+}
+
+func (s *LoaderSuite) TestAgenticFrameworksValidation() {
+	tests := []struct {
+		name        string
+		toml        string
+		wantErr     bool
+		errContains string
+		wantFWs     []string
+	}{
+		{
+			name:    "known value gsd",
+			toml:    "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"gsd\"]\n",
+			wantFWs: []string{"gsd"},
+		},
+		{
+			name:        "unknown value",
+			toml:        "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"speckit\"]\n",
+			wantErr:     true,
+			errContains: "speckit",
+		},
+		{
+			name:    "missing field defaults to gsd",
+			toml:    "[metarepo]\nname = \"ws\"\n",
+			wantFWs: []string{"gsd"},
+		},
+		{
+			name:    "multi-value known",
+			toml:    "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"gsd\", \"gsd\"]\n",
+			wantFWs: []string{"gsd", "gsd"},
+		},
+		{
+			name:        "multi-value with unknown",
+			toml:        "[metarepo]\nname = \"ws\"\nagentic_frameworks = [\"gsd\", \"badvalue\"]\n",
+			wantErr:     true,
+			errContains: "badvalue",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			cfg, err := config.Load(cfgPath)
+			if tt.wantErr {
+				s.Require().Error(err)
+				if tt.errContains != "" {
+					s.Assert().Contains(err.Error(), tt.errContains)
+				}
+				return
+			}
+			s.Require().NoError(err)
+			if tt.wantFWs != nil {
+				s.Assert().Equal(tt.wantFWs, cfg.Metarepo.AgenticFrameworks)
+			}
+		})
+	}
+}
+
+func (s *LoaderSuite) TestFullV2ConfigLoad() {
+	content := `[metarepo]
+name = "platform-work"
+default_remotes = ["origin"]
+agentic_frameworks = ["gsd"]
+
+[[workspace]]
+name = "payments-platform"
+description = "Payment processing and related services"
+repos = ["api-service", "payment-lib"]
+
+[[workspace]]
+name = "platform-infra"
+repos = ["infra-dev", "infra-test"]
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().Equal("platform-work", cfg.Metarepo.Name)
+	s.Assert().Equal([]string{"origin"}, cfg.Metarepo.DefaultRemotes)
+	s.Assert().Equal([]string{"gsd"}, cfg.Metarepo.AgenticFrameworks)
+	s.Require().Len(cfg.Workspaces, 2)
+	s.Assert().Equal("payments-platform", cfg.Workspaces[0].Name)
+	s.Assert().Equal("Payment processing and related services", cfg.Workspaces[0].Description)
+	s.Assert().Equal([]string{"api-service", "payment-lib"}, cfg.Workspaces[0].Repos)
+	s.Assert().Equal("platform-infra", cfg.Workspaces[1].Name)
 }

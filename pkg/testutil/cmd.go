@@ -162,10 +162,10 @@ func makeWorkspaceWithRepoNames(t *testing.T, repoNames []string, extraTOML stri
 }
 
 // newWorkspaceTOML returns a strings.Builder pre-populated with the standard
-// [workspace] TOML header using the given workspace name.
+// [metarepo] TOML header using the given workspace name.
 func newWorkspaceTOML(name string) *strings.Builder {
 	sb := new(strings.Builder)
-	fmt.Fprintf(sb, "[workspace]\nname = %q\n\n", name)
+	fmt.Fprintf(sb, "[metarepo]\nname = %q\n\n", name)
 	return sb
 }
 

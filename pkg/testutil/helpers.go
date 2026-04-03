@@ -127,7 +127,7 @@ func changeToDir(t testing.TB, dir string) {
 func setupWorkspaceDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	makeWorkspace(t, dir, "[workspace]\nname = \"testws\"\n")
+	makeWorkspace(t, dir, "[metarepo]\nname = \"testws\"\n")
 	changeToDir(t, dir)
 	return dir
 }

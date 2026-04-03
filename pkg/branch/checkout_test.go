@@ -515,7 +515,7 @@ func (s *BranchCheckoutSuite) setupRemoteWorkspaceWithDefaultBranch() (string, [
 
 func (s *BranchCheckoutSuite) writeWorkspaceConfig(wsDir string, names []string, workspaceExtra string, repoDefaults map[string]string) {
 	var sb strings.Builder
-	sb.WriteString("[workspace]\n")
+	sb.WriteString("[metarepo]\n")
 	sb.WriteString("name = \"test\"\n")
 	sb.WriteString(workspaceExtra)
 	sb.WriteString("\n")
@@ -556,7 +556,7 @@ func (s *BranchCheckoutSuite) addInfraWorktree(bareAbs, wsDir, branch string) st
 }
 
 func (s *BranchCheckoutSuite) writeInfraWorktreeConfig(wsDir, remoteURL, barePath, workspaceExtra string) {
-	cfg := fmt.Sprintf("[workspace]\nname = \"ws\"\n%s\n[worktrees.infra]\nurl=%q\nbare_path=%q\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", workspaceExtra, remoteURL, barePath)
+	cfg := fmt.Sprintf("[metarepo]\nname = \"ws\"\n%s\n[worktrees.infra]\nurl=%q\nbare_path=%q\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", workspaceExtra, remoteURL, barePath)
 	s.writeWorkspaceFile(wsDir, cfg)
 }
 

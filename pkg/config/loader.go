@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/robertwritescode/git-w/pkg/agents"
 	"github.com/robertwritescode/git-w/pkg/toml"
 	"github.com/spf13/cobra"
 )
@@ -44,7 +45,15 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 		return nil, err
 	}
 
+	applyMetarepoDefaults(cfg)
+
 	return cfg, nil
+}
+
+func applyMetarepoDefaults(cfg *WorkspaceConfig) {
+	if len(cfg.Metarepo.AgenticFrameworks) == 0 {
+		cfg.Metarepo.AgenticFrameworks = []string{"gsd"}
+	}
 }
 
 func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
@@ -56,7 +65,19 @@ func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
 		return err
 	}
 
-	return validateRepoPaths(configPath, cfg)
+	if err := validateRepoPaths(configPath, cfg); err != nil {
+		return err
+	}
+
+	return validateAgenticFrameworks(cfg)
+}
+
+func validateAgenticFrameworks(cfg *WorkspaceConfig) error {
+	if _, err := agents.FrameworksFor(cfg.Metarepo.AgenticFrameworks); err != nil {
+		return fmt.Errorf("agentic_frameworks: %w", err)
+	}
+
+	return nil
 }
 
 func ensureWorkspaceMaps(cfg *WorkspaceConfig) {
@@ -118,18 +139,20 @@ func Save(configPath string, cfg *WorkspaceConfig) error {
 }
 
 type diskConfig struct {
-	Workspace WorkspaceMeta             `toml:"workspace"`
-	Repos     map[string]RepoConfig     `toml:"repos,omitempty"`
-	Groups    map[string]GroupConfig    `toml:"groups,omitempty"`
-	Worktrees map[string]WorktreeConfig `toml:"worktrees,omitempty"`
+	Metarepo   MetarepoConfig            `toml:"metarepo"`
+	Workspaces []WorkspaceBlock          `toml:"workspace,omitempty"`
+	Repos      map[string]RepoConfig     `toml:"repos,omitempty"`
+	Groups     map[string]GroupConfig    `toml:"groups,omitempty"`
+	Worktrees  map[string]WorktreeConfig `toml:"worktrees,omitempty"`
 }
 
 func prepareDiskConfig(cfg *WorkspaceConfig) diskConfig {
 	return diskConfig{
-		Workspace: cfg.Workspace,
-		Repos:     withoutSynthesizedRepos(cfg.Repos, cfg.Worktrees),
-		Groups:    withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
-		Worktrees: cfg.Worktrees,
+		Metarepo:   cfg.Metarepo,
+		Workspaces: cfg.Workspaces,
+		Repos:      withoutSynthesizedRepos(cfg.Repos, cfg.Worktrees),
+		Groups:     withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
+		Worktrees:  cfg.Worktrees,
 	}
 }
 

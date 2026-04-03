@@ -1,4 +1,5 @@
 bin/
+example/
 .opencode/
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,macos,windows,linux

@@ -320,7 +320,7 @@ func (s *BranchDefaultSuite) makeRepoWithRemoteAhead(wsDir, startBranch string) 
 
 func (s *BranchDefaultSuite) writeDefaultConfig(wsDir string, names []string, overrides map[string]string, defaultBranch string) {
 	var sb strings.Builder
-	sb.WriteString("[workspace]\n")
+	sb.WriteString("[metarepo]\n")
 	if defaultBranch != "" {
 		fmt.Fprintf(&sb, "default_branch = %q\n", defaultBranch)
 	}
@@ -351,7 +351,7 @@ func (s *BranchDefaultSuite) writeInfraWorktreeConfig(wsDir, remoteURL string) {
 }
 
 func (s *BranchDefaultSuite) writeInfraWorktreeConfigAt(wsDir, remoteURL, barePath string) {
-	cfg := fmt.Sprintf("[workspace]\ndefault_branch = \"main\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = \"infra/dev\"\ntest = \"infra/test\"\n", remoteURL, barePath)
+	cfg := fmt.Sprintf("[metarepo]\ndefault_branch = \"main\"\n\n[worktrees.infra]\nurl = %q\nbare_path = %q\n\n[worktrees.infra.branches]\ndev = \"infra/dev\"\ntest = \"infra/test\"\n", remoteURL, barePath)
 	s.Require().NoError(os.WriteFile(filepath.Join(wsDir, ".gitw"), []byte(cfg), 0644))
 }
 

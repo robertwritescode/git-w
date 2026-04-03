@@ -14,7 +14,7 @@ type ConfigSuite struct {
 
 type branchAccessorCase struct {
 	name     string
-	meta     config.WorkspaceMeta
+	meta     config.MetarepoConfig
 	wantSync bool
 	wantUp   bool
 	wantPush bool
@@ -42,7 +42,7 @@ type worktreeIndexCase struct {
 
 type syncPushEnabledCase struct {
 	name string
-	meta config.WorkspaceMeta
+	meta config.MetarepoConfig
 	want bool
 }
 
@@ -50,9 +50,9 @@ var syncPushEnabledCases = func() []syncPushEnabledCase {
 	trueValue := true
 	falseValue := false
 	return []syncPushEnabledCase{
-		{name: "nil defaults true", meta: config.WorkspaceMeta{}, want: true},
-		{name: "explicit true", meta: config.WorkspaceMeta{SyncPush: &trueValue}, want: true},
-		{name: "explicit false", meta: config.WorkspaceMeta{SyncPush: &falseValue}, want: false},
+		{name: "nil defaults true", meta: config.MetarepoConfig{}, want: true},
+		{name: "explicit true", meta: config.MetarepoConfig{SyncPush: &trueValue}, want: true},
+		{name: "explicit false", meta: config.MetarepoConfig{SyncPush: &falseValue}, want: false},
 	}
 }()
 
@@ -63,7 +63,7 @@ func TestConfigSuite(t *testing.T) {
 func (s *ConfigSuite) TestSyncPushEnabled() {
 	for _, tt := range syncPushEnabledCases {
 		s.Run(tt.name, func() {
-			cfg := config.WorkspaceConfig{Workspace: tt.meta}
+			cfg := config.WorkspaceConfig{Metarepo: tt.meta}
 			s.Equal(tt.want, cfg.SyncPushEnabled())
 		})
 	}
@@ -72,7 +72,7 @@ func (s *ConfigSuite) TestSyncPushEnabled() {
 func (s *ConfigSuite) TestBranchAccessors() {
 	for _, tt := range branchAccessorCases() {
 		s.Run(tt.name, func() {
-			cfg := config.WorkspaceConfig{Workspace: tt.meta}
+			cfg := config.WorkspaceConfig{Metarepo: tt.meta}
 			s.Equal(tt.wantSync, cfg.BranchSyncSourceEnabled())
 			s.Equal(tt.wantUp, cfg.BranchSetUpstreamEnabled())
 			s.Equal(tt.wantPush, cfg.BranchPushEnabled())
@@ -84,8 +84,8 @@ func (s *ConfigSuite) TestResolveDefaultBranch() {
 	for _, tt := range resolveDefaultCases() {
 		s.Run(tt.name, func() {
 			cfg := config.WorkspaceConfig{
-				Workspace: config.WorkspaceMeta{DefaultBranch: tt.workspace},
-				Repos:     map[string]config.RepoConfig{"frontend": {DefaultBranch: tt.repoDefault}},
+				Metarepo: config.MetarepoConfig{DefaultBranch: tt.workspace},
+				Repos:    map[string]config.RepoConfig{"frontend": {DefaultBranch: tt.repoDefault}},
 			}
 			s.Equal(tt.want, cfg.ResolveDefaultBranch("frontend"))
 		})
@@ -94,7 +94,7 @@ func (s *ConfigSuite) TestResolveDefaultBranch() {
 
 func (s *ConfigSuite) TestResolveDefaultBranchWorktreeRepo() {
 	cfg := worktreeBranchConfig()
-	cfg.Workspace.DefaultBranch = "main"
+	cfg.Metarepo.DefaultBranch = "main"
 
 	// Worktree repos must return their own branch, not the workspace default.
 	s.Equal("dev", cfg.ResolveDefaultBranch("infra-dev"))
@@ -124,14 +124,25 @@ func (s *ConfigSuite) TestWorktreeRepoToSetIndex() {
 	}
 }
 
+func (s *ConfigSuite) TestWorkspaceBlockFields() {
+	wb := config.WorkspaceBlock{
+		Name:        "payments",
+		Description: "Payment processing",
+		Repos:       []string{"api", "gateway"},
+	}
+	s.Equal("payments", wb.Name)
+	s.Equal("Payment processing", wb.Description)
+	s.Equal([]string{"api", "gateway"}, wb.Repos)
+}
+
 func branchAccessorCases() []branchAccessorCase {
 	trueValue := true
 	falseValue := false
 
 	return []branchAccessorCase{
-		{name: "nil defaults true", meta: config.WorkspaceMeta{}, wantSync: true, wantUp: true, wantPush: true},
-		{name: "explicit false", meta: config.WorkspaceMeta{BranchSyncSource: &falseValue, BranchSetUpstream: &falseValue, BranchPush: &falseValue}, wantSync: false, wantUp: false, wantPush: false},
-		{name: "explicit true", meta: config.WorkspaceMeta{BranchSyncSource: &trueValue, BranchSetUpstream: &trueValue, BranchPush: &trueValue}, wantSync: true, wantUp: true, wantPush: true},
+		{name: "nil defaults true", meta: config.MetarepoConfig{}, wantSync: true, wantUp: true, wantPush: true},
+		{name: "explicit false", meta: config.MetarepoConfig{BranchSyncSource: &falseValue, BranchSetUpstream: &falseValue, BranchPush: &falseValue}, wantSync: false, wantUp: false, wantPush: false},
+		{name: "explicit true", meta: config.MetarepoConfig{BranchSyncSource: &trueValue, BranchSetUpstream: &trueValue, BranchPush: &trueValue}, wantSync: true, wantUp: true, wantPush: true},
 	}
 }
 
