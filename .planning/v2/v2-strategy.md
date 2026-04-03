@@ -119,8 +119,8 @@ When all 12 milestones are merged to `v2`:
 |---|---|
 | Active milestone | V2 M1: Config schema + loader |
 | Milestone branch | `v2/m1-config-schema` |
-| Current issue branch | none (setup only — no issue work started) |
-| Next issue to implement | #36 — Add `[[workspace]]` block to config schema |
+| Current issue branch | none |
+| Next issue to implement | #37 — Add `track_branch` and `upstream` fields to `[[repo]]` |
 | M12 parallel unlock | not yet unlocked |
 
 ---
