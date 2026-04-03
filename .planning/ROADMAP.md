@@ -137,7 +137,10 @@ Milestone branch: `v2-m1-config-schema` | Depends on: none
   2. Warning message includes actionable suggestion to run `git w migrate`
   3. Non-conforming paths do not prevent config loading (warning, not error)
 **Canonical refs**: `.planning/v2/v2-schema.md` (repo path), `.planning/v2/v2-migration.md`
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 03-01-PLAN.md — Add Warnings field, path-convention check, and LoadConfig stderr output
 
 ---
 
