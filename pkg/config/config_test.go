@@ -212,3 +212,141 @@ func (s *ConfigSuite) TestRepoConfigIsAlias() {
 		})
 	}
 }
+
+func (s *ConfigSuite) TestBranchActionConstants() {
+	s.Assert().Equal(config.BranchAction("allow"), config.ActionAllow)
+	s.Assert().Equal(config.BranchAction("block"), config.ActionBlock)
+	s.Assert().Equal(config.BranchAction("warn"), config.ActionWarn)
+	s.Assert().Equal(config.BranchAction("require-flag"), config.ActionRequireFlag)
+}
+
+func (s *ConfigSuite) TestMergeRemote() {
+	trueVal := true
+
+	cases := []struct {
+		name     string
+		base     config.RemoteConfig
+		override config.RemoteConfig
+		want     config.RemoteConfig
+	}{
+		{
+			name:     "empty override returns base unchanged",
+			base:     config.RemoteConfig{Name: "origin", Kind: "github", URL: "https://github.com"},
+			override: config.RemoteConfig{},
+			want:     config.RemoteConfig{Name: "origin", Kind: "github", URL: "https://github.com"},
+		},
+		{
+			name:     "non-zero name in override wins",
+			base:     config.RemoteConfig{Name: "origin"},
+			override: config.RemoteConfig{Name: "personal"},
+			want:     config.RemoteConfig{Name: "personal"},
+		},
+		{
+			name:     "zero URL keeps base URL",
+			base:     config.RemoteConfig{Name: "origin", URL: "https://github.com"},
+			override: config.RemoteConfig{Name: "origin"},
+			want:     config.RemoteConfig{Name: "origin", URL: "https://github.com"},
+		},
+		{
+			name:     "non-zero URL in override wins",
+			base:     config.RemoteConfig{Name: "origin", URL: "https://github.com"},
+			override: config.RemoteConfig{URL: "https://gitea.example.com"},
+			want:     config.RemoteConfig{Name: "origin", URL: "https://gitea.example.com"},
+		},
+		{
+			name:     "non-zero kind wins; empty kind keeps base kind",
+			base:     config.RemoteConfig{Kind: "github"},
+			override: config.RemoteConfig{Kind: "gitea"},
+			want:     config.RemoteConfig{Kind: "gitea"},
+		},
+		{
+			name:     "Critical true in override wins",
+			base:     config.RemoteConfig{Critical: false},
+			override: config.RemoteConfig{Critical: true},
+			want:     config.RemoteConfig{Critical: true},
+		},
+		{
+			name:     "Private true in override wins",
+			base:     config.RemoteConfig{Private: false},
+			override: config.RemoteConfig{Private: true},
+			want:     config.RemoteConfig{Private: true},
+		},
+		{
+			name: "nil BranchRules override keeps base BranchRules",
+			base: config.RemoteConfig{
+				BranchRules: []config.BranchRuleConfig{{Pattern: "main", Action: config.ActionAllow}},
+			},
+			override: config.RemoteConfig{},
+			want: config.RemoteConfig{
+				BranchRules: []config.BranchRuleConfig{{Pattern: "main", Action: config.ActionAllow}},
+			},
+		},
+		{
+			name: "non-nil BranchRules in override replaces base",
+			base: config.RemoteConfig{
+				BranchRules: []config.BranchRuleConfig{{Pattern: "old/*", Action: config.ActionBlock}},
+			},
+			override: config.RemoteConfig{
+				BranchRules: []config.BranchRuleConfig{{Pattern: "new/*", Action: config.ActionWarn}},
+			},
+			want: config.RemoteConfig{
+				BranchRules: []config.BranchRuleConfig{{Pattern: "new/*", Action: config.ActionWarn}},
+			},
+		},
+		{
+			name: "BranchRuleConfig *bool fields preserved",
+			base: config.RemoteConfig{
+				BranchRules: []config.BranchRuleConfig{{Untracked: &trueVal}},
+			},
+			override: config.RemoteConfig{},
+			want: config.RemoteConfig{
+				BranchRules: []config.BranchRuleConfig{{Untracked: &trueVal}},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			got := config.MergeRemote(tc.base, tc.override)
+			s.Assert().Equal(tc.want, got)
+		})
+	}
+}
+
+func (s *ConfigSuite) TestRemoteByName() {
+	cfg := config.WorkspaceConfig{
+		Remotes: []config.RemoteConfig{
+			{Name: "origin", Kind: "github"},
+			{Name: "personal", Kind: "gitea"},
+		},
+	}
+
+	s.Run("found by name", func() {
+		r, ok := cfg.RemoteByName("origin")
+		s.Assert().True(ok)
+		s.Assert().Equal("github", r.Kind)
+	})
+
+	s.Run("second entry found", func() {
+		r, ok := cfg.RemoteByName("personal")
+		s.Assert().True(ok)
+		s.Assert().Equal("gitea", r.Kind)
+	})
+
+	s.Run("not found returns false", func() {
+		_, ok := cfg.RemoteByName("missing")
+		s.Assert().False(ok)
+	})
+
+	s.Run("first matching name returned", func() {
+		cfgDup := config.WorkspaceConfig{
+			Remotes: []config.RemoteConfig{
+				{Name: "origin", Kind: "github"},
+				{Name: "origin", Kind: "gitea"},
+			},
+		}
+		r, ok := cfgDup.RemoteByName("origin")
+		s.Assert().True(ok)
+		s.Assert().Equal("github", r.Kind)
+	})
+}

@@ -12,6 +12,7 @@ import (
 type WorkspaceConfig struct {
 	Metarepo   MetarepoConfig             `toml:"metarepo"`
 	Workspaces []WorkspaceBlock           `toml:"workspace"`
+	Remotes    []RemoteConfig             // in-memory; populated from [[remote]] list by loader
 	Context    ContextConfig              `toml:"context"` // sourced from .gitw.local
 	Repos      map[string]RepoConfig      // in-memory only; populated from [[repo]] list by loader
 	Groups     map[string]GroupConfig     `toml:"groups"`
@@ -47,6 +48,119 @@ type WorkspaceBlock struct {
 	Repos       []string `toml:"repos,omitempty"`
 }
 
+// BranchAction is the typed action for a branch rule.
+type BranchAction string
+
+const (
+	ActionAllow       BranchAction = "allow"
+	ActionBlock       BranchAction = "block"
+	ActionWarn        BranchAction = "warn"
+	ActionRequireFlag BranchAction = "require-flag"
+)
+
+// BranchRuleConfig is one [[remote.branch_rule]] entry.
+type BranchRuleConfig struct {
+	Pattern   string       `toml:"pattern,omitempty"`
+	Action    BranchAction `toml:"action"`
+	Reason    string       `toml:"reason,omitempty"`
+	Flag      string       `toml:"flag,omitempty"`
+	Untracked *bool        `toml:"untracked,omitempty"`
+	Explicit  *bool        `toml:"explicit,omitempty"`
+}
+
+// RemoteConfig is one [[remote]] entry.
+type RemoteConfig struct {
+	Name        string             `toml:"name"`
+	Kind        string             `toml:"kind,omitempty"`
+	URL         string             `toml:"url,omitempty"`
+	User        string             `toml:"user,omitempty"`
+	TokenEnv    string             `toml:"token_env,omitempty"`
+	Org         string             `toml:"org,omitempty"`
+	RepoPrefix  string             `toml:"repo_prefix,omitempty"`
+	RepoSuffix  string             `toml:"repo_suffix,omitempty"`
+	Direction   string             `toml:"direction,omitempty"`
+	PushMode    string             `toml:"push_mode,omitempty"`
+	FetchMode   string             `toml:"fetch_mode,omitempty"`
+	UseSSH      bool               `toml:"use_ssh,omitempty"`
+	SSHHost     string             `toml:"ssh_host,omitempty"`
+	Critical    bool               `toml:"critical,omitempty"`
+	Private     bool               `toml:"private,omitempty"`
+	BranchRules []BranchRuleConfig `toml:"branch_rule,omitempty"`
+}
+
+// MergeRemote merges base and override RemoteConfig. For each field, the
+// override value wins if non-zero; otherwise the base value is used.
+// BranchRules from override replace base BranchRules entirely if non-nil.
+func MergeRemote(base, override RemoteConfig) RemoteConfig {
+	merged := base
+
+	if override.Name != "" {
+		merged.Name = override.Name
+	}
+
+	if override.Kind != "" {
+		merged.Kind = override.Kind
+	}
+
+	if override.URL != "" {
+		merged.URL = override.URL
+	}
+
+	if override.User != "" {
+		merged.User = override.User
+	}
+
+	if override.TokenEnv != "" {
+		merged.TokenEnv = override.TokenEnv
+	}
+
+	if override.Org != "" {
+		merged.Org = override.Org
+	}
+
+	if override.RepoPrefix != "" {
+		merged.RepoPrefix = override.RepoPrefix
+	}
+
+	if override.RepoSuffix != "" {
+		merged.RepoSuffix = override.RepoSuffix
+	}
+
+	if override.Direction != "" {
+		merged.Direction = override.Direction
+	}
+
+	if override.PushMode != "" {
+		merged.PushMode = override.PushMode
+	}
+
+	if override.FetchMode != "" {
+		merged.FetchMode = override.FetchMode
+	}
+
+	if override.UseSSH {
+		merged.UseSSH = override.UseSSH
+	}
+
+	if override.SSHHost != "" {
+		merged.SSHHost = override.SSHHost
+	}
+
+	if override.Critical {
+		merged.Critical = override.Critical
+	}
+
+	if override.Private {
+		merged.Private = override.Private
+	}
+
+	if override.BranchRules != nil {
+		merged.BranchRules = override.BranchRules
+	}
+
+	return merged
+}
+
 // RepoConfig represents one tracked repository.
 type RepoConfig struct {
 	Name          string   `toml:"name"`
@@ -56,6 +170,7 @@ type RepoConfig struct {
 	DefaultBranch string   `toml:"default_branch,omitempty"`
 	TrackBranch   string   `toml:"track_branch,omitempty"`
 	Upstream      string   `toml:"upstream,omitempty"`
+	Remotes       []string `toml:"remotes,omitempty"`
 }
 
 // IsAlias reports whether this repo is an env alias (has track_branch set).
@@ -85,6 +200,17 @@ type ContextConfig struct {
 func (c *WorkspaceConfig) RepoByName(name string) (RepoConfig, bool) {
 	rc, ok := c.Repos[name]
 	return rc, ok
+}
+
+// RemoteByName returns the RemoteConfig with the given name and whether it was found.
+func (c *WorkspaceConfig) RemoteByName(name string) (RemoteConfig, bool) {
+	for _, r := range c.Remotes {
+		if r.Name == name {
+			return r, true
+		}
+	}
+
+	return RemoteConfig{}, false
 }
 
 // AutoGitignoreEnabled reports whether auto-gitignore is on (nil means default true).
