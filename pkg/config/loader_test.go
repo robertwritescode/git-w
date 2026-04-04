@@ -968,3 +968,341 @@ dev = "infra/dev"
 
 	s.Assert().Empty(cfg.Warnings, "synthesized worktree repos should not produce path warnings")
 }
+
+func (s *LoaderSuite) TestRemoteBlocksParse() {
+	trueVal := true
+
+	tests := []struct {
+		name  string
+		toml  string
+		check func(s *LoaderSuite, cfg *config.WorkspaceConfig)
+		noErr bool
+	}{
+		{
+			name:  "no remote blocks",
+			toml:  "[metarepo]\nname = \"ws\"\n",
+			noErr: true,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Assert().Empty(cfg.Remotes)
+			},
+		},
+		{
+			name: "single remote no branch rules",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name       = "origin"
+kind       = "github"
+direction  = "both"
+push_mode  = "branch"
+critical   = true
+`,
+			noErr: true,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Require().Len(cfg.Remotes, 1)
+				s.Assert().Equal("origin", cfg.Remotes[0].Name)
+				s.Assert().Equal("github", cfg.Remotes[0].Kind)
+				s.Assert().Equal("both", cfg.Remotes[0].Direction)
+				s.Assert().Equal("branch", cfg.Remotes[0].PushMode)
+				s.Assert().True(cfg.Remotes[0].Critical)
+				s.Assert().Empty(cfg.Remotes[0].BranchRules)
+			},
+		},
+		{
+			name: "single remote with branch rules",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+
+[[remote.branch_rule]]
+pattern = "wip/*"
+action  = "block"
+reason  = "WIP branches must not be pushed to org"
+
+[[remote.branch_rule]]
+pattern = "feature/**"
+action  = "warn"
+`,
+			noErr: true,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Require().Len(cfg.Remotes, 1)
+				s.Require().Len(cfg.Remotes[0].BranchRules, 2)
+				s.Assert().Equal("wip/*", cfg.Remotes[0].BranchRules[0].Pattern)
+				s.Assert().Equal(config.ActionBlock, cfg.Remotes[0].BranchRules[0].Action)
+				s.Assert().Equal("WIP branches must not be pushed to org", cfg.Remotes[0].BranchRules[0].Reason)
+				s.Assert().Equal("feature/**", cfg.Remotes[0].BranchRules[1].Pattern)
+				s.Assert().Equal(config.ActionWarn, cfg.Remotes[0].BranchRules[1].Action)
+			},
+		},
+		{
+			name: "multiple remotes",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+
+[[remote]]
+name = "personal"
+kind = "gitea"
+`,
+			noErr: true,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Require().Len(cfg.Remotes, 2)
+				s.Assert().Equal("origin", cfg.Remotes[0].Name)
+				s.Assert().Equal("personal", cfg.Remotes[1].Name)
+			},
+		},
+		{
+			name: "branch rule *bool fields",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+
+[[remote.branch_rule]]
+pattern   = "wip/*"
+untracked = true
+action    = "block"
+
+[[remote.branch_rule]]
+pattern = "main"
+action  = "allow"
+`,
+			noErr: true,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Require().Len(cfg.Remotes[0].BranchRules, 2)
+				s.Require().NotNil(cfg.Remotes[0].BranchRules[0].Untracked)
+				s.Assert().True(*cfg.Remotes[0].BranchRules[0].Untracked)
+				s.Assert().Nil(cfg.Remotes[0].BranchRules[1].Untracked)
+			},
+		},
+	}
+
+	_ = trueVal
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			cfg, err := config.Load(cfgPath)
+			if !tt.noErr {
+				s.Require().Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			if tt.check != nil {
+				tt.check(s, cfg)
+			}
+		})
+	}
+}
+
+func (s *LoaderSuite) TestRemoteRoundTrip() {
+	content := `[metarepo]
+name = "ws"
+
+[[remote]]
+name      = "origin"
+kind      = "github"
+direction = "both"
+push_mode = "branch"
+critical  = true
+
+[[remote.branch_rule]]
+pattern = "wip/*"
+action  = "block"
+reason  = "WIP branches must not be pushed to org"
+
+[[remote.branch_rule]]
+pattern = "**"
+action  = "allow"
+
+[[remote]]
+name = "personal"
+kind = "gitea"
+url  = "https://gitea.example.com"
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+	s.Require().Len(cfg.Remotes, 2)
+
+	s.Require().NoError(config.Save(s.cfgPath, cfg))
+
+	cfg2, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg2.Remotes, 2)
+	s.Assert().Equal(cfg.Remotes[0].Name, cfg2.Remotes[0].Name)
+	s.Assert().Equal(cfg.Remotes[0].Kind, cfg2.Remotes[0].Kind)
+	s.Assert().Equal(cfg.Remotes[0].Direction, cfg2.Remotes[0].Direction)
+	s.Assert().Equal(cfg.Remotes[0].PushMode, cfg2.Remotes[0].PushMode)
+	s.Assert().Equal(cfg.Remotes[0].Critical, cfg2.Remotes[0].Critical)
+	s.Require().Len(cfg2.Remotes[0].BranchRules, 2)
+	s.Assert().Equal(cfg.Remotes[0].BranchRules[0].Pattern, cfg2.Remotes[0].BranchRules[0].Pattern)
+	s.Assert().Equal(cfg.Remotes[0].BranchRules[0].Action, cfg2.Remotes[0].BranchRules[0].Action)
+	s.Assert().Equal(cfg.Remotes[0].BranchRules[1].Pattern, cfg2.Remotes[0].BranchRules[1].Pattern)
+	s.Assert().Equal(cfg.Remotes[1].Name, cfg2.Remotes[1].Name)
+	s.Assert().Equal(cfg.Remotes[1].Kind, cfg2.Remotes[1].Kind)
+	s.Assert().Equal(cfg.Remotes[1].URL, cfg2.Remotes[1].URL)
+}
+
+func (s *LoaderSuite) TestRemoteValidation() {
+	tests := []struct {
+		name        string
+		toml        string
+		cfgSuffix   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "valid remote no branch rules",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+`,
+			cfgSuffix: ".gitw",
+		},
+		{
+			name: "valid remote with branch rules",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "gitea"
+
+[[remote.branch_rule]]
+pattern = "main"
+action  = "allow"
+`,
+			cfgSuffix: ".gitw",
+		},
+		{
+			name: "missing name",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+kind = "github"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "missing required name",
+		},
+		{
+			name: "duplicate name",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+
+[[remote]]
+name = "origin"
+kind = "gitea"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "duplicate",
+		},
+		{
+			name: "invalid kind",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "bitbucket"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "bitbucket",
+		},
+		{
+			name: "invalid action",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+
+[[remote.branch_rule]]
+pattern = "main"
+action  = "skip"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "skip",
+		},
+		{
+			name: "private in public file",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name    = "personal"
+kind    = "gitea"
+private = true
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: ".git/.gitw",
+		},
+		{
+			name: "private in private file ok",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name    = "personal"
+kind    = "gitea"
+private = true
+`,
+			cfgSuffix: ".git/.gitw",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			dir := s.T().TempDir()
+
+			var cfgPath string
+			if tt.cfgSuffix == ".git/.gitw" {
+				gitDir := filepath.Join(dir, ".git")
+				s.Require().NoError(os.MkdirAll(gitDir, 0o755))
+				cfgPath = filepath.Join(gitDir, ".gitw")
+			} else {
+				cfgPath = filepath.Join(dir, tt.cfgSuffix)
+			}
+
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			_, err := config.Load(cfgPath)
+			if tt.wantErr {
+				s.Require().Error(err)
+				if tt.errContains != "" {
+					s.Assert().Contains(err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			s.Require().NoError(err)
+		})
+	}
+}
