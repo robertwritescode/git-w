@@ -12,7 +12,7 @@ Requirements for v2.0 release. Each maps to roadmap phases (GSD phases = GitHub 
 - [x] **CFG-01**: User can define `[[workspace]]` blocks with name, description, and repos list in `.gitw`
 - [ ] **CFG-02**: User can add `track_branch` and `upstream` fields to `[[repo]]` blocks for env aliases
 - [ ] **CFG-03**: Tool enforces `repos/<n>` path convention and warns on v1 paths with migration suggestion
-- [ ] **CFG-04**: User can define `[[remote]]` and `[[remote.branch_rule]]` blocks with all specified fields
+- [x] **CFG-04**: User can define `[[remote]]` and `[[remote.branch_rule]]` blocks with all specified fields
 - [ ] **CFG-05**: User can define `[[sync_pair]]` blocks with cycle detection at load time
 - [ ] **CFG-06**: User can define `[[workstream]]` root config blocks for lightweight remote overrides
 - [ ] **CFG-07**: Tool merges `.gitw` and `.git/.gitw` with field-level semantics (private file wins on conflicts)
@@ -144,7 +144,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CFG-01 | Phase 1 (M1 #36) | Complete |
 | CFG-02 | Phase 2 (M1 #37) | Pending |
 | CFG-03 | Phase 3 (M1 #38) | Pending |
-| CFG-04 | Phase 4 (M1 #39) | Pending |
+| CFG-04 | Phase 4 (M1 #39) | Complete |
 | CFG-05 | Phase 5 (M1 #40) | Pending |
 | CFG-06 | Phase 6 (M1 #41) | Pending |
 | CFG-07 | Phase 7 (M1 #42) | Pending |
