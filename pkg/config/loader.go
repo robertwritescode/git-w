@@ -44,6 +44,7 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 	cfg := &WorkspaceConfig{
 		Metarepo:   dc.Metarepo,
 		Workspaces: dc.Workspaces,
+		Remotes:    dc.RemoteList,
 		Groups:     dc.Groups,
 		Worktrees:  dc.Worktrees,
 	}
@@ -249,6 +250,7 @@ type diskConfig struct {
 	Metarepo   MetarepoConfig            `toml:"metarepo"`
 	Workspaces []WorkspaceBlock          `toml:"workspace,omitempty"`
 	RepoList   []RepoConfig              `toml:"repo,omitempty"`
+	RemoteList []RemoteConfig            `toml:"remote,omitempty"`
 	Groups     map[string]GroupConfig    `toml:"groups,omitempty"`
 	Worktrees  map[string]WorktreeConfig `toml:"worktrees,omitempty"`
 }
@@ -258,6 +260,7 @@ func prepareDiskConfig(cfg *WorkspaceConfig) diskConfig {
 		Metarepo:   cfg.Metarepo,
 		Workspaces: cfg.Workspaces,
 		RepoList:   buildRepoList(cfg),
+		RemoteList: cfg.Remotes,
 		Groups:     withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
 		Worktrees:  cfg.Worktrees,
 	}
