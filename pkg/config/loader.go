@@ -45,6 +45,7 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 		Metarepo:   dc.Metarepo,
 		Workspaces: dc.Workspaces,
 		Remotes:    dc.RemoteList,
+		SyncPairs:  dc.SyncPairList,
 		Groups:     dc.Groups,
 		Worktrees:  dc.Worktrees,
 	}
@@ -94,6 +95,14 @@ func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
 	}
 
 	if err := validateRemotes(configPath, cfg); err != nil {
+		return err
+	}
+
+	if err := validateSyncPairFields(cfg); err != nil {
+		return err
+	}
+
+	if err := detectSyncCycles(cfg); err != nil {
 		return err
 	}
 
@@ -176,6 +185,81 @@ func validateRemotes(cfgPath string, cfg *WorkspaceConfig) error {
 		}
 	}
 
+	return nil
+}
+
+func validateSyncPairFields(cfg *WorkspaceConfig) error {
+	type pairKey struct{ from, to string }
+	seen := make(map[pairKey]struct{}, len(cfg.SyncPairs))
+
+	for i, p := range cfg.SyncPairs {
+		if p.From == "" {
+			return fmt.Errorf("[[sync_pair]] entry at index %d: missing required %q field", i, "from")
+		}
+
+		if p.To == "" {
+			return fmt.Errorf("[[sync_pair]] entry at index %d: missing required %q field", i, "to")
+		}
+
+		k := pairKey{p.From, p.To}
+		if _, dup := seen[k]; dup {
+			return fmt.Errorf("duplicate [[sync_pair]] (from=%q, to=%q)", p.From, p.To)
+		}
+
+		seen[k] = struct{}{}
+	}
+
+	return nil
+}
+
+func detectSyncCycles(cfg *WorkspaceConfig) error {
+	adj := make(map[string][]string)
+	for _, p := range cfg.SyncPairs {
+		adj[p.From] = append(adj[p.From], p.To)
+	}
+
+	visited := make(map[string]bool)
+	inStack := make(map[string]bool)
+
+	for node := range adj {
+		if visited[node] {
+			continue
+		}
+
+		if cycle := dfsSyncCycle(node, adj, visited, inStack, []string{node}); cycle != nil {
+			return fmt.Errorf("sync_pair cycle detected: %s", strings.Join(cycle, " → "))
+		}
+	}
+
+	return nil
+}
+
+func dfsSyncCycle(node string, adj map[string][]string, visited, inStack map[string]bool, path []string) []string {
+	visited[node] = true
+	inStack[node] = true
+
+	for _, neighbor := range adj[node] {
+		if inStack[neighbor] {
+			// cycle found: find the start of the cycle in path, append closing node
+			for i, n := range path {
+				if n == neighbor {
+					cycle := make([]string, len(path[i:])+1)
+					copy(cycle, path[i:])
+					cycle[len(cycle)-1] = neighbor
+					return cycle
+				}
+			}
+			return append(path, neighbor)
+		}
+
+		if !visited[neighbor] {
+			if cycle := dfsSyncCycle(neighbor, adj, visited, inStack, append(path, neighbor)); cycle != nil {
+				return cycle
+			}
+		}
+	}
+
+	inStack[node] = false
 	return nil
 }
 
@@ -291,22 +375,24 @@ func Save(configPath string, cfg *WorkspaceConfig) error {
 }
 
 type diskConfig struct {
-	Metarepo   MetarepoConfig            `toml:"metarepo"`
-	Workspaces []WorkspaceBlock          `toml:"workspace,omitempty"`
-	RepoList   []RepoConfig              `toml:"repo,omitempty"`
-	RemoteList []RemoteConfig            `toml:"remote,omitempty"`
-	Groups     map[string]GroupConfig    `toml:"groups,omitempty"`
-	Worktrees  map[string]WorktreeConfig `toml:"worktrees,omitempty"`
+	Metarepo     MetarepoConfig            `toml:"metarepo"`
+	Workspaces   []WorkspaceBlock          `toml:"workspace,omitempty"`
+	RepoList     []RepoConfig              `toml:"repo,omitempty"`
+	RemoteList   []RemoteConfig            `toml:"remote,omitempty"`
+	SyncPairList []SyncPairConfig          `toml:"sync_pair,omitempty"`
+	Groups       map[string]GroupConfig    `toml:"groups,omitempty"`
+	Worktrees    map[string]WorktreeConfig `toml:"worktrees,omitempty"`
 }
 
 func prepareDiskConfig(cfg *WorkspaceConfig) diskConfig {
 	return diskConfig{
-		Metarepo:   cfg.Metarepo,
-		Workspaces: cfg.Workspaces,
-		RepoList:   buildRepoList(cfg),
-		RemoteList: cfg.Remotes,
-		Groups:     withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
-		Worktrees:  cfg.Worktrees,
+		Metarepo:     cfg.Metarepo,
+		Workspaces:   cfg.Workspaces,
+		RepoList:     buildRepoList(cfg),
+		RemoteList:   cfg.Remotes,
+		SyncPairList: cfg.SyncPairs,
+		Groups:       withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
+		Worktrees:    cfg.Worktrees,
 	}
 }
 

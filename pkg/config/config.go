@@ -13,6 +13,7 @@ type WorkspaceConfig struct {
 	Metarepo   MetarepoConfig             `toml:"metarepo"`
 	Workspaces []WorkspaceBlock           `toml:"workspace"`
 	Remotes    []RemoteConfig             // in-memory; populated from [[remote]] list by loader
+	SyncPairs  []SyncPairConfig           // in-memory; populated from [[sync_pair]] list by loader
 	Context    ContextConfig              `toml:"context"` // sourced from .gitw.local
 	Repos      map[string]RepoConfig      // in-memory only; populated from [[repo]] list by loader
 	Groups     map[string]GroupConfig     `toml:"groups"`
@@ -88,6 +89,13 @@ type RemoteConfig struct {
 	BranchRules []BranchRuleConfig `toml:"branch_rule,omitempty"`
 }
 
+// SyncPairConfig is one [[sync_pair]] entry.
+type SyncPairConfig struct {
+	From string   `toml:"from"`
+	To   string   `toml:"to"`
+	Refs []string `toml:"refs,omitempty"`
+}
+
 // MergeRemote merges base and override RemoteConfig. For each field, the
 // override value wins if non-zero; otherwise the base value is used.
 // BranchRules from override replace base BranchRules entirely if non-nil.
@@ -156,6 +164,27 @@ func MergeRemote(base, override RemoteConfig) RemoteConfig {
 
 	if override.BranchRules != nil {
 		merged.BranchRules = override.BranchRules
+	}
+
+	return merged
+}
+
+// MergeSyncPair merges base and override SyncPairConfig. For each field,
+// the override value wins if non-zero; otherwise the base value is used.
+// Refs from override replace base Refs entirely if non-empty.
+func MergeSyncPair(base, override SyncPairConfig) SyncPairConfig {
+	merged := base
+
+	if override.From != "" {
+		merged.From = override.From
+	}
+
+	if override.To != "" {
+		merged.To = override.To
+	}
+
+	if len(override.Refs) > 0 {
+		merged.Refs = override.Refs
 	}
 
 	return merged

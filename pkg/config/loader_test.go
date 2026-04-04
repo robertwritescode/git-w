@@ -1157,6 +1157,368 @@ url  = "https://gitea.example.com"
 	s.Assert().Equal(cfg.Remotes[1].URL, cfg2.Remotes[1].URL)
 }
 
+func (s *LoaderSuite) TestSyncPairBlocksParse() {
+	tests := []struct {
+		name  string
+		toml  string
+		check func(s *LoaderSuite, cfg *config.WorkspaceConfig)
+	}{
+		{
+			name: "no sync_pair blocks",
+			toml: "[metarepo]\nname = \"ws\"\n",
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Assert().Empty(cfg.SyncPairs)
+			},
+		},
+		{
+			name: "single pair no refs",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+`,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Require().Len(cfg.SyncPairs, 1)
+				s.Assert().Equal("origin", cfg.SyncPairs[0].From)
+				s.Assert().Equal("personal", cfg.SyncPairs[0].To)
+				s.Assert().Empty(cfg.SyncPairs[0].Refs)
+			},
+		},
+		{
+			name: "single pair with refs",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+refs = ["**"]
+`,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Require().Len(cfg.SyncPairs, 1)
+				s.Assert().Equal([]string{"**"}, cfg.SyncPairs[0].Refs)
+			},
+		},
+		{
+			name: "multiple pairs",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "personal"
+to   = "contractor"
+`,
+			check: func(s *LoaderSuite, cfg *config.WorkspaceConfig) {
+				s.Require().Len(cfg.SyncPairs, 2)
+				s.Assert().Equal("origin", cfg.SyncPairs[0].From)
+				s.Assert().Equal("personal", cfg.SyncPairs[0].To)
+				s.Assert().Equal("personal", cfg.SyncPairs[1].From)
+				s.Assert().Equal("contractor", cfg.SyncPairs[1].To)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			cfg, err := config.Load(cfgPath)
+			s.Require().NoError(err)
+			if tt.check != nil {
+				tt.check(s, cfg)
+			}
+		})
+	}
+}
+
+func (s *LoaderSuite) TestSyncPairRoundTrip() {
+	content := `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+refs = ["main", "develop"]
+
+[[sync_pair]]
+from = "personal"
+to   = "contractor"
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+	s.Require().Len(cfg.SyncPairs, 2)
+
+	s.Require().NoError(config.Save(s.cfgPath, cfg))
+
+	cfg2, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg2.SyncPairs, 2)
+	s.Assert().Equal(cfg.SyncPairs[0].From, cfg2.SyncPairs[0].From)
+	s.Assert().Equal(cfg.SyncPairs[0].To, cfg2.SyncPairs[0].To)
+	s.Assert().Equal(cfg.SyncPairs[0].Refs, cfg2.SyncPairs[0].Refs)
+	s.Assert().Equal(cfg.SyncPairs[1].From, cfg2.SyncPairs[1].From)
+	s.Assert().Equal(cfg.SyncPairs[1].To, cfg2.SyncPairs[1].To)
+}
+
+func (s *LoaderSuite) TestSyncPairValidation() {
+	tests := []struct {
+		name        string
+		toml        string
+		wantErr     bool
+		errContains []string
+	}{
+		{
+			name: "valid pair no refs",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+`,
+		},
+		{
+			name: "valid pair with refs",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+refs = ["**"]
+`,
+		},
+		{
+			name: "missing from",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+to = "personal"
+`,
+			wantErr:     true,
+			errContains: []string{"missing required", "from"},
+		},
+		{
+			name: "missing to",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+`,
+			wantErr:     true,
+			errContains: []string{"missing required", "to"},
+		},
+		{
+			name: "duplicate pair",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+`,
+			wantErr:     true,
+			errContains: []string{"duplicate", "origin", "personal"},
+		},
+		{
+			name: "same from different to ok",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "origin"
+to   = "contractor"
+`,
+		},
+		{
+			name: "same to different from ok",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "personal"
+to   = "contractor"
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			_, err := config.Load(cfgPath)
+			if tt.wantErr {
+				s.Require().Error(err)
+				for _, want := range tt.errContains {
+					s.Assert().Contains(err.Error(), want)
+				}
+				return
+			}
+			s.Require().NoError(err)
+		})
+	}
+}
+
+func (s *LoaderSuite) TestSyncCycleDetection() {
+	tests := []struct {
+		name        string
+		toml        string
+		wantErr     bool
+		errContains []string
+	}{
+		{
+			name: "no pairs no cycle",
+			toml: "[metarepo]\nname = \"ws\"\n",
+		},
+		{
+			name: "linear chain no cycle",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "personal"
+to   = "contractor"
+`,
+		},
+		{
+			name: "two-node cycle",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "personal"
+to   = "origin"
+`,
+			wantErr:     true,
+			errContains: []string{"sync_pair cycle detected", "origin", "personal"},
+		},
+		{
+			name: "three-node cycle",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "personal"
+to   = "contractor"
+
+[[sync_pair]]
+from = "contractor"
+to   = "origin"
+`,
+			wantErr:     true,
+			errContains: []string{"sync_pair cycle detected", "origin", "personal", "contractor", "→ origin"},
+		},
+		{
+			name: "self-loop",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "origin"
+`,
+			wantErr:     true,
+			errContains: []string{"sync_pair cycle detected", "origin"},
+		},
+		{
+			name: "cycle in longer chain",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "a"
+to   = "b"
+
+[[sync_pair]]
+from = "b"
+to   = "c"
+
+[[sync_pair]]
+from = "c"
+to   = "b"
+`,
+			wantErr:     true,
+			errContains: []string{"sync_pair cycle detected", "b", "c"},
+		},
+		{
+			name: "diamond no cycle",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "origin"
+to   = "personal"
+
+[[sync_pair]]
+from = "origin"
+to   = "contractor"
+
+[[sync_pair]]
+from = "personal"
+to   = "mirror"
+
+[[sync_pair]]
+from = "contractor"
+to   = "mirror"
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			_, err := config.Load(cfgPath)
+			if tt.wantErr {
+				s.Require().Error(err)
+				for _, want := range tt.errContains {
+					s.Assert().Contains(err.Error(), want)
+				}
+				return
+			}
+			s.Require().NoError(err)
+		})
+	}
+}
+
 func (s *LoaderSuite) TestRemoteValidation() {
 	tests := []struct {
 		name        string
