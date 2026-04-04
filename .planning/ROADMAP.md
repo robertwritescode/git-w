@@ -173,7 +173,9 @@ Plans:
   2. Cycle detection at load time identifies circular sync routes
   3. Cycles produce actionable error message naming the cycle path
 **Canonical refs**: `.planning/v2/v2-schema.md` (sync_pair block), `.planning/v2/v2-remote-management.md` (sync fan-out)
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 05-01-PLAN.md — SyncPairConfig struct, SyncPairs field on WorkspaceConfig, MergeSyncPair function + tests
+- [ ] 05-02-PLAN.md — diskConfig wiring, validateSyncPairFields, detectSyncCycles, buildAndValidate integration + tests
 
 ---
 
