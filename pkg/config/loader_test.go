@@ -1156,3 +1156,153 @@ url  = "https://gitea.example.com"
 	s.Assert().Equal(cfg.Remotes[1].Kind, cfg2.Remotes[1].Kind)
 	s.Assert().Equal(cfg.Remotes[1].URL, cfg2.Remotes[1].URL)
 }
+
+func (s *LoaderSuite) TestRemoteValidation() {
+	tests := []struct {
+		name        string
+		toml        string
+		cfgSuffix   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "valid remote no branch rules",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+`,
+			cfgSuffix: ".gitw",
+		},
+		{
+			name: "valid remote with branch rules",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "gitea"
+
+[[remote.branch_rule]]
+pattern = "main"
+action  = "allow"
+`,
+			cfgSuffix: ".gitw",
+		},
+		{
+			name: "missing name",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+kind = "github"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "missing required name",
+		},
+		{
+			name: "duplicate name",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+
+[[remote]]
+name = "origin"
+kind = "gitea"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "duplicate",
+		},
+		{
+			name: "invalid kind",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "bitbucket"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "bitbucket",
+		},
+		{
+			name: "invalid action",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+kind = "github"
+
+[[remote.branch_rule]]
+pattern = "main"
+action  = "skip"
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: "skip",
+		},
+		{
+			name: "private in public file",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name    = "personal"
+kind    = "gitea"
+private = true
+`,
+			cfgSuffix:   ".gitw",
+			wantErr:     true,
+			errContains: ".git/.gitw",
+		},
+		{
+			name: "private in private file ok",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name    = "personal"
+kind    = "gitea"
+private = true
+`,
+			cfgSuffix: ".git/.gitw",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			dir := s.T().TempDir()
+
+			var cfgPath string
+			if tt.cfgSuffix == ".git/.gitw" {
+				gitDir := filepath.Join(dir, ".git")
+				s.Require().NoError(os.MkdirAll(gitDir, 0o755))
+				cfgPath = filepath.Join(gitDir, ".gitw")
+			} else {
+				cfgPath = filepath.Join(dir, tt.cfgSuffix)
+			}
+
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			_, err := config.Load(cfgPath)
+			if tt.wantErr {
+				s.Require().Error(err)
+				if tt.errContains != "" {
+					s.Assert().Contains(err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			s.Require().NoError(err)
+		})
+	}
+}

@@ -93,6 +93,10 @@ func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
 		return err
 	}
 
+	if err := validateRemotes(configPath, cfg); err != nil {
+		return err
+	}
+
 	return validateAliasFields(cfg)
 }
 
@@ -130,6 +134,46 @@ func validateAliasFields(cfg *WorkspaceConfig) error {
 func validateAgenticFrameworks(cfg *WorkspaceConfig) error {
 	if _, err := agents.FrameworksFor(cfg.Metarepo.AgenticFrameworks); err != nil {
 		return fmt.Errorf("agentic_frameworks: %w", err)
+	}
+
+	return nil
+}
+
+func validateRemotes(cfgPath string, cfg *WorkspaceConfig) error {
+	isPrivateFile := strings.HasSuffix(filepath.ToSlash(cfgPath), ".git/.gitw")
+	seen := make(map[string]struct{}, len(cfg.Remotes))
+
+	for i, r := range cfg.Remotes {
+		if r.Name == "" {
+			return fmt.Errorf("[[remote]] entry at index %d: missing required name field", i)
+		}
+
+		if _, dup := seen[r.Name]; dup {
+			return fmt.Errorf("duplicate [[remote]] name %q", r.Name)
+		}
+		seen[r.Name] = struct{}{}
+
+		if r.Kind != "" {
+			switch r.Kind {
+			case "gitea", "forgejo", "github", "generic":
+			default:
+				return fmt.Errorf("remote %q: kind %q is not valid; must be one of: gitea, forgejo, github, generic", r.Name, r.Kind)
+			}
+		}
+
+		for j, rule := range r.BranchRules {
+			if rule.Action != "" {
+				switch rule.Action {
+				case ActionAllow, ActionBlock, ActionWarn, ActionRequireFlag:
+				default:
+					return fmt.Errorf("remote %q branch_rule[%d]: action %q is not valid; must be one of: allow, block, warn, require-flag", r.Name, j, rule.Action)
+				}
+			}
+		}
+
+		if r.Private && !isPrivateFile {
+			return fmt.Errorf("remote %q: private remotes must be defined in .git/.gitw, not .gitw", r.Name)
+		}
 	}
 
 	return nil
