@@ -155,7 +155,11 @@ Plans:
   3. Branch rules preserve declaration order (array-of-tables, not map)
   4. Invalid remote or rule configurations produce actionable validation errors
 **Canonical refs**: `.planning/v2/v2-schema.md` (remote block), `.planning/v2/v2-remote-management.md`
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Type definitions: RemoteConfig, BranchRuleConfig, BranchAction, MergeRemote, diskConfig wiring
+- [ ] 04-02-PLAN.md — Validation: validateRemotes wired into buildAndValidate (name, uniqueness, kind, action, private)
 
 ---
 
