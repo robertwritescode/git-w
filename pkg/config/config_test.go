@@ -313,6 +313,71 @@ func (s *ConfigSuite) TestMergeRemote() {
 	}
 }
 
+func (s *ConfigSuite) TestMergeSyncPair() {
+	cases := []struct {
+		name     string
+		base     config.SyncPairConfig
+		override config.SyncPairConfig
+		want     config.SyncPairConfig
+	}{
+		{
+			name:     "empty override returns base unchanged",
+			base:     config.SyncPairConfig{From: "origin", To: "personal", Refs: []string{"**"}},
+			override: config.SyncPairConfig{},
+			want:     config.SyncPairConfig{From: "origin", To: "personal", Refs: []string{"**"}},
+		},
+		{
+			name:     "non-zero From in override wins",
+			base:     config.SyncPairConfig{From: "origin"},
+			override: config.SyncPairConfig{From: "personal"},
+			want:     config.SyncPairConfig{From: "personal"},
+		},
+		{
+			name:     "non-zero To in override wins",
+			base:     config.SyncPairConfig{To: "personal"},
+			override: config.SyncPairConfig{To: "contractor"},
+			want:     config.SyncPairConfig{To: "contractor"},
+		},
+		{
+			name:     "non-empty Refs in override wins",
+			base:     config.SyncPairConfig{Refs: []string{"main"}},
+			override: config.SyncPairConfig{Refs: []string{"release/**"}},
+			want:     config.SyncPairConfig{Refs: []string{"release/**"}},
+		},
+		{
+			name:     "nil override Refs keeps base Refs",
+			base:     config.SyncPairConfig{Refs: []string{"main", "develop"}},
+			override: config.SyncPairConfig{Refs: nil},
+			want:     config.SyncPairConfig{Refs: []string{"main", "develop"}},
+		},
+		{
+			name:     "empty slice override Refs keeps base Refs",
+			base:     config.SyncPairConfig{Refs: []string{"main"}},
+			override: config.SyncPairConfig{Refs: []string{}},
+			want:     config.SyncPairConfig{Refs: []string{"main"}},
+		},
+		{
+			name:     "zero From keeps base From",
+			base:     config.SyncPairConfig{From: "origin"},
+			override: config.SyncPairConfig{From: ""},
+			want:     config.SyncPairConfig{From: "origin"},
+		},
+		{
+			name:     "zero To keeps base To",
+			base:     config.SyncPairConfig{To: "personal"},
+			override: config.SyncPairConfig{To: ""},
+			want:     config.SyncPairConfig{To: "personal"},
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			got := config.MergeSyncPair(tc.base, tc.override)
+			s.Assert().Equal(tc.want, got)
+		})
+	}
+}
+
 func (s *ConfigSuite) TestRemoteByName() {
 	cfg := config.WorkspaceConfig{
 		Remotes: []config.RemoteConfig{
