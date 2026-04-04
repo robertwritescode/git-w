@@ -120,7 +120,7 @@ When all 12 milestones are merged to `v2`:
 | Active milestone | V2 M1: Config schema + loader |
 | Milestone branch | `v2/m1-config-schema` |
 | Current issue branch | none |
-| Next issue to implement | #39 — Add `[[remote]]` and `[[remote.branch_rule]]` parsing |
+| Next issue to implement | #40 — Add `[[sync_pair]]` parsing with cycle detection |
 | M12 parallel unlock | not yet unlocked |
 
 ---
