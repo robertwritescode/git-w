@@ -158,7 +158,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Type definitions: RemoteConfig, BranchRuleConfig, BranchAction, MergeRemote, diskConfig wiring
+- [x] 04-01-PLAN.md — Type definitions: RemoteConfig, BranchRuleConfig, BranchAction, MergeRemote, diskConfig wiring
 - [ ] 04-02-PLAN.md — Validation: validateRemotes wired into buildAndValidate (name, uniqueness, kind, action, private)
 
 ---
