@@ -10,16 +10,17 @@ import (
 // WorkspaceConfig is the merged result of `.gitw` and `.gitw.local`.
 // Repos and Groups maps are always non-nil after loading.
 type WorkspaceConfig struct {
-	Metarepo   MetarepoConfig             `toml:"metarepo"`
-	Workspaces []WorkspaceBlock           `toml:"workspace"`
-	Remotes    []RemoteConfig             // in-memory; populated from [[remote]] list by loader
-	SyncPairs  []SyncPairConfig           // in-memory; populated from [[sync_pair]] list by loader
-	Context    ContextConfig              `toml:"context"` // sourced from .gitw.local
-	Repos      map[string]RepoConfig      // in-memory only; populated from [[repo]] list by loader
-	Groups     map[string]GroupConfig     `toml:"groups"`
-	Worktrees  map[string]WorktreeConfig  `toml:"worktrees"`
-	Workgroups map[string]WorkgroupConfig `toml:"workgroup"` // sourced from .gitw.local
-	Warnings   []string                   // in-memory only; populated at load time
+	Metarepo    MetarepoConfig             `toml:"metarepo"`
+	Workspaces  []WorkspaceBlock           `toml:"workspace"`
+	Remotes     []RemoteConfig             // in-memory; populated from [[remote]] list by loader
+	SyncPairs   []SyncPairConfig           // in-memory; populated from [[sync_pair]] list by loader
+	Workstreams []WorkstreamConfig         // in-memory; populated from [[workstream]] list by loader
+	Context     ContextConfig              `toml:"context"` // sourced from .gitw.local
+	Repos       map[string]RepoConfig      // in-memory only; populated from [[repo]] list by loader
+	Groups      map[string]GroupConfig     `toml:"groups"`
+	Worktrees   map[string]WorktreeConfig  `toml:"worktrees"`
+	Workgroups  map[string]WorkgroupConfig `toml:"workgroup"` // sourced from .gitw.local
+	Warnings    []string                   // in-memory only; populated at load time
 }
 
 // WorkgroupConfig is a local workgroup entry (stored only in .gitw.local).
@@ -94,6 +95,12 @@ type SyncPairConfig struct {
 	From string   `toml:"from"`
 	To   string   `toml:"to"`
 	Refs []string `toml:"refs,omitempty"`
+}
+
+// WorkstreamConfig is one [[workstream]] entry.
+type WorkstreamConfig struct {
+	Name    string   `toml:"name"`
+	Remotes []string `toml:"remotes,omitempty"`
 }
 
 // MergeRemote merges base and override RemoteConfig. For each field, the
@@ -190,6 +197,23 @@ func MergeSyncPair(base, override SyncPairConfig) SyncPairConfig {
 	return merged
 }
 
+// MergeWorkstream merges base and override WorkstreamConfig. For each field,
+// the override value wins if non-zero; otherwise the base value is used.
+// Remotes from override replace base Remotes entirely if non-empty.
+func MergeWorkstream(base, override WorkstreamConfig) WorkstreamConfig {
+	merged := base
+
+	if override.Name != "" {
+		merged.Name = override.Name
+	}
+
+	if len(override.Remotes) > 0 {
+		merged.Remotes = override.Remotes
+	}
+
+	return merged
+}
+
 // RepoConfig represents one tracked repository.
 type RepoConfig struct {
 	Name          string   `toml:"name"`
@@ -240,6 +264,17 @@ func (c *WorkspaceConfig) RemoteByName(name string) (RemoteConfig, bool) {
 	}
 
 	return RemoteConfig{}, false
+}
+
+// WorkstreamByName returns the WorkstreamConfig with the given name and whether it was found.
+func (c *WorkspaceConfig) WorkstreamByName(name string) (WorkstreamConfig, bool) {
+	for _, w := range c.Workstreams {
+		if w.Name == name {
+			return w, true
+		}
+	}
+
+	return WorkstreamConfig{}, false
 }
 
 // AutoGitignoreEnabled reports whether auto-gitignore is on (nil means default true).
