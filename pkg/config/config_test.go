@@ -378,6 +378,86 @@ func (s *ConfigSuite) TestMergeSyncPair() {
 	}
 }
 
+func (s *ConfigSuite) TestMergeWorkstream() {
+	cases := []struct {
+		name     string
+		base     config.WorkstreamConfig
+		override config.WorkstreamConfig
+		want     config.WorkstreamConfig
+	}{
+		{
+			name:     "empty override keeps base",
+			base:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin", "mirror"}},
+			override: config.WorkstreamConfig{},
+			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin", "mirror"}},
+		},
+		{
+			name:     "name override replaces base name",
+			base:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
+			override: config.WorkstreamConfig{Name: "beta"},
+			want:     config.WorkstreamConfig{Name: "beta", Remotes: []string{"origin"}},
+		},
+		{
+			name:     "non-empty remotes override replaces base remotes",
+			base:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
+			override: config.WorkstreamConfig{Remotes: []string{"mirror", "backup"}},
+			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"mirror", "backup"}},
+		},
+		{
+			name:     "nil remotes override keeps base remotes",
+			base:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
+			override: config.WorkstreamConfig{Remotes: nil},
+			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
+		},
+		{
+			name:     "empty remotes override keeps base remotes",
+			base:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
+			override: config.WorkstreamConfig{Remotes: []string{}},
+			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			got := config.MergeWorkstream(tc.base, tc.override)
+			s.Assert().Equal(tc.want, got)
+		})
+	}
+}
+
+func (s *ConfigSuite) TestWorkstreamByName() {
+	cfg := config.WorkspaceConfig{
+		Workstreams: []config.WorkstreamConfig{
+			{Name: "alpha", Remotes: []string{"origin"}},
+			{Name: "beta", Remotes: []string{"mirror"}},
+			{Name: "alpha", Remotes: []string{"backup"}},
+		},
+	}
+
+	s.Run("found first entry", func() {
+		workstream, ok := cfg.WorkstreamByName("alpha")
+		s.Assert().True(ok)
+		s.Assert().Equal([]string{"origin"}, workstream.Remotes)
+	})
+
+	s.Run("found second entry", func() {
+		workstream, ok := cfg.WorkstreamByName("beta")
+		s.Assert().True(ok)
+		s.Assert().Equal([]string{"mirror"}, workstream.Remotes)
+	})
+
+	s.Run("missing returns false", func() {
+		_, ok := cfg.WorkstreamByName("missing")
+		s.Assert().False(ok)
+	})
+
+	s.Run("duplicate names return first match", func() {
+		workstream, ok := cfg.WorkstreamByName("alpha")
+		s.Assert().True(ok)
+		s.Assert().Equal([]string{"origin"}, workstream.Remotes)
+	})
+}
+
 func (s *ConfigSuite) TestRemoteByName() {
 	cfg := config.WorkspaceConfig{
 		Remotes: []config.RemoteConfig{
