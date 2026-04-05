@@ -192,7 +192,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Define WorkstreamConfig contract, merge helper, and config-level tests
+- [x] 06-01-PLAN.md — Define WorkstreamConfig contract, merge helper, and config-level tests
 - [ ] 06-02-PLAN.md — Wire loader parse/validation/normalization for [[workstream]] with strict-key and reference checks
 
 ---
