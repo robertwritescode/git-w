@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-04-05T19:11:44.343Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-04-05T19:18:53.452Z"
 progress:
   total_phases: 63
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -51,6 +51,7 @@ Plan: 2 of 2
 | Phase 05 P01 | - | 1 task | 2 files |
 | Phase 05 P02 | - | 2 tasks | 2 files |
 | Phase 06 P01 | 2 min | 2 tasks | 2 files |
+| Phase 06 P02 | 5 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 05]: DFS cycle detection with visited/in-stack sets; error format "sync_pair cycle detected: A → B → A"
 - [Phase 06]: Model workstream entries as an in-memory WorkstreamConfig slice on WorkspaceConfig for loader-populated array-of-table parity — Aligns with established schema patterns and prepares loader wiring.
 - [Phase 06]: Use MergeWorkstream semantics where remotes override only when non-empty — Preserves explicit empty/nil distinction for downstream loader validation semantics.
+- [Phase 06]: Use a targeted raw TOML pass for [[workstream]] strict-key checks instead of globally tightening unknown-key behavior.
+- [Phase 06]: Validate workstreams immediately after remotes and normalize both workstream names and remotes lists during load.
 
 ### Pending Todos
 
@@ -80,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T19:11:44.341Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-04-05T19:18:53.449Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
