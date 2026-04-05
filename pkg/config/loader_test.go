@@ -1668,3 +1668,250 @@ private = true
 		})
 	}
 }
+
+func (s *LoaderSuite) TestWorkstreamBlocksParse() {
+	tests := []struct {
+		name string
+		toml string
+		want []config.WorkstreamConfig
+	}{
+		{
+			name: "no workstream blocks",
+			toml: `[metarepo]
+name = "ws"
+`,
+			want: []config.WorkstreamConfig{},
+		},
+		{
+			name: "single workstream with remotes",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[workstream]]
+name = "alpha"
+remotes = ["origin"]
+`,
+			want: []config.WorkstreamConfig{
+				{Name: "alpha", Remotes: []string{"origin"}},
+			},
+		},
+		{
+			name: "single workstream with empty remotes",
+			toml: `[metarepo]
+name = "ws"
+
+[[workstream]]
+name = "alpha"
+remotes = []
+`,
+			want: []config.WorkstreamConfig{
+				{Name: "alpha", Remotes: []string{}},
+			},
+		},
+		{
+			name: "multiple workstream blocks",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[workstream]]
+name = "beta"
+remotes = ["personal"]
+
+[[workstream]]
+name = "alpha"
+remotes = ["origin"]
+`,
+			want: []config.WorkstreamConfig{
+				{Name: "alpha", Remotes: []string{"origin"}},
+				{Name: "beta", Remotes: []string{"personal"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			cfg, err := config.Load(cfgPath)
+			s.Require().NoError(err)
+			if len(tt.want) == 0 {
+				s.Assert().Empty(cfg.Workstreams)
+				return
+			}
+
+			s.Assert().Equal(tt.want, cfg.Workstreams)
+		})
+	}
+}
+
+func (s *LoaderSuite) TestWorkstreamValidation() {
+	tests := []struct {
+		name        string
+		toml        string
+		errContains []string
+	}{
+		{
+			name: "missing name",
+			toml: `[metarepo]
+name = "ws"
+
+[[workstream]]
+remotes = []
+`,
+			errContains: []string{"[[workstream]]", "missing required name field"},
+		},
+		{
+			name: "missing remotes key",
+			toml: `[metarepo]
+name = "ws"
+
+[[workstream]]
+name = "alpha"
+`,
+			errContains: []string{"[[workstream]]", "missing required remotes key"},
+		},
+		{
+			name: "duplicate workstream name",
+			toml: `[metarepo]
+name = "ws"
+
+[[workstream]]
+name = "alpha"
+remotes = []
+
+[[workstream]]
+name = "alpha"
+remotes = []
+`,
+			errContains: []string{"duplicate [[workstream]] name", "alpha"},
+		},
+		{
+			name: "unknown key",
+			toml: `[metarepo]
+name = "ws"
+
+[[workstream]]
+name = "alpha"
+remotes = []
+policy = "x"
+`,
+			errContains: []string{"[[workstream]]", "unknown key", "policy"},
+		},
+		{
+			name: "unknown remote reference",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[workstream]]
+name = "alpha"
+remotes = ["does-not-exist"]
+`,
+			errContains: []string{"workstream", "unknown remote", "does-not-exist"},
+		},
+		{
+			name: "duplicate remote in remotes list",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[workstream]]
+name = "alpha"
+remotes = ["origin", "origin"]
+`,
+			errContains: []string{"workstream", "duplicate remote", "origin"},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			_, err := config.Load(cfgPath)
+			s.Require().Error(err)
+			for _, fragment := range tt.errContains {
+				s.Assert().Contains(err.Error(), fragment)
+			}
+		})
+	}
+}
+
+func (s *LoaderSuite) TestWorkstreamPlacementAllowedInPublicConfig() {
+	content := `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[workstream]]
+name = "alpha"
+remotes = ["origin"]
+`
+
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+	s.Require().Len(cfg.Workstreams, 1)
+
+	for _, warning := range cfg.Warnings {
+		s.Assert().NotContains(strings.ToLower(warning), "workstream")
+		s.Assert().NotContains(strings.ToLower(warning), "misconfiguration")
+	}
+}
+
+func (s *LoaderSuite) TestWorkstreamNormalizationOrder() {
+	content := `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "backup"
+
+[[remote]]
+name = "personal"
+
+[[workstream]]
+name = "zeta"
+remotes = ["personal", "backup"]
+
+[[workstream]]
+name = "alpha"
+remotes = ["origin", "backup"]
+
+[[workstream]]
+name = "beta"
+remotes = ["personal", "origin", "backup"]
+`
+
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg.Workstreams, 3)
+	s.Assert().Equal("alpha", cfg.Workstreams[0].Name)
+	s.Assert().Equal("beta", cfg.Workstreams[1].Name)
+	s.Assert().Equal("zeta", cfg.Workstreams[2].Name)
+
+	s.Assert().Equal([]string{"backup", "origin"}, cfg.Workstreams[0].Remotes)
+	s.Assert().Equal([]string{"backup", "origin", "personal"}, cfg.Workstreams[1].Remotes)
+	s.Assert().Equal([]string{"backup", "personal"}, cfg.Workstreams[2].Remotes)
+}

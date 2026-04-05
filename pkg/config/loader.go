@@ -42,12 +42,13 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 	}
 
 	cfg := &WorkspaceConfig{
-		Metarepo:   dc.Metarepo,
-		Workspaces: dc.Workspaces,
-		Remotes:    dc.RemoteList,
-		SyncPairs:  dc.SyncPairList,
-		Groups:     dc.Groups,
-		Worktrees:  dc.Worktrees,
+		Metarepo:    dc.Metarepo,
+		Workspaces:  dc.Workspaces,
+		Remotes:     dc.RemoteList,
+		SyncPairs:   dc.SyncPairList,
+		Workstreams: dc.WorkstreamList,
+		Groups:      dc.Groups,
+		Worktrees:   dc.Worktrees,
 	}
 
 	if err := buildReposIndex(cfg, dc.RepoList); err != nil {
@@ -95,6 +96,10 @@ func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
 	}
 
 	if err := validateRemotes(configPath, cfg); err != nil {
+		return err
+	}
+
+	if err := validateWorkstreams(configPath, cfg); err != nil {
 		return err
 	}
 
@@ -207,6 +212,123 @@ func validateSyncPairFields(cfg *WorkspaceConfig) error {
 		}
 
 		seen[k] = struct{}{}
+	}
+
+	return nil
+}
+
+func validateWorkstreams(configPath string, cfg *WorkspaceConfig) error {
+	entries, err := loadWorkstreamRawEntries(configPath)
+	if err != nil {
+		return err
+	}
+
+	if len(entries) != len(cfg.Workstreams) {
+		return fmt.Errorf("[[workstream]] parse mismatch: expected %d entries, got %d", len(cfg.Workstreams), len(entries))
+	}
+
+	knownRemotes := make(map[string]struct{}, len(cfg.Remotes))
+	for _, remote := range cfg.Remotes {
+		knownRemotes[remote.Name] = struct{}{}
+	}
+
+	seenNames := make(map[string]struct{}, len(cfg.Workstreams))
+
+	for i := range cfg.Workstreams {
+		entry := entries[i]
+		if err := validateWorkstreamEntryKeys(i, entry); err != nil {
+			return err
+		}
+
+		if _, ok := entry["remotes"]; !ok {
+			return fmt.Errorf("[[workstream]] entry at index %d: missing required remotes key", i)
+		}
+
+		workstream := &cfg.Workstreams[i]
+		if strings.TrimSpace(workstream.Name) == "" {
+			return fmt.Errorf("[[workstream]] entry at index %d: missing required name field", i)
+		}
+
+		if _, dup := seenNames[workstream.Name]; dup {
+			return fmt.Errorf("duplicate [[workstream]] name %q", workstream.Name)
+		}
+		seenNames[workstream.Name] = struct{}{}
+
+		seenWorkstreamRemotes := make(map[string]struct{}, len(workstream.Remotes))
+		for _, remoteName := range workstream.Remotes {
+			if _, ok := knownRemotes[remoteName]; !ok {
+				return fmt.Errorf("workstream %q: unknown remote %q", workstream.Name, remoteName)
+			}
+
+			if _, dup := seenWorkstreamRemotes[remoteName]; dup {
+				return fmt.Errorf("workstream %q: duplicate remote %q", workstream.Name, remoteName)
+			}
+			seenWorkstreamRemotes[remoteName] = struct{}{}
+		}
+
+		sort.Strings(workstream.Remotes)
+	}
+
+	sort.Slice(cfg.Workstreams, func(i, j int) bool {
+		return cfg.Workstreams[i].Name < cfg.Workstreams[j].Name
+	})
+
+	return nil
+}
+
+func loadWorkstreamRawEntries(configPath string) ([]map[string]any, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading config %s: %w", configPath, err)
+	}
+
+	var raw map[string]any
+	if err := toml.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("parsing config %s: %w", configPath, err)
+	}
+
+	return parseWorkstreamEntries(raw)
+}
+
+func parseWorkstreamEntries(raw map[string]any) ([]map[string]any, error) {
+	rawWorkstreams, ok := raw["workstream"]
+	if !ok {
+		return nil, nil
+	}
+
+	var list []any
+	switch v := rawWorkstreams.(type) {
+	case []any:
+		list = v
+	case []map[string]any:
+		list = make([]any, 0, len(v))
+		for _, item := range v {
+			list = append(list, item)
+		}
+	default:
+		return nil, fmt.Errorf("[[workstream]] should be an array of tables")
+	}
+
+	entries := make([]map[string]any, 0, len(list))
+	for i, item := range list {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("[[workstream]] entry at index %d is not a table", i)
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+func validateWorkstreamEntryKeys(index int, entry map[string]any) error {
+	for key := range entry {
+		if key == "name" || key == "remotes" {
+			continue
+		}
+
+		return fmt.Errorf("[[workstream]] entry at index %d: unknown key %q", index, key)
 	}
 
 	return nil
@@ -375,24 +497,26 @@ func Save(configPath string, cfg *WorkspaceConfig) error {
 }
 
 type diskConfig struct {
-	Metarepo     MetarepoConfig            `toml:"metarepo"`
-	Workspaces   []WorkspaceBlock          `toml:"workspace,omitempty"`
-	RepoList     []RepoConfig              `toml:"repo,omitempty"`
-	RemoteList   []RemoteConfig            `toml:"remote,omitempty"`
-	SyncPairList []SyncPairConfig          `toml:"sync_pair,omitempty"`
-	Groups       map[string]GroupConfig    `toml:"groups,omitempty"`
-	Worktrees    map[string]WorktreeConfig `toml:"worktrees,omitempty"`
+	Metarepo       MetarepoConfig            `toml:"metarepo"`
+	Workspaces     []WorkspaceBlock          `toml:"workspace,omitempty"`
+	RepoList       []RepoConfig              `toml:"repo,omitempty"`
+	RemoteList     []RemoteConfig            `toml:"remote,omitempty"`
+	SyncPairList   []SyncPairConfig          `toml:"sync_pair,omitempty"`
+	WorkstreamList []WorkstreamConfig        `toml:"workstream,omitempty"`
+	Groups         map[string]GroupConfig    `toml:"groups,omitempty"`
+	Worktrees      map[string]WorktreeConfig `toml:"worktrees,omitempty"`
 }
 
 func prepareDiskConfig(cfg *WorkspaceConfig) diskConfig {
 	return diskConfig{
-		Metarepo:     cfg.Metarepo,
-		Workspaces:   cfg.Workspaces,
-		RepoList:     buildRepoList(cfg),
-		RemoteList:   cfg.Remotes,
-		SyncPairList: cfg.SyncPairs,
-		Groups:       withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
-		Worktrees:    cfg.Worktrees,
+		Metarepo:       cfg.Metarepo,
+		Workspaces:     cfg.Workspaces,
+		RepoList:       buildRepoList(cfg),
+		RemoteList:     cfg.Remotes,
+		SyncPairList:   cfg.SyncPairs,
+		WorkstreamList: cfg.Workstreams,
+		Groups:         withoutSynthesizedGroups(cfg.Groups, cfg.Worktrees),
+		Worktrees:      cfg.Worktrees,
 	}
 }
 

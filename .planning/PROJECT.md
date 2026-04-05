@@ -39,6 +39,7 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - ✓ Config local overrides (`.gitw.local`) -- existing
 - ✓ Shell completion -- existing
 - ✓ GoReleaser + Homebrew distribution -- existing
+- ✓ Root `[[workstream]]` config block contract + loader parse/validate/normalize (`CFG-06`) -- validated in Phase 06
 
 ### Active
 
@@ -137,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 — Milestone M1 started*
+*Last updated: 2026-04-05 — Phase 06 complete (workstream root config block added and validated)*

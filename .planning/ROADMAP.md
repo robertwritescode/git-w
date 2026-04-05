@@ -189,7 +189,11 @@ Plans:
   2. Workstream remote overrides participate in cascade resolution
   3. Multiple workstream blocks can coexist in the same config file
 **Canonical refs**: `.planning/v2/v2-schema.md` (workstream block), `.planning/v2/v2-remote-management.md` (cascade)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [x] 06-01-PLAN.md — Define WorkstreamConfig contract, merge helper, and config-level tests
+- [x] 06-02-PLAN.md — Wire loader parse/validation/normalization for [[workstream]] with strict-key and reference checks
 
 ---
 
