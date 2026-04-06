@@ -43,9 +43,9 @@ git-w/
 - Key files: `pkg/cmd/root.go`
 
 **`pkg/config/`:**
-- Purpose: All logic for reading/writing `.gitw` and `.gitw.local` TOML config files
-- Contains: Config structs (`WorkspaceConfig`, `RepoConfig`, `WorktreeConfig`, etc.), discovery (walk-up search), loader (merge main + local), saver (atomic write with comment preservation), path resolution utilities
-- Key files: `pkg/config/config.go`, `pkg/config/loader.go`, `pkg/config/discovery.go`
+- Purpose: All logic for reading/writing `.gitw`, `.gitw.local`, and `.gitw-stream` TOML config files
+- Contains: Config structs (`WorkspaceConfig`, `WorkstreamManifest`, `WorktreeEntry`, etc.), discovery (walk-up search), loader (merge main + local), stream loader (`LoadStream`), saver (atomic write with comment preservation), path resolution utilities
+- Key files: `pkg/config/config.go`, `pkg/config/loader.go`, `pkg/config/discovery.go`, `pkg/config/stream.go`
 
 **`pkg/repo/`:**
 - Purpose: Resolves raw config entries into `Repo` structs with absolute paths; filters by name, group, or active context

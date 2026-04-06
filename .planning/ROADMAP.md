@@ -227,7 +227,11 @@ Plans:
   4. `path` defaults to `name` when not explicitly set
   5. Load-time validation enforces `name` and `path` uniqueness within workstream
 **Canonical refs**: `.planning/v2/v2-schema.md` (gitw-stream), `.planning/v2/v2-infra-patterns.md` (Pattern B worktree fields)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [x] 08-01-PLAN.md — Define WorkstreamManifest, WorktreeEntry, ShipState, StreamContext, WorkstreamStatus types in pkg/config/config.go
+- [x] 08-02-PLAN.md — Implement LoadStream, applyStreamDefaults, validateStream in stream.go with full TDD test coverage
 
 ---
 

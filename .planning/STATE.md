@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-04-06T05:08:51.147Z"
+stopped_at: Completed 08-parse-gitw-stream-manifest-02-PLAN.md
+last_updated: "2026-04-06T06:08:05.516Z"
 progress:
   total_phases: 63
-  completed_phases: 6
-  total_plans: 14
-  completed_plans: 12
+  completed_phases: 7
+  total_plans: 16
+  completed_plans: 14
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Multi-repo orchestration that keeps repos organized, synced, and safe from accidental pushes while giving AI agents full visibility into the workspace structure.
-**Current focus:** Phase 07 — two-file-config-merge
+**Current focus:** Phase 08 — parse-gitw-stream-manifest
 
 ## Current Position
 
-Phase: 8
+Phase: 9
 Plan: Not started
 
 ## Performance Metrics
@@ -54,6 +54,8 @@ Plan: Not started
 | Phase 06 P02 | 5 min | 2 tasks | 2 files |
 | Phase 07-two-file-config-merge P01 | 3 min | 1 tasks | 2 files |
 | Phase 07-two-file-config-merge P02 | 5min | 1 tasks | 2 files |
+| Phase 08-parse-gitw-stream-manifest P01 | 1min | 1 tasks | 1 files |
+| Phase 08-parse-gitw-stream-manifest P02 | 4min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,6 +77,10 @@ Recent decisions affecting current work:
 - [Phase 06]: Use a targeted raw TOML pass for [[workstream]] strict-key checks instead of globally tightening unknown-key behavior.
 - [Phase 06]: Validate workstreams immediately after remotes and normalize both workstream names and remotes lists during load.
 - [Phase 07-two-file-config-merge]: mergePrivateConfig placed between loadMainConfig and mergeLocalConfig so .gitw.local context always wins
+- [Phase 08-parse-gitw-stream-manifest]: Types placed in config.go alongside existing config types per D-01
+- [Phase 08-parse-gitw-stream-manifest]: WorkstreamStatus follows BranchAction typed string alias pattern per D-02
+- [Phase 08-parse-gitw-stream-manifest]: ShipState and StreamContext defined with all schema-specified fields per D-06
+- [Phase 08-parse-gitw-stream-manifest]: LoadStream returns os.ErrNotExist unwrapped — callers use errors.Is (consistent with mergeLocalConfig)
 
 ### Pending Todos
 
@@ -86,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T05:04:29.137Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-04-06T06:03:06.627Z
+Stopped at: Completed 08-parse-gitw-stream-manifest-02-PLAN.md
 Resume file: None

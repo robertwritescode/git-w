@@ -103,6 +103,49 @@ type WorkstreamConfig struct {
 	Remotes []string `toml:"remotes,omitempty"`
 }
 
+// WorkstreamStatus is the typed status for a .gitw-stream manifest.
+type WorkstreamStatus string
+
+const (
+	StatusActive   WorkstreamStatus = "active"
+	StatusShipped  WorkstreamStatus = "shipped"
+	StatusArchived WorkstreamStatus = "archived"
+)
+
+// WorktreeEntry is one [[worktree]] entry in a .gitw-stream manifest.
+type WorktreeEntry struct {
+	Repo   string `toml:"repo"`
+	Branch string `toml:"branch,omitempty"`
+	Name   string `toml:"name,omitempty"`
+	Path   string `toml:"path,omitempty"`
+	Scope  string `toml:"scope,omitempty"`
+}
+
+// ShipState holds ship pipeline metadata for a workstream.
+type ShipState struct {
+	PRURLs          []string          `toml:"pr_urls,omitempty"`
+	PreShipBranches map[string]string `toml:"pre_ship_branches,omitempty"`
+	ShippedAt       string            `toml:"shipped_at,omitempty"`
+}
+
+// StreamContext holds agent context metadata for a workstream.
+type StreamContext struct {
+	Summary      string   `toml:"summary,omitempty"`
+	KeyDecisions []string `toml:"key_decisions,omitempty"`
+}
+
+// WorkstreamManifest is the in-memory representation of a .gitw-stream file.
+type WorkstreamManifest struct {
+	Name        string           `toml:"name"`
+	Description string           `toml:"description,omitempty"`
+	Workspace   string           `toml:"workspace,omitempty"`
+	Status      WorkstreamStatus `toml:"status,omitempty"`
+	Created     string           `toml:"created,omitempty"`
+	Worktrees   []WorktreeEntry  `toml:"worktree"`
+	Ship        ShipState        `toml:"ship"`
+	Context     StreamContext    `toml:"context"`
+}
+
 // MergeRemote merges base and override RemoteConfig. For each field, the
 // override value wins if non-zero; otherwise the base value is used.
 // BranchRules from override replace base BranchRules entirely if non-nil.
