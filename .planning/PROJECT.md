@@ -41,6 +41,7 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - ✓ GoReleaser + Homebrew distribution -- existing
 - ✓ Root `[[workstream]]` config block contract + loader parse/validate/normalize (`CFG-06`) -- validated in Phase 06
 - ✓ Two-file config merge with field-level semantics (`.gitw` + `.git/.gitw`) (`CFG-07`) -- validated in Phase 07
+- ✓ `.gitw-stream` manifest with `[[worktree]]` entries (name, path, scope) + `LoadStream` loader (`CFG-08`) -- validated in Phase 08
 
 ### Active
 
@@ -138,4 +139,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-06 — Phase 07 complete (two-file config merge implemented and validated)*
+*Last updated: 2026-04-06 — Phase 08 complete (.gitw-stream manifest types and LoadStream loader implemented and validated)*
