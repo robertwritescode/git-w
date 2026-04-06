@@ -1915,3 +1915,329 @@ remotes = ["personal", "origin", "backup"]
 	s.Assert().Equal([]string{"backup", "origin", "personal"}, cfg.Workstreams[1].Remotes)
 	s.Assert().Equal([]string{"backup", "personal"}, cfg.Workstreams[2].Remotes)
 }
+
+// privatePath returns the expected .git/.gitw path for the suite's cfgPath.
+func (s *LoaderSuite) privatePath() string {
+	return filepath.Join(filepath.Dir(s.cfgPath), ".git", ".gitw")
+}
+
+// writePrivate creates the .git/ directory and writes content to .git/.gitw.
+func (s *LoaderSuite) writePrivate(content string) {
+	dir := filepath.Join(filepath.Dir(s.cfgPath), ".git")
+	s.Require().NoError(os.MkdirAll(dir, 0o755))
+	s.Require().NoError(os.WriteFile(s.privatePath(), []byte(content), 0o644))
+}
+
+func (s *LoaderSuite) TestPrivateConfigAbsent() {
+	content := `
+[[repo]]
+name = "api"
+path = "repos/api"
+
+[[remote]]
+name = "origin"
+kind = "github"
+`
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(content), 0o644))
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().Len(cfg.Repos, 1)
+	s.Assert().Contains(cfg.Repos, "api")
+	s.Assert().Len(cfg.Remotes, 1)
+	s.Assert().Equal("origin", cfg.Remotes[0].Name)
+}
+
+func (s *LoaderSuite) TestPrivateConfigRemoteOverride() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+kind = "github"
+url = "https://github.com"
+`), 0o644))
+
+	s.writePrivate(`
+[[remote]]
+name = "origin"
+token_env = "GITHUB_TOKEN"
+private = true
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg.Remotes, 1)
+	r := cfg.Remotes[0]
+	s.Assert().Equal("origin", r.Name)
+	s.Assert().Equal("github", r.Kind)
+	s.Assert().Equal("https://github.com", r.URL)
+	s.Assert().Equal("GITHUB_TOKEN", r.TokenEnv)
+	s.Assert().True(r.Private)
+}
+
+func (s *LoaderSuite) TestPrivateConfigNewRemote() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+kind = "github"
+`), 0o644))
+
+	s.writePrivate(`
+[[remote]]
+name = "personal"
+kind = "gitea"
+url = "https://gitea.example.com"
+private = true
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg.Remotes, 2)
+	names := []string{cfg.Remotes[0].Name, cfg.Remotes[1].Name}
+	s.Assert().Contains(names, "origin")
+	s.Assert().Contains(names, "personal")
+}
+
+func (s *LoaderSuite) TestPrivateConfigRepoOverride() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[repo]]
+name = "api-service"
+path = "repos/api-service"
+`), 0o644))
+
+	s.writePrivate(`
+[[repo]]
+name = "api-service"
+clone_url = "https://github.com/work-org/api-service"
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	r := cfg.Repos["api-service"]
+	s.Assert().Equal("repos/api-service", r.Path)
+	s.Assert().Equal("https://github.com/work-org/api-service", r.CloneURL)
+}
+
+func (s *LoaderSuite) TestPrivateConfigUnknownRepo() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[repo]]
+name = "api-service"
+path = "repos/api-service"
+`), 0o644))
+
+	s.writePrivate(`
+[[repo]]
+name = "nonexistent"
+path = "repos/nonexistent"
+`)
+
+	_, err := config.Load(s.cfgPath)
+	s.Require().Error(err)
+	s.Assert().Contains(err.Error(), "nonexistent")
+	s.Assert().Contains(err.Error(), "not declared in .gitw")
+}
+
+func (s *LoaderSuite) TestPrivateConfigMetarepoOverride() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[metarepo]
+default_remotes = ["origin"]
+`), 0o644))
+
+	s.writePrivate(`
+[metarepo]
+default_remotes = ["origin", "personal"]
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Assert().Equal([]string{"origin", "personal"}, cfg.Metarepo.DefaultRemotes)
+}
+
+func (s *LoaderSuite) TestPrivateConfigWorkstreamOverride() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+
+[[workstream]]
+name = "TICKET-123"
+remotes = ["origin"]
+`), 0o644))
+
+	s.writePrivate(`
+[[remote]]
+name = "personal"
+private = true
+
+[[workstream]]
+name = "TICKET-123"
+remotes = ["personal"]
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	var ws *config.WorkstreamConfig
+	for i := range cfg.Workstreams {
+		if cfg.Workstreams[i].Name == "TICKET-123" {
+			ws = &cfg.Workstreams[i]
+			break
+		}
+	}
+	s.Require().NotNil(ws)
+	s.Assert().Equal([]string{"personal"}, ws.Remotes)
+}
+
+func (s *LoaderSuite) TestPrivateConfigNewWorkstream() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+`), 0o644))
+
+	s.writePrivate(`
+[[remote]]
+name = "personal"
+private = true
+
+[[workstream]]
+name = "LOCAL-WS"
+remotes = ["personal"]
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	found := false
+	for _, w := range cfg.Workstreams {
+		if w.Name == "LOCAL-WS" {
+			found = true
+			break
+		}
+	}
+	s.Assert().True(found, "expected workstream LOCAL-WS in merged config")
+}
+
+func (s *LoaderSuite) TestPrivateConfigSyncPairOverride() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[sync_pair]]
+from = "origin"
+to = "personal"
+refs = ["main"]
+`), 0o644))
+
+	s.writePrivate(`
+[[sync_pair]]
+from = "origin"
+to = "personal"
+refs = ["**"]
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg.SyncPairs, 1)
+	s.Assert().Equal([]string{"**"}, cfg.SyncPairs[0].Refs)
+}
+
+func (s *LoaderSuite) TestPrivateConfigNewSyncPair() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+`), 0o644))
+
+	s.writePrivate(`
+[[sync_pair]]
+from = "origin"
+to = "personal"
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	s.Require().Len(cfg.SyncPairs, 1)
+	s.Assert().Equal("origin", cfg.SyncPairs[0].From)
+	s.Assert().Equal("personal", cfg.SyncPairs[0].To)
+}
+
+func (s *LoaderSuite) TestPrivateConfigWorkspaceOverride() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[repo]]
+name = "api-service"
+path = "repos/api-service"
+
+[[workspace]]
+name = "platform"
+repos = ["api-service"]
+`), 0o644))
+
+	s.writePrivate(`
+[[workspace]]
+name = "platform"
+description = "local override"
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	var ws *config.WorkspaceBlock
+	for i := range cfg.Workspaces {
+		if cfg.Workspaces[i].Name == "platform" {
+			ws = &cfg.Workspaces[i]
+			break
+		}
+	}
+	s.Require().NotNil(ws)
+	s.Assert().Equal([]string{"api-service"}, ws.Repos)
+	s.Assert().Equal("local override", ws.Description)
+}
+
+func (s *LoaderSuite) TestPrivateConfigNewWorkspace() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[repo]]
+name = "api-service"
+path = "repos/api-service"
+`), 0o644))
+
+	s.writePrivate(`
+[[workspace]]
+name = "local-ws"
+repos = ["api-service"]
+`)
+
+	cfg, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+
+	found := false
+	for _, w := range cfg.Workspaces {
+		if w.Name == "local-ws" {
+			found = true
+			break
+		}
+	}
+	s.Assert().True(found, "expected workspace local-ws in merged config")
+}
+
+func (s *LoaderSuite) TestPrivateEnforcementInSharedFile() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "secret"
+private = true
+`), 0o644))
+
+	_, err := config.Load(s.cfgPath)
+	s.Require().Error(err)
+	s.Assert().Contains(err.Error(), "secret")
+	s.Assert().Contains(err.Error(), ".git/.gitw")
+}
