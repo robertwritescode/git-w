@@ -210,7 +210,7 @@ Plans:
 **Canonical refs**: `.planning/v2/v2-schema.md` (two-file merge, private enforcement)
 **Plans**: 2 plans
 Plans:
-- [ ] 07-01-PLAN.md — Add MergeRepo, MergeWorkspace, and mergeMetarepo helpers to config.go
+- [x] 07-01-PLAN.md — Add MergeRepo, MergeWorkspace, and mergeMetarepo helpers to config.go
 - [ ] 07-02-PLAN.md — Implement mergePrivateConfig and wire into Load()
 
 ---
@@ -1128,7 +1128,7 @@ M12 (Phases 59-63) can run in parallel after M1 (Phases 1-11) completes.
 | 4. Add `[[remote]]`/`[[remote.branch_rule]]` | M1 | 0/? | Not started | - |
 | 5. Add `[[sync_pair]]` parsing | M1 | 0/? | Not started | - |
 | 6. Add `[[workstream]]` root block | M1 | 0/? | Not started | - |
-| 7. Two-file config merge | M1 | 0/? | Not started | - |
+| 7. Two-file config merge | M1 | 1/2 | In Progress|  |
 | 8. Parse `.gitw-stream` manifest | M1 | 0/? | Not started | - |
 | 9. Default remotes cascade | M1 | 0/? | Not started | - |
 | 10. Detect v1 `[[workgroup]]` | M1 | 0/? | Not started | - |
