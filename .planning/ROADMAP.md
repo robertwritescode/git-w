@@ -208,7 +208,10 @@ Plans:
   3. `private = true` fields in shared config are rejected with error
   4. Merge handles all v2 block types (workspace, repo, remote, sync_pair, workstream)
 **Canonical refs**: `.planning/v2/v2-schema.md` (two-file merge, private enforcement)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 07-01-PLAN.md — Add MergeRepo, MergeWorkspace, and mergeMetarepo helpers to config.go
+- [ ] 07-02-PLAN.md — Implement mergePrivateConfig and wire into Load()
 
 ---
 
