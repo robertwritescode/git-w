@@ -120,7 +120,7 @@ When all 12 milestones are merged to `v2`:
 | Active milestone | V2 M1: Config schema + loader |
 | Milestone branch | `v2/m1-config-schema` |
 | Current issue branch | none |
-| Next issue to implement | #41 — Add `[[workstream]]` root config block |
+| Next issue to implement | #42 — Implement two-file config merge with field-level semantics |
 | M12 parallel unlock | not yet unlocked |
 
 ---
