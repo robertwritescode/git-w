@@ -93,6 +93,12 @@ None - no external service configuration required.
 - Ready for Plan 02: implement `LoadStream(path string) (*WorkstreamManifest, error)` in `pkg/config/stream.go`
 - Types cover all schema fields needed by ship pipeline (M9/M10) without changes
 
+## Self-Check: PASSED
+
+- `pkg/config/config.go` — FOUND ✓
+- `.planning/phases/08-parse-gitw-stream-manifest/08-01-SUMMARY.md` — FOUND ✓
+- Commit `cbda61e` — FOUND ✓
+
 ---
 *Phase: 08-parse-gitw-stream-manifest*
 *Completed: 2026-04-06*
