@@ -458,6 +458,192 @@ func (s *ConfigSuite) TestWorkstreamByName() {
 	})
 }
 
+func (s *ConfigSuite) TestMergeRepo() {
+	cases := []struct {
+		name     string
+		base     config.RepoConfig
+		override config.RepoConfig
+		want     config.RepoConfig
+	}{
+		{
+			name: "empty override returns base unchanged",
+			base: config.RepoConfig{
+				Name: "svc-a", Path: "repos/svc-a", CloneURL: "https://github.com/org/svc-a",
+				DefaultBranch: "main", TrackBranch: "dev", Upstream: "origin",
+				Flags: []string{"--no-push"}, Remotes: []string{"origin"},
+			},
+			override: config.RepoConfig{},
+			want: config.RepoConfig{
+				Name: "svc-a", Path: "repos/svc-a", CloneURL: "https://github.com/org/svc-a",
+				DefaultBranch: "main", TrackBranch: "dev", Upstream: "origin",
+				Flags: []string{"--no-push"}, Remotes: []string{"origin"},
+			},
+		},
+		{
+			name:     "non-zero Name in override wins",
+			base:     config.RepoConfig{Name: "old-name"},
+			override: config.RepoConfig{Name: "new-name"},
+			want:     config.RepoConfig{Name: "new-name"},
+		},
+		{
+			name:     "zero Name keeps base Name",
+			base:     config.RepoConfig{Name: "svc-a"},
+			override: config.RepoConfig{Name: ""},
+			want:     config.RepoConfig{Name: "svc-a"},
+		},
+		{
+			name:     "non-zero Path in override wins",
+			base:     config.RepoConfig{Path: "repos/old"},
+			override: config.RepoConfig{Path: "repos/new"},
+			want:     config.RepoConfig{Path: "repos/new"},
+		},
+		{
+			name:     "zero Path keeps base Path",
+			base:     config.RepoConfig{Path: "repos/svc-a"},
+			override: config.RepoConfig{Path: ""},
+			want:     config.RepoConfig{Path: "repos/svc-a"},
+		},
+		{
+			name:     "non-zero CloneURL in override wins",
+			base:     config.RepoConfig{CloneURL: "https://github.com/org/old"},
+			override: config.RepoConfig{CloneURL: "https://gitea.example.com/org/new"},
+			want:     config.RepoConfig{CloneURL: "https://gitea.example.com/org/new"},
+		},
+		{
+			name:     "zero CloneURL keeps base CloneURL",
+			base:     config.RepoConfig{CloneURL: "https://github.com/org/svc-a"},
+			override: config.RepoConfig{CloneURL: ""},
+			want:     config.RepoConfig{CloneURL: "https://github.com/org/svc-a"},
+		},
+		{
+			name:     "non-nil Flags in override replaces base Flags",
+			base:     config.RepoConfig{Flags: []string{"--no-push"}},
+			override: config.RepoConfig{Flags: []string{"--push", "--verbose"}},
+			want:     config.RepoConfig{Flags: []string{"--push", "--verbose"}},
+		},
+		{
+			name:     "nil Flags in override keeps base Flags",
+			base:     config.RepoConfig{Flags: []string{"--no-push"}},
+			override: config.RepoConfig{Flags: nil},
+			want:     config.RepoConfig{Flags: []string{"--no-push"}},
+		},
+		{
+			name:     "non-nil Remotes in override replaces base Remotes",
+			base:     config.RepoConfig{Remotes: []string{"origin"}},
+			override: config.RepoConfig{Remotes: []string{"origin", "mirror"}},
+			want:     config.RepoConfig{Remotes: []string{"origin", "mirror"}},
+		},
+		{
+			name:     "nil Remotes in override keeps base Remotes",
+			base:     config.RepoConfig{Remotes: []string{"origin"}},
+			override: config.RepoConfig{Remotes: nil},
+			want:     config.RepoConfig{Remotes: []string{"origin"}},
+		},
+		{
+			name:     "non-zero DefaultBranch in override wins",
+			base:     config.RepoConfig{DefaultBranch: "main"},
+			override: config.RepoConfig{DefaultBranch: "develop"},
+			want:     config.RepoConfig{DefaultBranch: "develop"},
+		},
+		{
+			name:     "zero DefaultBranch keeps base DefaultBranch",
+			base:     config.RepoConfig{DefaultBranch: "main"},
+			override: config.RepoConfig{DefaultBranch: ""},
+			want:     config.RepoConfig{DefaultBranch: "main"},
+		},
+		{
+			name:     "non-zero TrackBranch in override wins",
+			base:     config.RepoConfig{TrackBranch: "dev"},
+			override: config.RepoConfig{TrackBranch: "test"},
+			want:     config.RepoConfig{TrackBranch: "test"},
+		},
+		{
+			name:     "zero TrackBranch keeps base TrackBranch",
+			base:     config.RepoConfig{TrackBranch: "dev"},
+			override: config.RepoConfig{TrackBranch: ""},
+			want:     config.RepoConfig{TrackBranch: "dev"},
+		},
+		{
+			name:     "non-zero Upstream in override wins",
+			base:     config.RepoConfig{Upstream: "origin"},
+			override: config.RepoConfig{Upstream: "personal"},
+			want:     config.RepoConfig{Upstream: "personal"},
+		},
+		{
+			name:     "zero Upstream keeps base Upstream",
+			base:     config.RepoConfig{Upstream: "origin"},
+			override: config.RepoConfig{Upstream: ""},
+			want:     config.RepoConfig{Upstream: "origin"},
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			got := config.MergeRepo(tc.base, tc.override)
+			s.Assert().Equal(tc.want, got)
+		})
+	}
+}
+
+func (s *ConfigSuite) TestMergeWorkspace() {
+	cases := []struct {
+		name     string
+		base     config.WorkspaceBlock
+		override config.WorkspaceBlock
+		want     config.WorkspaceBlock
+	}{
+		{
+			name:     "empty override returns base unchanged",
+			base:     config.WorkspaceBlock{Name: "default", Description: "main workspace", Repos: []string{"svc-a", "svc-b"}},
+			override: config.WorkspaceBlock{},
+			want:     config.WorkspaceBlock{Name: "default", Description: "main workspace", Repos: []string{"svc-a", "svc-b"}},
+		},
+		{
+			name:     "non-zero Name in override wins",
+			base:     config.WorkspaceBlock{Name: "old-name"},
+			override: config.WorkspaceBlock{Name: "new-name"},
+			want:     config.WorkspaceBlock{Name: "new-name"},
+		},
+		{
+			name:     "zero Name keeps base Name",
+			base:     config.WorkspaceBlock{Name: "default"},
+			override: config.WorkspaceBlock{Name: ""},
+			want:     config.WorkspaceBlock{Name: "default"},
+		},
+		{
+			name:     "non-zero Description in override wins",
+			base:     config.WorkspaceBlock{Description: "base desc"},
+			override: config.WorkspaceBlock{Description: "override desc"},
+			want:     config.WorkspaceBlock{Description: "override desc"},
+		},
+		{
+			name:     "zero Description keeps base Description",
+			base:     config.WorkspaceBlock{Description: "base desc"},
+			override: config.WorkspaceBlock{Description: ""},
+			want:     config.WorkspaceBlock{Description: "base desc"},
+		},
+		{
+			name:     "non-nil Repos in override replaces base Repos",
+			base:     config.WorkspaceBlock{Repos: []string{"svc-a"}},
+			override: config.WorkspaceBlock{Repos: []string{"svc-b", "svc-c"}},
+			want:     config.WorkspaceBlock{Repos: []string{"svc-b", "svc-c"}},
+		},
+		{
+			name:     "nil Repos in override keeps base Repos",
+			base:     config.WorkspaceBlock{Repos: []string{"svc-a", "svc-b"}},
+			override: config.WorkspaceBlock{Repos: nil},
+			want:     config.WorkspaceBlock{Repos: []string{"svc-a", "svc-b"}},
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			got := config.MergeWorkspace(tc.base, tc.override)
+			s.Assert().Equal(tc.want, got)
+		})
+	}
+}
+
 func (s *ConfigSuite) TestRemoteByName() {
 	cfg := config.WorkspaceConfig{
 		Remotes: []config.RemoteConfig{

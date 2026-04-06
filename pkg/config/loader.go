@@ -14,11 +14,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Load reads configPath `.gitw` and merges `.gitw.local` if present.
+// Load reads configPath `.gitw`, merges `.git/.gitw` if present, then
+// merges `.gitw.local` if present.
 // Returns a WorkspaceConfig with non-nil Repos and Groups maps.
 func Load(configPath string) (*WorkspaceConfig, error) {
 	cfg, err := loadMainConfig(configPath)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := mergePrivateConfig(cfg, configPath); err != nil {
 		return nil, err
 	}
 
@@ -477,6 +482,122 @@ func mergeLocalConfig(cfg *WorkspaceConfig, localPath string) error {
 	}
 
 	return nil
+}
+
+func privateConfigPath(cfgPath string) string {
+	return filepath.Join(filepath.Dir(cfgPath), ".git", ".gitw")
+}
+
+// mergePrivateConfig reads .git/.gitw (if present) and merges its blocks
+// into cfg using field-level semantics: private file wins on all conflicts.
+// Absent .git/.gitw is silently skipped.
+func mergePrivateConfig(cfg *WorkspaceConfig, cfgPath string) error {
+	privatePath := privateConfigPath(cfgPath)
+
+	data, err := os.ReadFile(privatePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("reading private config %s: %w", privatePath, err)
+	}
+
+	var dc diskConfig
+	if err := toml.Unmarshal(data, &dc); err != nil {
+		return fmt.Errorf("parsing private config %s: %w", privatePath, err)
+	}
+
+	cfg.Metarepo = mergeMetarepo(cfg.Metarepo, dc.Metarepo)
+
+	if err := mergePrivateRemotes(cfg, dc.RemoteList); err != nil {
+		return err
+	}
+
+	if err := mergePrivateRepos(cfg, dc.RepoList); err != nil {
+		return err
+	}
+
+	mergePrivateSyncPairs(cfg, dc.SyncPairList)
+	mergePrivateWorkstreams(cfg, dc.WorkstreamList)
+	mergePrivateWorkspaces(cfg, dc.Workspaces)
+
+	return nil
+}
+
+func mergePrivateRemotes(cfg *WorkspaceConfig, overrides []RemoteConfig) error {
+	idx := make(map[string]int, len(cfg.Remotes))
+	for i, r := range cfg.Remotes {
+		idx[r.Name] = i
+	}
+
+	for _, override := range overrides {
+		if i, ok := idx[override.Name]; ok {
+			cfg.Remotes[i] = MergeRemote(cfg.Remotes[i], override)
+		} else {
+			cfg.Remotes = append(cfg.Remotes, override)
+		}
+	}
+
+	return nil
+}
+
+func mergePrivateRepos(cfg *WorkspaceConfig, overrides []RepoConfig) error {
+	for _, override := range overrides {
+		base, ok := cfg.Repos[override.Name]
+		if !ok {
+			return fmt.Errorf("private config: repo %q is not declared in .gitw", override.Name)
+		}
+		cfg.Repos[override.Name] = MergeRepo(base, override)
+	}
+
+	return nil
+}
+
+func mergePrivateSyncPairs(cfg *WorkspaceConfig, overrides []SyncPairConfig) {
+	type key struct{ from, to string }
+	idx := make(map[key]int, len(cfg.SyncPairs))
+	for i, p := range cfg.SyncPairs {
+		idx[key{p.From, p.To}] = i
+	}
+
+	for _, override := range overrides {
+		k := key{override.From, override.To}
+		if i, ok := idx[k]; ok {
+			cfg.SyncPairs[i] = MergeSyncPair(cfg.SyncPairs[i], override)
+		} else {
+			cfg.SyncPairs = append(cfg.SyncPairs, override)
+		}
+	}
+}
+
+func mergePrivateWorkstreams(cfg *WorkspaceConfig, overrides []WorkstreamConfig) {
+	idx := make(map[string]int, len(cfg.Workstreams))
+	for i, w := range cfg.Workstreams {
+		idx[w.Name] = i
+	}
+
+	for _, override := range overrides {
+		if i, ok := idx[override.Name]; ok {
+			cfg.Workstreams[i] = MergeWorkstream(cfg.Workstreams[i], override)
+		} else {
+			cfg.Workstreams = append(cfg.Workstreams, override)
+		}
+	}
+}
+
+func mergePrivateWorkspaces(cfg *WorkspaceConfig, overrides []WorkspaceBlock) {
+	idx := make(map[string]int, len(cfg.Workspaces))
+	for i, w := range cfg.Workspaces {
+		idx[w.Name] = i
+	}
+
+	for _, override := range overrides {
+		if i, ok := idx[override.Name]; ok {
+			cfg.Workspaces[i] = MergeWorkspace(cfg.Workspaces[i], override)
+		} else {
+			cfg.Workspaces = append(cfg.Workspaces, override)
+		}
+	}
 }
 
 // Save writes cfg to configPath atomically (write to .tmp, then rename).

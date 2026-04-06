@@ -40,11 +40,11 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - ✓ Shell completion -- existing
 - ✓ GoReleaser + Homebrew distribution -- existing
 - ✓ Root `[[workstream]]` config block contract + loader parse/validate/normalize (`CFG-06`) -- validated in Phase 06
+- ✓ Two-file config merge with field-level semantics (`.gitw` + `.git/.gitw`) (`CFG-07`) -- validated in Phase 07
 
 ### Active
 
 - [ ] v2 config schema (`[[workspace]]`, `[[remote]]`, `[[sync_pair]]`, `[[workstream]]`, `.gitw-stream`)
-- [ ] Two-file config merge with field-level semantics (`.gitw` + `.git/.gitw`)
 - [ ] Branch rule engine (glob patterns, criteria combos, four action tiers)
 - [ ] Multi-remote sync fan-out with `[[sync_pair]]` routing
 - [ ] Remote management (`git w remote add/list/status/remove`) with Gitea/GitHub providers
@@ -138,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-05 — Phase 06 complete (workstream root config block added and validated)*
+*Last updated: 2026-04-06 — Phase 07 complete (two-file config merge implemented and validated)*

@@ -15,7 +15,7 @@ Requirements for v2.0 release. Each maps to roadmap phases (GSD phases = GitHub 
 - [x] **CFG-04**: User can define `[[remote]]` and `[[remote.branch_rule]]` blocks with all specified fields
 - [ ] **CFG-05**: User can define `[[sync_pair]]` blocks with cycle detection at load time
 - [x] **CFG-06**: User can define `[[workstream]]` root config blocks for lightweight remote overrides
-- [ ] **CFG-07**: Tool merges `.gitw` and `.git/.gitw` with field-level semantics (private file wins on conflicts)
+- [x] **CFG-07**: Tool merges `.gitw` and `.git/.gitw` with field-level semantics (private file wins on conflicts)
 - [ ] **CFG-08**: User can define `.gitw-stream` manifest with `[[worktree]]` entries including `name`, `path`, `scope` fields
 - [ ] **CFG-09**: Tool resolves `[metarepo] default_remotes` cascade: metarepo -> workstream -> repo (innermost wins)
 - [ ] **CFG-10**: Tool detects v1 `[[workgroup]]` blocks at load time with actionable error directing to `git w migrate`
@@ -147,7 +147,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CFG-04 | Phase 4 (M1 #39) | Complete |
 | CFG-05 | Phase 5 (M1 #40) | Pending |
 | CFG-06 | Phase 6 (M1 #41) | Complete |
-| CFG-07 | Phase 7 (M1 #42) | Pending |
+| CFG-07 | Phase 7 (M1 #42) | Complete |
 | CFG-08 | Phase 8 (M1 #43) | Pending |
 | CFG-09 | Phase 9 (M1 #44) | Pending |
 | CFG-10 | Phase 10 (M1 #45) | Pending |
