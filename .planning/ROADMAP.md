@@ -211,7 +211,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 07-01-PLAN.md — Add MergeRepo, MergeWorkspace, and mergeMetarepo helpers to config.go
-- [ ] 07-02-PLAN.md — Implement mergePrivateConfig and wire into Load()
+- [x] 07-02-PLAN.md — Implement mergePrivateConfig and wire into Load()
 
 ---
 
