@@ -231,7 +231,7 @@ Plans:
 
 Plans:
 - [x] 08-01-PLAN.md — Define WorkstreamManifest, WorktreeEntry, ShipState, StreamContext, WorkstreamStatus types in pkg/config/config.go
-- [ ] 08-02-PLAN.md — Implement LoadStream, applyStreamDefaults, validateStream in stream.go with full TDD test coverage
+- [x] 08-02-PLAN.md — Implement LoadStream, applyStreamDefaults, validateStream in stream.go with full TDD test coverage
 
 ---
 
