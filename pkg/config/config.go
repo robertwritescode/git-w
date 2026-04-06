@@ -214,6 +214,112 @@ func MergeWorkstream(base, override WorkstreamConfig) WorkstreamConfig {
 	return merged
 }
 
+// MergeRepo merges base and override RepoConfig. For each string field,
+// the override value wins if non-empty; otherwise the base value is used.
+// Slice fields (Flags, Remotes) from override replace base if non-nil.
+func MergeRepo(base, override RepoConfig) RepoConfig {
+	merged := base
+
+	if override.Name != "" {
+		merged.Name = override.Name
+	}
+
+	if override.Path != "" {
+		merged.Path = override.Path
+	}
+
+	if override.CloneURL != "" {
+		merged.CloneURL = override.CloneURL
+	}
+
+	if override.DefaultBranch != "" {
+		merged.DefaultBranch = override.DefaultBranch
+	}
+
+	if override.TrackBranch != "" {
+		merged.TrackBranch = override.TrackBranch
+	}
+
+	if override.Upstream != "" {
+		merged.Upstream = override.Upstream
+	}
+
+	if override.Flags != nil {
+		merged.Flags = override.Flags
+	}
+
+	if override.Remotes != nil {
+		merged.Remotes = override.Remotes
+	}
+
+	return merged
+}
+
+// MergeWorkspace merges base and override WorkspaceBlock. For each string
+// field, the override value wins if non-empty; otherwise the base value is
+// used. Repos from override replace base Repos if non-nil.
+func MergeWorkspace(base, override WorkspaceBlock) WorkspaceBlock {
+	merged := base
+
+	if override.Name != "" {
+		merged.Name = override.Name
+	}
+
+	if override.Description != "" {
+		merged.Description = override.Description
+	}
+
+	if override.Repos != nil {
+		merged.Repos = override.Repos
+	}
+
+	return merged
+}
+
+// mergeMetarepo merges base and override MetarepoConfig. Non-zero string
+// and non-nil slice/pointer fields in override win; otherwise base is used.
+func mergeMetarepo(base, override MetarepoConfig) MetarepoConfig {
+	merged := base
+
+	if override.Name != "" {
+		merged.Name = override.Name
+	}
+
+	if override.DefaultBranch != "" {
+		merged.DefaultBranch = override.DefaultBranch
+	}
+
+	if override.DefaultRemotes != nil {
+		merged.DefaultRemotes = override.DefaultRemotes
+	}
+
+	if override.AgenticFrameworks != nil {
+		merged.AgenticFrameworks = override.AgenticFrameworks
+	}
+
+	if override.AutoGitignore != nil {
+		merged.AutoGitignore = override.AutoGitignore
+	}
+
+	if override.SyncPush != nil {
+		merged.SyncPush = override.SyncPush
+	}
+
+	if override.BranchSyncSource != nil {
+		merged.BranchSyncSource = override.BranchSyncSource
+	}
+
+	if override.BranchSetUpstream != nil {
+		merged.BranchSetUpstream = override.BranchSetUpstream
+	}
+
+	if override.BranchPush != nil {
+		merged.BranchPush = override.BranchPush
+	}
+
+	return merged
+}
+
 // RepoConfig represents one tracked repository.
 type RepoConfig struct {
 	Name          string   `toml:"name"`
