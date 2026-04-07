@@ -318,7 +318,10 @@ Plans:
   2. `validateSyncPairFields` calls `cfg.RemoteByName()` for `from` and `to` values; nonexistent remote names produce an error (INT-02)
   3. Warnings accumulated by `warnNonConformingRepoPaths` are preserved when `validateAliasFields` returns an error (INT-03)
   4. Tests cover all three fix paths
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 13-01-PLAN.md — Three loader.go correctness fixes (INT-01/INT-02/INT-03) with test coverage
 
 ---
 
