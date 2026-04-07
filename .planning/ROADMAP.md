@@ -245,7 +245,10 @@ Plans:
   2. Repo-level remote overrides fully replace (not merge with) workstream-level
   3. Missing override at any level falls through to next outer level
 **Canonical refs**: `.planning/v2/v2-schema.md` (cascade resolution), `.planning/v2/v2-remote-management.md` (effective remote list)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 09-01-PLAN.md — Fix MergeWorkstream/MergeRepo nil guards (prerequisite for cascade)
+- [ ] 09-02-PLAN.md — Add ResolveRepoRemotes and ResolveWorkstreamRemotes cascade methods
 
 ---
 
