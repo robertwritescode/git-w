@@ -278,7 +278,11 @@ Plans:
   2. Field ordering is preserved after write-read cycle
   3. All new block types (workspace, remote, sync_pair, workstream) are covered
 **Canonical refs**: `.planning/v2/v2-schema.md`, `.planning/codebase/CONCERNS.md` (TOML comment preservation)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Tech debt fixes: interface{} → any and applySmartUpdate error propagation
+- [ ] 11-02-PLAN.md — Round-trip tests for all diskConfig block types
 
 ---
 
