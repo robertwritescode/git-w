@@ -31,7 +31,7 @@ git-w v2 replaces the workgroup model with workspace/workstream hierarchy, adds 
 - [ ] **Phase 8: Parse `.gitw-stream` manifest** - Workstream manifest with `[[worktree]]` entries (name, path, scope)
 - [ ] **Phase 9: Default remotes cascade** - `[metarepo] default_remotes` resolution: metarepo -> workstream -> repo
 - [x] **Phase 10: Detect v1 `[[workgroup]]` blocks** - Actionable error at load time directing to `git w migrate` (completed 2026-04-07)
-- [ ] **Phase 11: `UpdatePreservingComments` round-trip** - Round-trip tests for all v2 config fields
+- [x] **Phase 11: `UpdatePreservingComments` round-trip** - Round-trip tests for all v2 config fields (completed 2026-04-07)
 - [ ] **Phase 12: `BranchInfo` type and glob package** - Branch info type and internal glob matching with `*` and `**` patterns
 - [ ] **Phase 13: `EvaluateRule` pure function** - Four action tiers (allow, block, warn, require-flag) with criteria evaluation
 - [ ] **Phase 14: Rule criteria combination tests** - Table-driven tests for all criteria x action tier combinations
@@ -282,7 +282,7 @@ Plans:
 
 Plans:
 - [x] 11-01-PLAN.md — Tech debt fixes: interface{} → any and applySmartUpdate error propagation
-- [ ] 11-02-PLAN.md — Round-trip tests for all diskConfig block types
+- [x] 11-02-PLAN.md — Round-trip tests for all diskConfig block types
 
 ---
 
@@ -1145,7 +1145,7 @@ M12 (Phases 59-63) can run in parallel after M1 (Phases 1-11) completes.
 | 8. Parse `.gitw-stream` manifest | M1 | 0/? | Not started | - |
 | 9. Default remotes cascade | M1 | 0/? | Not started | - |
 | 10. Detect v1 `[[workgroup]]` | M1 | 1/1 | Complete    | 2026-04-07 |
-| 11. `UpdatePreservingComments` round-trip | M1 | 1/2 | In Progress|  |
+| 11. `UpdatePreservingComments` round-trip | M1 | 2/2 | Complete   | 2026-04-07 |
 | 12. `BranchInfo` + glob package | M2 | 0/? | Not started | - |
 | 13. `EvaluateRule` pure function | M2 | 0/? | Not started | - |
 | 14. Rule criteria tests | M2 | 0/? | Not started | - |
