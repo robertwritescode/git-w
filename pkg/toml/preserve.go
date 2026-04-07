@@ -11,19 +11,19 @@ import (
 )
 
 // Marshal is a re-export of go-toml's Marshal function.
-func Marshal(v interface{}) ([]byte, error) {
+func Marshal(v any) ([]byte, error) {
 	return gotoml.Marshal(v)
 }
 
 // Unmarshal is a re-export of go-toml's Unmarshal function.
-func Unmarshal(data []byte, v interface{}) error {
+func Unmarshal(data []byte, v any) error {
 	return gotoml.Unmarshal(data, v)
 }
 
 // UpdatePreservingComments updates a TOML file while preserving comments and formatting.
 // It takes the original file content, the old config (as parsed), and new config to write.
 // Returns the updated content with comments preserved where possible.
-func UpdatePreservingComments(originalContent []byte, oldData, newData interface{}) ([]byte, error) {
+func UpdatePreservingComments(originalContent []byte, oldData, newData any) ([]byte, error) {
 	oldBytes, newBytes, err := marshalBoth(oldData, newData)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func UpdatePreservingComments(originalContent []byte, oldData, newData interface
 	return applySmartUpdate(originalContent, oldMap, newMap, newBytes)
 }
 
-func marshalBoth(oldData, newData interface{}) ([]byte, []byte, error) {
+func marshalBoth(oldData, newData any) ([]byte, []byte, error) {
 	oldBytes, err := Marshal(oldData)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshaling old data: %w", err)
@@ -59,9 +59,9 @@ func isContentIdentical(oldBytes, newBytes []byte) bool {
 	return bytes.Equal(normalizeToml(oldBytes), normalizeToml(newBytes))
 }
 
-func parseBothToMaps(oldBytes, newBytes []byte) (map[string]interface{}, map[string]interface{}, error) {
-	oldMap := make(map[string]interface{})
-	newMap := make(map[string]interface{})
+func parseBothToMaps(oldBytes, newBytes []byte) (map[string]any, map[string]any, error) {
+	oldMap := make(map[string]any)
+	newMap := make(map[string]any)
 
 	if err := Unmarshal(oldBytes, &oldMap); err != nil {
 		return nil, nil, fmt.Errorf("unmarshaling old: %w", err)
@@ -74,10 +74,10 @@ func parseBothToMaps(oldBytes, newBytes []byte) (map[string]interface{}, map[str
 	return oldMap, newMap, nil
 }
 
-func applySmartUpdate(originalContent []byte, oldMap, newMap map[string]interface{}, newBytes []byte) ([]byte, error) {
+func applySmartUpdate(originalContent []byte, oldMap, newMap map[string]any, newBytes []byte) ([]byte, error) {
 	result, err := smartUpdate(originalContent, oldMap, newMap, newBytes)
 	if err != nil {
-		return newBytes, nil
+		return nil, err
 	}
 	return result, nil
 }
@@ -96,7 +96,7 @@ func normalizeToml(data []byte) []byte {
 	return bytes.Join(normalized, []byte("\n"))
 }
 
-func smartUpdate(original []byte, oldMap, newMap map[string]interface{}, fullNew []byte) ([]byte, error) {
+func smartUpdate(original []byte, oldMap, newMap map[string]any, fullNew []byte) ([]byte, error) {
 	changes := detectChanges(oldMap, newMap)
 
 	result := original
@@ -117,7 +117,7 @@ type sectionChanges struct {
 	sections []string
 }
 
-func detectChanges(oldMap, newMap map[string]interface{}) sectionChanges {
+func detectChanges(oldMap, newMap map[string]any) sectionChanges {
 	changes := sectionChanges{}
 
 	for key := range newMap {
@@ -135,7 +135,7 @@ func detectChanges(oldMap, newMap map[string]interface{}) sectionChanges {
 	return changes
 }
 
-func mapsEqual(a, b interface{}) bool {
+func mapsEqual(a, b any) bool {
 	aBytes, err1 := Marshal(a)
 	bBytes, err2 := Marshal(b)
 
@@ -146,7 +146,7 @@ func mapsEqual(a, b interface{}) bool {
 	return bytes.Equal(normalizeToml(aBytes), normalizeToml(bBytes))
 }
 
-func updateSection(content []byte, sectionName string, newMap map[string]interface{}, fullNew []byte) ([]byte, error) {
+func updateSection(content []byte, sectionName string, newMap map[string]any, fullNew []byte) ([]byte, error) {
 	start, end, err := findSectionBounds(content, sectionName)
 	if err != nil {
 		return appendSection(content, sectionName, newMap, fullNew), nil
@@ -240,8 +240,8 @@ func findNextNonSubsection(content []byte, section string) int {
 	return -1
 }
 
-func extractSectionContent(content []byte, section string, dataMap map[string]interface{}) ([]byte, error) {
-	sectionData := map[string]interface{}{
+func extractSectionContent(content []byte, section string, dataMap map[string]any) ([]byte, error) {
+	sectionData := map[string]any{
 		section: dataMap[section],
 	}
 
@@ -253,7 +253,7 @@ func extractSectionContent(content []byte, section string, dataMap map[string]in
 	return marshaled, nil
 }
 
-func appendSection(content []byte, section string, newMap map[string]interface{}, fullNew []byte) []byte {
+func appendSection(content []byte, section string, newMap map[string]any, fullNew []byte) []byte {
 	newSection, err := extractSectionContent(fullNew, section, newMap)
 	if err != nil {
 		return append(content, fullNew...)
