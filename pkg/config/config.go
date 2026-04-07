@@ -242,7 +242,7 @@ func MergeSyncPair(base, override SyncPairConfig) SyncPairConfig {
 
 // MergeWorkstream merges base and override WorkstreamConfig. For each field,
 // the override value wins if non-zero; otherwise the base value is used.
-// Remotes from override replace base Remotes entirely if non-empty.
+// Remotes from override replace base Remotes if non-nil (including empty slice).
 func MergeWorkstream(base, override WorkstreamConfig) WorkstreamConfig {
 	merged := base
 
@@ -250,7 +250,7 @@ func MergeWorkstream(base, override WorkstreamConfig) WorkstreamConfig {
 		merged.Name = override.Name
 	}
 
-	if len(override.Remotes) > 0 {
+	if override.Remotes != nil {
 		merged.Remotes = override.Remotes
 	}
 
@@ -467,6 +467,49 @@ func (c WorkspaceConfig) ResolveDefaultBranch(repoName string) string {
 	}
 
 	return "main"
+}
+
+// ResolveRepoRemotes returns the effective remote list for a repo using a
+// two-level cascade: repo-level Remotes -> metarepo default_remotes.
+// nil Remotes at a level means "not configured here, fall through to next level".
+// []string{} means "explicitly no remotes, stop cascade, return empty".
+// Returns the resolved list and the source level: "repo", "metarepo", or "none".
+// "none" means nothing was configured at any level.
+func (c WorkspaceConfig) ResolveRepoRemotes(repoName string) ([]string, string) {
+	if repoCfg, ok := c.Repos[repoName]; ok && repoCfg.Remotes != nil {
+		return repoCfg.Remotes, "repo"
+	}
+
+	if c.Metarepo.DefaultRemotes != nil {
+		return c.Metarepo.DefaultRemotes, "metarepo"
+	}
+
+	return nil, "none"
+}
+
+// ResolveWorkstreamRemotes returns the effective remote list for a repo in the
+// context of a named workstream using a three-level cascade:
+// repo-level Remotes -> workstream-level Remotes -> metarepo default_remotes.
+// nil Remotes at a level means "not configured here, fall through to next level".
+// []string{} means "explicitly no remotes, stop cascade, return empty".
+// An empty or unknown workstreamName skips the workstream level.
+// Returns the resolved list and the source level: "repo", "workstream", "metarepo", or "none".
+func (c WorkspaceConfig) ResolveWorkstreamRemotes(repoName, workstreamName string) ([]string, string) {
+	if repoCfg, ok := c.Repos[repoName]; ok && repoCfg.Remotes != nil {
+		return repoCfg.Remotes, "repo"
+	}
+
+	if workstreamName != "" {
+		if ws, ok := c.WorkstreamByName(workstreamName); ok && ws.Remotes != nil {
+			return ws.Remotes, "workstream"
+		}
+	}
+
+	if c.Metarepo.DefaultRemotes != nil {
+		return c.Metarepo.DefaultRemotes, "metarepo"
+	}
+
+	return nil, "none"
 }
 
 // WorktreeBranchForRepo returns the worktree branch for a synthesized repo name.
