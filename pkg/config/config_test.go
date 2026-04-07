@@ -410,10 +410,10 @@ func (s *ConfigSuite) TestMergeWorkstream() {
 			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
 		},
 		{
-			name:     "empty remotes override keeps base remotes",
+			name:     "empty slice remotes override replaces base (explicit no-remotes)",
 			base:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
 			override: config.WorkstreamConfig{Remotes: []string{}},
-			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
+			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{}},
 		},
 	}
 
@@ -680,4 +680,186 @@ func (s *ConfigSuite) TestRemoteByName() {
 		s.Assert().True(ok)
 		s.Assert().Equal("github", r.Kind)
 	})
+}
+
+func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
+	type resolveWorkstreamCase struct {
+		name              string
+		repoRemotes       []string
+		workstreamName    string
+		workstreamRemotes []string
+		metaRemotes       []string
+		wantRemotes       []string
+		wantSource        string
+	}
+
+	cases := []resolveWorkstreamCase{
+		{
+			name:              "repo remotes set: returns repo remotes",
+			repoRemotes:       []string{"origin", "personal"},
+			workstreamName:    "ws1",
+			workstreamRemotes: []string{"mirror"},
+			metaRemotes:       []string{"default"},
+			wantRemotes:       []string{"origin", "personal"},
+			wantSource:        "repo",
+		},
+		{
+			name:              "repo remotes explicit empty: stops cascade",
+			repoRemotes:       []string{},
+			workstreamName:    "ws1",
+			workstreamRemotes: []string{"mirror"},
+			metaRemotes:       []string{"default"},
+			wantRemotes:       []string{},
+			wantSource:        "repo",
+		},
+		{
+			name:              "repo nil, workstream remotes set: returns workstream remotes",
+			repoRemotes:       nil,
+			workstreamName:    "ws1",
+			workstreamRemotes: []string{"personal"},
+			metaRemotes:       []string{"default"},
+			wantRemotes:       []string{"personal"},
+			wantSource:        "workstream",
+		},
+		{
+			name:              "repo nil, workstream remotes explicit empty: stops cascade",
+			repoRemotes:       nil,
+			workstreamName:    "ws1",
+			workstreamRemotes: []string{},
+			metaRemotes:       []string{"default"},
+			wantRemotes:       []string{},
+			wantSource:        "workstream",
+		},
+		{
+			name:              "repo nil, workstream nil, metarepo set: returns metarepo",
+			repoRemotes:       nil,
+			workstreamName:    "ws1",
+			workstreamRemotes: nil,
+			metaRemotes:       []string{"origin"},
+			wantRemotes:       []string{"origin"},
+			wantSource:        "metarepo",
+		},
+		{
+			name:              "repo nil, workstream nil, metarepo explicit empty: returns empty",
+			repoRemotes:       nil,
+			workstreamName:    "ws1",
+			workstreamRemotes: nil,
+			metaRemotes:       []string{},
+			wantRemotes:       []string{},
+			wantSource:        "metarepo",
+		},
+		{
+			name:              "all nil: returns nil source none",
+			repoRemotes:       nil,
+			workstreamName:    "ws1",
+			workstreamRemotes: nil,
+			metaRemotes:       nil,
+			wantRemotes:       nil,
+			wantSource:        "none",
+		},
+		{
+			name:              "workstream not found: skips to metarepo",
+			repoRemotes:       nil,
+			workstreamName:    "nonexistent",
+			workstreamRemotes: nil,
+			metaRemotes:       []string{"origin"},
+			wantRemotes:       []string{"origin"},
+			wantSource:        "metarepo",
+		},
+		{
+			name:              "empty workstream name: skips workstream level",
+			repoRemotes:       nil,
+			workstreamName:    "",
+			workstreamRemotes: nil,
+			metaRemotes:       []string{"origin"},
+			wantRemotes:       []string{"origin"},
+			wantSource:        "metarepo",
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			cfg := config.WorkspaceConfig{
+				Metarepo: config.MetarepoConfig{DefaultRemotes: tc.metaRemotes},
+				Repos: map[string]config.RepoConfig{
+					"svc-a": {Name: "svc-a", Remotes: tc.repoRemotes},
+				},
+			}
+			if tc.workstreamName == "ws1" {
+				cfg.Workstreams = []config.WorkstreamConfig{
+					{Name: "ws1", Remotes: tc.workstreamRemotes},
+				}
+			}
+			gotRemotes, gotSource := cfg.ResolveWorkstreamRemotes("svc-a", tc.workstreamName)
+			s.Assert().Equal(tc.wantRemotes, gotRemotes)
+			s.Assert().Equal(tc.wantSource, gotSource)
+		})
+	}
+}
+
+func (s *ConfigSuite) TestResolveRepoRemotes() {
+	cases := []struct {
+		name        string
+		repoRemotes []string
+		metaRemotes []string
+		wantRemotes []string
+		wantSource  string
+	}{
+		{
+			name:        "repo remotes set: returns repo remotes",
+			repoRemotes: []string{"origin", "personal"},
+			metaRemotes: []string{"default"},
+			wantRemotes: []string{"origin", "personal"},
+			wantSource:  "repo",
+		},
+		{
+			name:        "repo explicit empty: stops cascade",
+			repoRemotes: []string{},
+			metaRemotes: []string{"default"},
+			wantRemotes: []string{},
+			wantSource:  "repo",
+		},
+		{
+			name:        "repo nil, metarepo set: returns metarepo",
+			repoRemotes: nil,
+			metaRemotes: []string{"origin"},
+			wantRemotes: []string{"origin"},
+			wantSource:  "metarepo",
+		},
+		{
+			name:        "repo nil, metarepo explicit empty: returns empty",
+			repoRemotes: nil,
+			metaRemotes: []string{},
+			wantRemotes: []string{},
+			wantSource:  "metarepo",
+		},
+		{
+			name:        "repo nil, metarepo nil: returns nil source none",
+			repoRemotes: nil,
+			metaRemotes: nil,
+			wantRemotes: nil,
+			wantSource:  "none",
+		},
+		{
+			name:        "repo not in config: falls through to metarepo",
+			repoRemotes: nil,
+			metaRemotes: []string{"origin"},
+			wantRemotes: []string{"origin"},
+			wantSource:  "metarepo",
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			cfg := config.WorkspaceConfig{
+				Metarepo: config.MetarepoConfig{DefaultRemotes: tc.metaRemotes},
+				Repos: map[string]config.RepoConfig{
+					"svc-a": {Name: "svc-a", Remotes: tc.repoRemotes},
+				},
+			}
+			gotRemotes, gotSource := cfg.ResolveRepoRemotes("svc-a")
+			s.Assert().Equal(tc.wantRemotes, gotRemotes)
+			s.Assert().Equal(tc.wantSource, gotSource)
+		})
+	}
 }
