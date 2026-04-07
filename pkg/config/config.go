@@ -10,17 +10,18 @@ import (
 // WorkspaceConfig is the merged result of `.gitw` and `.gitw.local`.
 // Repos and Groups maps are always non-nil after loading.
 type WorkspaceConfig struct {
-	Metarepo    MetarepoConfig             `toml:"metarepo"`
-	Workspaces  []WorkspaceBlock           `toml:"workspace"`
-	Remotes     []RemoteConfig             // in-memory; populated from [[remote]] list by loader
-	SyncPairs   []SyncPairConfig           // in-memory; populated from [[sync_pair]] list by loader
-	Workstreams []WorkstreamConfig         // in-memory; populated from [[workstream]] list by loader
-	Context     ContextConfig              `toml:"context"` // sourced from .gitw.local
-	Repos       map[string]RepoConfig      // in-memory only; populated from [[repo]] list by loader
-	Groups      map[string]GroupConfig     `toml:"groups"`
-	Worktrees   map[string]WorktreeConfig  `toml:"worktrees"`
-	Workgroups  map[string]WorkgroupConfig `toml:"workgroup"` // sourced from .gitw.local
-	Warnings    []string                   // in-memory only; populated at load time
+	Metarepo         MetarepoConfig             `toml:"metarepo"`
+	Workspaces       []WorkspaceBlock           `toml:"workspace"`
+	Remotes          []RemoteConfig             // in-memory; populated from [[remote]] list by loader
+	SyncPairs        []SyncPairConfig           // in-memory; populated from [[sync_pair]] list by loader
+	Workstreams      []WorkstreamConfig         // in-memory; populated from [[workstream]] list by loader
+	Context          ContextConfig              `toml:"context"` // sourced from .gitw.local
+	Repos            map[string]RepoConfig      // in-memory only; populated from [[repo]] list by loader
+	Groups           map[string]GroupConfig     `toml:"groups"`
+	Worktrees        map[string]WorktreeConfig  `toml:"worktrees"`
+	Workgroups       map[string]WorkgroupConfig `toml:"workgroup"` // sourced from .gitw.local
+	Warnings         []string                   // in-memory only; populated at load time
+	V1WorkgroupCount int                        // in-memory only; set when [[workgroup]] blocks found in v1 config
 }
 
 // WorkgroupConfig is a local workgroup entry (stored only in .gitw.local).

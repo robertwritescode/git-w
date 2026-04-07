@@ -62,6 +62,8 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 
 	ensureWorkspaceMaps(cfg)
 
+	cfg.V1WorkgroupCount = countV1WorkgroupBlocks(data)
+
 	if err := buildAndValidate(configPath, cfg); err != nil {
 		return nil, err
 	}
@@ -78,6 +80,10 @@ func applyMetarepoDefaults(cfg *WorkspaceConfig) {
 }
 
 func buildAndValidate(configPath string, cfg *WorkspaceConfig) error {
+	if err := detectV1Workgroups(cfg); err != nil {
+		return err
+	}
+
 	if err := validateRepoNames(cfg); err != nil {
 		return err
 	}
@@ -412,6 +418,28 @@ func warnNonConformingRepoPaths(cfg *WorkspaceConfig) {
 	}
 
 	sort.Strings(cfg.Warnings)
+}
+
+func detectV1Workgroups(cfg *WorkspaceConfig) error {
+	if cfg.V1WorkgroupCount == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("v1 config detected: found %d [[workgroup]] block(s) \u2014 run 'git w migrate' to upgrade", cfg.V1WorkgroupCount)
+}
+
+// countV1WorkgroupBlocks counts [[workgroup]] array-of-tables headers in raw TOML bytes.
+// It looks for lines that are exactly "[[workgroup]]" or "[[workgroup]]" with trailing whitespace.
+func countV1WorkgroupBlocks(data []byte) int {
+	count := 0
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "[[workgroup]]" {
+			count++
+		}
+	}
+
+	return count
 }
 
 func ensureWorkspaceMaps(cfg *WorkspaceConfig) {

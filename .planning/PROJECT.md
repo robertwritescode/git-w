@@ -42,6 +42,7 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - ✓ Root `[[workstream]]` config block contract + loader parse/validate/normalize (`CFG-06`) -- validated in Phase 06
 - ✓ Two-file config merge with field-level semantics (`.gitw` + `.git/.gitw`) (`CFG-07`) -- validated in Phase 07
 - ✓ `.gitw-stream` manifest with `[[worktree]]` entries (name, path, scope) + `LoadStream` loader (`CFG-08`) -- validated in Phase 08
+- ✓ v1 `[[workgroup]]` detection: hard error at load time directing user to `git w migrate` (`CFG-10`) -- validated in Phase 10
 
 ### Active
 
@@ -63,7 +64,7 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - [ ] Close and archival (`git w workstream close` with worktree removal, hook cleanup, archive)
 - [ ] `git w migrate` for v1-to-v2 upgrade path
 - [ ] `repos/<n>` path convention enforcement with v1 warning
-- [ ] v1 `[[workgroup]]` detection with actionable error
+  - [ ] v1 `[[workgroup]]` detection with actionable error -- **done, Phase 10**
 - [ ] `agentic_frameworks` config field with registry validation
 - [ ] Net command reduction: 39 to 27 commands
 
@@ -139,4 +140,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-06 — Phase 08 complete (.gitw-stream manifest types and LoadStream loader implemented and validated)*
+*Last updated: 2026-04-07 — Phase 10 complete (v1 [[workgroup]] detection: hard error at load time with migrate directive)*
