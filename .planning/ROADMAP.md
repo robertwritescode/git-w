@@ -1145,7 +1145,7 @@ M12 (Phases 59-63) can run in parallel after M1 (Phases 1-11) completes.
 | 8. Parse `.gitw-stream` manifest | M1 | 0/? | Not started | - |
 | 9. Default remotes cascade | M1 | 0/? | Not started | - |
 | 10. Detect v1 `[[workgroup]]` | M1 | 1/1 | Complete    | 2026-04-07 |
-| 11. `UpdatePreservingComments` round-trip | M1 | 2/2 | Complete   | 2026-04-07 |
+| 11. `UpdatePreservingComments` round-trip | M1 | 2/2 | Complete    | 2026-04-07 |
 | 12. `BranchInfo` + glob package | M2 | 0/? | Not started | - |
 | 13. `EvaluateRule` pure function | M2 | 0/? | Not started | - |
 | 14. Rule criteria tests | M2 | 0/? | Not started | - |
