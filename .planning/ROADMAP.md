@@ -262,7 +262,9 @@ Plans:
   2. Error message directs user to run `git w migrate`
   3. Detection only; no migration logic executed
 **Canonical refs**: `.planning/v2/v2-schema.md`, `.planning/v2/v2-migration.md` (v1 detection)
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 10-01-PLAN.md — Detect v1 `[[workgroup]]` blocks at load time, return hard error with migration instruction
 
 ---
 
