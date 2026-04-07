@@ -120,7 +120,7 @@ When all 12 milestones are merged to `v2`:
 | Active milestone | V2 M1: Config schema + loader |
 | Milestone branch | `v2/m1-config-schema` |
 | Current issue branch | none |
-| Next issue to implement | #45 — Detect v1 `[[workgroup]]` blocks at load time |
+| Next issue to implement | #46 — UpdatePreservingComments round-trip tests for all v2 fields |
 | M12 parallel unlock | not yet unlocked |
 
 ---
