@@ -298,7 +298,13 @@ Plans:
   2. Phase 02 SUMMARY.md files created documenting what was implemented
   3. REQUIREMENTS.md CFG-10 checkbox updated to `[x]` (stale — phase has VERIFIED PASSED)
   4. REQUIREMENTS.md CFG-12 checkbox updated to `[x]` (stale — phase has VERIFIED PASSED)
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Verify Phase 01 (workspace block, CFG-01/CFG-11) and Phase 03 (repos path convention, CFG-03)
+- [ ] 12-02-PLAN.md — Verify Phase 04 (remote + branch_rule, CFG-04) and Phase 05 (sync_pair cycle detection, CFG-05)
+- [ ] 12-03-PLAN.md — Reconstruct Phase 02 SUMMARY.md files and verify Phase 02 (track_branch/upstream, CFG-02)
+- [ ] 12-04-PLAN.md — Verify Phase 09 (default remotes cascade, CFG-09) and confirm CFG-10/CFG-12 checkboxes
 
 ---
 
