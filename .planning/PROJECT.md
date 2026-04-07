@@ -43,6 +43,7 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - ✓ Two-file config merge with field-level semantics (`.gitw` + `.git/.gitw`) (`CFG-07`) -- validated in Phase 07
 - ✓ `.gitw-stream` manifest with `[[worktree]]` entries (name, path, scope) + `LoadStream` loader (`CFG-08`) -- validated in Phase 08
 - ✓ v1 `[[workgroup]]` detection: hard error at load time directing user to `git w migrate` (`CFG-10`) -- validated in Phase 10
+- ✓ `UpdatePreservingComments` round-trip fidelity for all v2 fields + `interface{}` tech debt resolved (`CFG-12`) -- validated in Phase 11
 
 ### Active
 
@@ -140,4 +141,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 — Phase 10 complete (v1 [[workgroup]] detection: hard error at load time with migrate directive)*
+*Last updated: 2026-04-07 — Phase 11 complete (UpdatePreservingComments round-trip tests + interface{} tech debt resolved; CFG-12 validated)*
