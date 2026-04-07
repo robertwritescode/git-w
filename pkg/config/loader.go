@@ -753,13 +753,13 @@ func writeLocalDiskConfig(localPath string, cfg localDiskConfig) error {
 	return atomicWriteFile(localPath, data)
 }
 
-func saveWithCommentPreservation(path string, newConfig interface{}) ([]byte, error) {
+func saveWithCommentPreservation(path string, newConfig any) ([]byte, error) {
 	original, err := os.ReadFile(path)
 	if err != nil {
 		return marshalToml(newConfig)
 	}
 
-	var oldConfig interface{}
+	var oldConfig any
 	if err := toml.Unmarshal(original, &oldConfig); err != nil {
 		return marshalToml(newConfig)
 	}
@@ -772,7 +772,7 @@ func saveWithCommentPreservation(path string, newConfig interface{}) ([]byte, er
 	return data, nil
 }
 
-func marshalToml(cfg interface{}) ([]byte, error) {
+func marshalToml(cfg any) ([]byte, error) {
 	data, err := toml.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling config: %w", err)
