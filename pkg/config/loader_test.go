@@ -2323,3 +2323,48 @@ private = true
 	s.Assert().Contains(err.Error(), "secret")
 	s.Assert().Contains(err.Error(), ".git/.gitw")
 }
+
+func (s *LoaderSuite) TestPrivateConfigWorkstreamValidRemoteAfterMerge() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+
+[[workstream]]
+name = "TICKET-123"
+remotes = ["origin"]
+`), 0o644))
+
+	s.writePrivate(`
+[[remote]]
+name = "personal"
+private = true
+
+[[workstream]]
+name = "LOCAL-WS"
+remotes = ["personal"]
+`)
+
+	_, err := config.Load(s.cfgPath)
+	s.Require().NoError(err)
+}
+
+func (s *LoaderSuite) TestPrivateConfigWorkstreamUnknownRemoteAfterMerge() {
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte(`
+[[remote]]
+name = "origin"
+
+[[workstream]]
+name = "TICKET-123"
+remotes = ["origin"]
+`), 0o644))
+
+	s.writePrivate(`
+[[workstream]]
+name = "LOCAL-WS"
+remotes = ["ghost"]
+`)
+
+	_, err := config.Load(s.cfgPath)
+	s.Require().Error(err)
+	s.Assert().Contains(err.Error(), "ghost")
+}

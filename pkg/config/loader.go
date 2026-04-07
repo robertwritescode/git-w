@@ -27,11 +27,37 @@ func Load(configPath string) (*WorkspaceConfig, error) {
 		return nil, err
 	}
 
+	// Re-validate workstream remote references after private config merge,
+	// since private config can add workstreams referencing newly-merged remotes.
+	if err := revalidateWorkstreamRemotes(cfg); err != nil {
+		return nil, err
+	}
+
 	if err := mergeLocalConfig(cfg, configPath+".local"); err != nil {
 		return nil, err
 	}
 
 	return cfg, nil
+}
+
+// revalidateWorkstreamRemotes checks that all workstream remote references
+// exist in cfg.Remotes. Called after mergePrivateConfig to catch references
+// added by the private config layer.
+func revalidateWorkstreamRemotes(cfg *WorkspaceConfig) error {
+	knownRemotes := make(map[string]struct{}, len(cfg.Remotes))
+	for _, r := range cfg.Remotes {
+		knownRemotes[r.Name] = struct{}{}
+	}
+
+	for _, w := range cfg.Workstreams {
+		for _, remoteName := range w.Remotes {
+			if _, ok := knownRemotes[remoteName]; !ok {
+				return fmt.Errorf("workstream %q: unknown remote %q", w.Name, remoteName)
+			}
+		}
+	}
+
+	return nil
 }
 
 func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
