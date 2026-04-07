@@ -32,7 +32,7 @@ git-w v2 replaces the workgroup model with workspace/workstream hierarchy, adds 
 - [ ] **Phase 9: Default remotes cascade** - `[metarepo] default_remotes` resolution: metarepo -> workstream -> repo
 - [x] **Phase 10: Detect v1 `[[workgroup]]` blocks** - Actionable error at load time directing to `git w migrate` (completed 2026-04-07)
 - [x] **Phase 11: `UpdatePreservingComments` round-trip** - Round-trip tests for all v2 config fields (completed 2026-04-07)
-- [ ] **Phase 12: Verify M1 Phases 01–05 and 09** - Run gsd-verifier on all unverified M1 phases and fix stale REQUIREMENTS.md checkboxes
+- [x] **Phase 12: Verify M1 Phases 01–05 and 09** - Run gsd-verifier on all unverified M1 phases and fix stale REQUIREMENTS.md checkboxes (completed 2026-04-07)
 - [ ] **Phase 13: Fix post-merge validation and sync_pair remote validation** - Three loader.go correctness fixes from M1 integration audit
 - [ ] **Phase 15: `BranchInfo` type and glob package** - Branch info type and internal glob matching with `*` and `**` patterns
 - [ ] **Phase 16: `EvaluateRule` pure function** - Four action tiers (allow, block, warn, require-flag) with criteria evaluation
@@ -1182,7 +1182,7 @@ M12 (Phases 62-66) can run in parallel after M1 (Phases 1-13) completes.
 | 9. Default remotes cascade | M1 | 0/? | Not started | - |
 | 10. Detect v1 `[[workgroup]]` | M1 | 1/1 | Complete    | 2026-04-07 |
 | 11. `UpdatePreservingComments` round-trip | M1 | 2/2 | Complete    | 2026-04-07 |
-| 12. Verify M1 Phases 01-05 and 09 | M1 | 0/? | Not started | - |
+| 12. Verify M1 Phases 01-05 and 09 | M1 | 0/? | Complete    | 2026-04-07 |
 | 13. Fix post-merge validation | M1 | 0/? | Not started | - |
 | 15. `BranchInfo` + glob package | M2 | 0/? | Not started | - |
 | 16. `EvaluateRule` pure function | M2 | 0/? | Not started | - |
