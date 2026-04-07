@@ -969,6 +969,88 @@ dev = "infra/dev"
 	s.Assert().Empty(cfg.Warnings, "synthesized worktree repos should not produce path warnings")
 }
 
+func (s *LoaderSuite) TestV1WorkgroupDetection() {
+	tests := []struct {
+		name    string
+		content string
+		wantErr string
+	}{
+		{
+			name: "single workgroup block triggers error",
+			content: `[metarepo]
+name = "ws"
+
+[[workgroup]]
+name = "my-group"
+`,
+			wantErr: "v1 config detected",
+		},
+		{
+			name: "multiple workgroup blocks include count",
+			content: `[metarepo]
+name = "ws"
+
+[[workgroup]]
+name = "group-a"
+
+[[workgroup]]
+name = "group-b"
+
+[[workgroup]]
+name = "group-c"
+`,
+			wantErr: "3",
+		},
+		{
+			name: "migrate directive in error",
+			content: `[metarepo]
+name = "ws"
+
+[[workgroup]]
+name = "my-group"
+`,
+			wantErr: "git w migrate",
+		},
+		{
+			name: "no workgroup blocks loads successfully",
+			content: `[metarepo]
+name = "ws"
+`,
+		},
+		{
+			name: "workgroup error fires before repo path error",
+			content: `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "bad"
+path = "/absolute/path"
+
+[[workgroup]]
+name = "my-group"
+`,
+			wantErr: "v1 config detected",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.content), 0o644))
+
+			_, err := config.Load(cfgPath)
+
+			if tt.wantErr == "" {
+				s.Require().NoError(err)
+				return
+			}
+
+			s.Require().Error(err)
+			s.Assert().Contains(err.Error(), tt.wantErr)
+		})
+	}
+}
+
 func (s *LoaderSuite) TestRemoteBlocksParse() {
 	trueVal := true
 
