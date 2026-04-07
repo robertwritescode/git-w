@@ -18,9 +18,9 @@ Requirements for v2.0 release. Each maps to roadmap phases (GSD phases = GitHub 
 - [x] **CFG-07**: Tool merges `.gitw` and `.git/.gitw` with field-level semantics (private file wins on conflicts)
 - [x] **CFG-08**: User can define `.gitw-stream` manifest with `[[worktree]]` entries including `name`, `path`, `scope` fields
 - [ ] **CFG-09**: Tool resolves `[metarepo] default_remotes` cascade: metarepo -> workstream -> repo (innermost wins)
-- [ ] **CFG-10**: Tool detects v1 `[[workgroup]]` blocks at load time with actionable error directing to `git w migrate`
+- [x] **CFG-10**: Tool detects v1 `[[workgroup]]` blocks at load time with actionable error directing to `git w migrate`
 - [x] **CFG-11**: Tool validates `[metarepo] agentic_frameworks` field against known framework registry
-- [ ] **CFG-12**: `UpdatePreservingComments` round-trips all v2 fields without losing comments or field order
+- [x] **CFG-12**: `UpdatePreservingComments` round-trips all v2 fields without losing comments or field order
 
 ### Branch Rules
 
@@ -150,68 +150,70 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CFG-07 | Phase 7 (M1 #42) | Complete |
 | CFG-08 | Phase 8 (M1 #43) | Complete |
 | CFG-09 | Phase 9 (M1 #44) | Pending |
-| CFG-10 | Phase 10 (M1 #45) | Pending |
+| CFG-10 | Phase 10 (M1 #45) | Complete |
 | CFG-11 | Phase 1 (M1 #36) | Complete |
-| CFG-12 | Phase 11 (M1 #46) | Pending |
-| BRULE-01 | Phase 12 (M2 #47) | Pending |
-| BRULE-02 | Phase 13 (M2 #48) | Pending |
-| BRULE-03 | Phase 14 (M2 #49) | Pending |
-| SYNC-01 | Phase 15 (M3 #50) | Pending |
-| SYNC-02 | Phase 16 (M3 #51) | Pending |
-| SYNC-03 | Phase 17 (M3 #52) | Pending |
-| SYNC-04 | Phase 18 (M3 #54) | Pending |
-| SYNC-05 | Phase 19 (M3 #55) | Pending |
-| SYNC-06 | Phase 20 (M3 #98) | Pending |
-| RMT-01 | Phase 21 (M4 #56) | Pending |
-| RMT-02 | Phase 22 (M4 #59) | Pending |
-| RMT-03 | Phase 23 (M4 #60) | Pending |
-| RMT-04 | Phase 24 (M4 #61) | Pending |
-| RMT-05 | Phase 25 (M4 #99) | Pending |
-| STAT-01 | Phase 26 (M5 #62) | Pending |
-| STAT-02 | Phase 27 (M5 #63) | Pending |
-| STAT-03 | Phase 28 (M5 #64) | Pending |
-| STAT-04 | Phase 29 (M5 #65) | Pending |
-| STAT-05 | Phase 30 (M5 #66) | Pending |
-| HOOK-01 | Phase 32 (M6 #67) | Pending |
-| HOOK-02 | Phase 31 (M6 #53) | Pending |
-| HOOK-03 | Phase 33 (M6 #68) | Pending |
-| HOOK-04 | Phase 34 (M6 #69) | Pending |
-| WKSP-01 | Phase 35 (M7 #70) | Pending |
-| WKSP-02 | Phase 36 (M7 #71) | Pending |
-| WKSP-03 | Phase 36 (M7 #71) | Pending |
-| WKSP-04 | Phase 37 (M7 #72) | Pending |
-| WKSP-05 | Phase 38 (M7 #73) | Pending |
-| WKSP-06 | Phase 39 (M7 #74) | Pending |
-| WKSP-07 | Phase 40 (M7 #75) | Pending |
-| WKSP-08 | Phase 41 (M7 #76) | Pending |
-| INFRA-01 | Phase 42 (M8 #77) | Pending |
-| INFRA-02 | Phase 43 (M8 #78) | Pending |
-| INFRA-03 | Phase 44 (M8 #79) | Pending |
-| INFRA-04 | Phase 45 (M8 #80) | Pending |
-| INFRA-05 | Phase 46 (M8 #81) | Pending |
-| INFRA-06 | Phase 47 (M8 #82) | Pending |
-| AGNT-01 | Phase 48 (M9 #83) | Pending |
-| AGNT-02 | Phase 49 (M9 #84) | Pending |
-| AGNT-03 | Phase 50 (M9 #85) | Pending |
-| SHIP-01 | Phase 51 (M10 #86) | Pending |
-| SHIP-02 | Phase 52 (M10 #87) | Pending |
-| SHIP-03 | Phase 53 (M10 #88) | Pending |
-| SHIP-04 | Phase 54 (M10 #89) | Pending |
-| SHIP-05 | Phase 55 (M10 #100) | Pending |
-| CLOSE-01 | Phase 56 (M11 #90) | Pending |
-| CLOSE-02 | Phase 57 (M11 #91) | Pending |
-| CLOSE-03 | Phase 58 (M11 #92) | Pending |
-| MIG-01 | Phase 59 (M12 #93) | Pending |
-| MIG-02 | Phase 60 (M12 #94) | Pending |
-| MIG-03 | Phase 61 (M12 #95) | Pending |
-| MIG-04 | Phase 62 (M12 #96) | Pending |
-| MIG-05 | Phase 63 (M12 #97) | Pending |
+| CFG-12 | Phase 11 (M1 #46) | Complete |
+| CFG-01, CFG-03, CFG-04, CFG-05, CFG-09, CFG-11 | Phase 12 (M1 gap) | Pending |
+| CFG-02, CFG-03, CFG-05, CFG-07 | Phase 13 (M1 gap) | Pending |
+| BRULE-01 | Phase 15 (M2 #47) | Pending |
+| BRULE-02 | Phase 16 (M2 #48) | Pending |
+| BRULE-03 | Phase 17 (M2 #49) | Pending |
+| SYNC-01 | Phase 18 (M3 #50) | Pending |
+| SYNC-02 | Phase 19 (M3 #51) | Pending |
+| SYNC-03 | Phase 20 (M3 #52) | Pending |
+| SYNC-04 | Phase 21 (M3 #54) | Pending |
+| SYNC-05 | Phase 22 (M3 #55) | Pending |
+| SYNC-06 | Phase 23 (M3 #98) | Pending |
+| RMT-01 | Phase 24 (M4 #56) | Pending |
+| RMT-02 | Phase 25 (M4 #59) | Pending |
+| RMT-03 | Phase 26 (M4 #60) | Pending |
+| RMT-04 | Phase 27 (M4 #61) | Pending |
+| RMT-05 | Phase 28 (M4 #99) | Pending |
+| STAT-01 | Phase 29 (M5 #62) | Pending |
+| STAT-02 | Phase 30 (M5 #63) | Pending |
+| STAT-03 | Phase 31 (M5 #64) | Pending |
+| STAT-04 | Phase 32 (M5 #65) | Pending |
+| STAT-05 | Phase 33 (M5 #66) | Pending |
+| HOOK-01 | Phase 35 (M6 #67) | Pending |
+| HOOK-02 | Phase 34 (M6 #53) | Pending |
+| HOOK-03 | Phase 36 (M6 #68) | Pending |
+| HOOK-04 | Phase 37 (M6 #69) | Pending |
+| WKSP-01 | Phase 38 (M7 #70) | Pending |
+| WKSP-02 | Phase 39 (M7 #71) | Pending |
+| WKSP-03 | Phase 39 (M7 #71) | Pending |
+| WKSP-04 | Phase 40 (M7 #72) | Pending |
+| WKSP-05 | Phase 41 (M7 #73) | Pending |
+| WKSP-06 | Phase 42 (M7 #74) | Pending |
+| WKSP-07 | Phase 43 (M7 #75) | Pending |
+| WKSP-08 | Phase 44 (M7 #76) | Pending |
+| INFRA-01 | Phase 45 (M8 #77) | Pending |
+| INFRA-02 | Phase 46 (M8 #78) | Pending |
+| INFRA-03 | Phase 47 (M8 #79) | Pending |
+| INFRA-04 | Phase 48 (M8 #80) | Pending |
+| INFRA-05 | Phase 49 (M8 #81) | Pending |
+| INFRA-06 | Phase 50 (M8 #82) | Pending |
+| AGNT-01 | Phase 51 (M9 #83) | Pending |
+| AGNT-02 | Phase 52 (M9 #84) | Pending |
+| AGNT-03 | Phase 53 (M9 #85) | Pending |
+| SHIP-01 | Phase 54 (M10 #86) | Pending |
+| SHIP-02 | Phase 55 (M10 #87) | Pending |
+| SHIP-03 | Phase 56 (M10 #88) | Pending |
+| SHIP-04 | Phase 57 (M10 #89) | Pending |
+| SHIP-05 | Phase 58 (M10 #100) | Pending |
+| CLOSE-01 | Phase 59 (M11 #90) | Pending |
+| CLOSE-02 | Phase 60 (M11 #91) | Pending |
+| CLOSE-03 | Phase 61 (M11 #92) | Pending |
+| MIG-01 | Phase 62 (M12 #93) | Pending |
+| MIG-02 | Phase 63 (M12 #94) | Pending |
+| MIG-03 | Phase 64 (M12 #95) | Pending |
+| MIG-04 | Phase 65 (M12 #96) | Pending |
+| MIG-05 | Phase 66 (M12 #97) | Pending |
 
 **Coverage:**
 - v1 requirements: 63 total
-- Mapped to phases: 63
+- Mapped to phases: 65
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-01*
-*Last updated: 2026-04-01 after initial definition*
+*Last updated: 2026-04-07 after M1 gap audit — added phases 12-13, fixed stale checkboxes, renumbered M2+ phases*
