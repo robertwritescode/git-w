@@ -1257,6 +1257,12 @@ func (s *LoaderSuite) TestSyncPairBlocksParse() {
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
 [[sync_pair]]
 from = "origin"
 to   = "personal"
@@ -1273,6 +1279,12 @@ to   = "personal"
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
 [[sync_pair]]
 from = "origin"
 to   = "personal"
@@ -1287,6 +1299,15 @@ refs = ["**"]
 			name: "multiple pairs",
 			toml: `[metarepo]
 name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[remote]]
+name = "contractor"
 
 [[sync_pair]]
 from = "origin"
@@ -1323,6 +1344,15 @@ to   = "contractor"
 func (s *LoaderSuite) TestSyncPairRoundTrip() {
 	content := `[metarepo]
 name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[remote]]
+name = "contractor"
 
 [[sync_pair]]
 from = "origin"
@@ -1364,6 +1394,12 @@ func (s *LoaderSuite) TestSyncPairValidation() {
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
 [[sync_pair]]
 from = "origin"
 to   = "personal"
@@ -1373,6 +1409,12 @@ to   = "personal"
 			name: "valid pair with refs",
 			toml: `[metarepo]
 name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
 
 [[sync_pair]]
 from = "origin"
@@ -1407,6 +1449,12 @@ from = "origin"
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
 [[sync_pair]]
 from = "origin"
 to   = "personal"
@@ -1423,6 +1471,15 @@ to   = "personal"
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[remote]]
+name = "contractor"
+
 [[sync_pair]]
 from = "origin"
 to   = "personal"
@@ -1437,6 +1494,15 @@ to   = "contractor"
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[remote]]
+name = "contractor"
+
 [[sync_pair]]
 from = "origin"
 to   = "personal"
@@ -1445,6 +1511,76 @@ to   = "personal"
 from = "personal"
 to   = "contractor"
 `,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+			s.Require().NoError(os.WriteFile(cfgPath, []byte(tt.toml), 0o644))
+
+			_, err := config.Load(cfgPath)
+			if tt.wantErr {
+				s.Require().Error(err)
+				for _, want := range tt.errContains {
+					s.Assert().Contains(err.Error(), want)
+				}
+				return
+			}
+			s.Require().NoError(err)
+		})
+	}
+}
+
+func (s *LoaderSuite) TestSyncPairRemoteValidation() {
+	tests := []struct {
+		name        string
+		toml        string
+		wantErr     bool
+		errContains []string
+	}{
+		{
+			name: "valid pair both remotes defined",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "backup"
+
+[[sync_pair]]
+from = "origin"
+to   = "backup"
+`,
+		},
+		{
+			name: "unknown from remote",
+			toml: `[metarepo]
+name = "ws"
+
+[[sync_pair]]
+from = "ghost"
+to   = "origin"
+`,
+			wantErr:     true,
+			errContains: []string{"ghost", "from"},
+		},
+		{
+			name: "unknown to remote",
+			toml: `[metarepo]
+name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[sync_pair]]
+from = "origin"
+to   = "nowhere"
+`,
+			wantErr:     true,
+			errContains: []string{"nowhere", "to"},
 		},
 	}
 
@@ -1482,6 +1618,15 @@ func (s *LoaderSuite) TestSyncCycleDetection() {
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[remote]]
+name = "contractor"
+
 [[sync_pair]]
 from = "origin"
 to   = "personal"
@@ -1495,6 +1640,12 @@ to   = "contractor"
 			name: "two-node cycle",
 			toml: `[metarepo]
 name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
 
 [[sync_pair]]
 from = "origin"
@@ -1511,6 +1662,15 @@ to   = "origin"
 			name: "three-node cycle",
 			toml: `[metarepo]
 name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[remote]]
+name = "contractor"
 
 [[sync_pair]]
 from = "origin"
@@ -1532,6 +1692,9 @@ to   = "origin"
 			toml: `[metarepo]
 name = "ws"
 
+[[remote]]
+name = "origin"
+
 [[sync_pair]]
 from = "origin"
 to   = "origin"
@@ -1543,6 +1706,15 @@ to   = "origin"
 			name: "cycle in longer chain",
 			toml: `[metarepo]
 name = "ws"
+
+[[remote]]
+name = "a"
+
+[[remote]]
+name = "b"
+
+[[remote]]
+name = "c"
 
 [[sync_pair]]
 from = "a"
@@ -1563,6 +1735,18 @@ to   = "b"
 			name: "diamond no cycle",
 			toml: `[metarepo]
 name = "ws"
+
+[[remote]]
+name = "origin"
+
+[[remote]]
+name = "personal"
+
+[[remote]]
+name = "contractor"
+
+[[remote]]
+name = "mirror"
 
 [[sync_pair]]
 from = "origin"

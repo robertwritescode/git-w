@@ -144,6 +144,18 @@ action = "block"
 			initial: `[metarepo]
 name = "myws"
 
+[[remote]]
+name = "svc-a"
+
+[[remote]]
+name = "svc-b"
+
+[[remote]]
+name = "svc-c"
+
+[[remote]]
+name = "svc-d"
+
 # mirror pair
 [[sync_pair]]
 from = "svc-a"
@@ -275,6 +287,12 @@ path = "services/svc-a"
 [[remote]]
 name = "origin"
 url = "https://github.com/org/svc-a"
+
+[[remote]]
+name = "svc-a"
+
+[[remote]]
+name = "svc-b"
 
 # all-blocks sync
 [[sync_pair]]

@@ -243,6 +243,14 @@ func validateSyncPairFields(cfg *WorkspaceConfig) error {
 			return fmt.Errorf("[[sync_pair]] entry at index %d: missing required %q field", i, "to")
 		}
 
+		if _, ok := cfg.RemoteByName(p.From); !ok {
+			return fmt.Errorf("[[sync_pair]] entry at index %d: from remote %q is not defined", i, p.From)
+		}
+
+		if _, ok := cfg.RemoteByName(p.To); !ok {
+			return fmt.Errorf("[[sync_pair]] entry at index %d: to remote %q is not defined", i, p.To)
+		}
+
 		k := pairKey{p.From, p.To}
 		if _, dup := seen[k]; dup {
 			return fmt.Errorf("duplicate [[sync_pair]] (from=%q, to=%q)", p.From, p.To)
