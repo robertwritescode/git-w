@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 08-parse-gitw-stream-manifest-02-PLAN.md
-last_updated: "2026-04-06T06:08:05.516Z"
+stopped_at: Completed 09-default-remotes-cascade discuss-phase (09-CONTEXT.md written)
+last_updated: "2026-04-07T00:00:00.000Z"
 progress:
   total_phases: 63
   completed_phases: 7
@@ -19,7 +19,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** Multi-repo orchestration that keeps repos organized, synced, and safe from accidental pushes while giving AI agents full visibility into the workspace structure.
-**Current focus:** Phase 08 — parse-gitw-stream-manifest
+**Current focus:** Phase 09 — default-remotes-cascade
 
 ## Current Position
 
@@ -80,7 +80,7 @@ Recent decisions affecting current work:
 - [Phase 08-parse-gitw-stream-manifest]: Types placed in config.go alongside existing config types per D-01
 - [Phase 08-parse-gitw-stream-manifest]: WorkstreamStatus follows BranchAction typed string alias pattern per D-02
 - [Phase 08-parse-gitw-stream-manifest]: ShipState and StreamContext defined with all schema-specified fields per D-06
-- [Phase 08-parse-gitw-stream-manifest]: LoadStream returns os.ErrNotExist unwrapped — callers use errors.Is (consistent with mergeLocalConfig)
+- [Phase 09]: ResolveRepoRemotes and ResolveWorkstreamRemotes as two methods returning ([]string, string); nil = fall through, []string{} = stop cascade; MergeWorkstream/MergeRepo guards changed to != nil
 
 ### Pending Todos
 
@@ -92,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T06:03:06.627Z
-Stopped at: Completed 08-parse-gitw-stream-manifest-02-PLAN.md
-Resume file: None
+Last session: 2026-04-07T00:00:00.000Z
+Stopped at: Completed 09-default-remotes-cascade discuss-phase (09-CONTEXT.md written)
+Resume file: .planning/phases/09-default-remotes-cascade/09-CONTEXT.md
