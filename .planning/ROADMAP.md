@@ -6,7 +6,7 @@ git-w v2 replaces the workgroup model with workspace/workstream hierarchy, adds 
 
 ## Milestones
 
-- ✅ **M1: Config Schema + Loader** — Phases 1-13 (shipped 2026-04-08) · [archive](.planning/milestones/v1.0-ROADMAP.md)
+- ✅ **M1: Config Schema + Loader** — Phases 1-13 (shipped 2026-04-08) · [archive](.planning/milestones/v2.0-m1-ROADMAP.md)
 - 📋 **M2: Branch Rule Engine** - Phases 15-17
 - 📋 **M3: Sync Multi-Remote Fan-Out** - Phases 18-23
 - 📋 **M4: Remote Subcommand** - Phases 24-28
@@ -38,7 +38,7 @@ git-w v2 replaces the workgroup model with workspace/workstream hierarchy, adds 
 - [x] Phase 12: Verify M1 Phases 01–05 and 09 (4/4 plans) — completed 2026-04-07
 - [x] Phase 13: Fix post-merge validation and sync_pair remote validation (1/1 plan) — completed 2026-04-08
 
-Full details: [.planning/milestones/v1.0-ROADMAP.md](.planning/milestones/v1.0-ROADMAP.md)
+Full details: [.planning/milestones/v2.0-m1-ROADMAP.md](.planning/milestones/v2.0-m1-ROADMAP.md)
 
 </details>
 

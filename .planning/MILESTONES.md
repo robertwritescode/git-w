@@ -1,6 +1,6 @@
 # Milestones
 
-## v1.0 M1: Config Schema + Loader (Shipped: 2026-04-08)
+## v2.0 M1: Config Schema + Loader (Shipped: 2026-04-08)
 
 **Phases completed:** 13 phases, 26 plans, 32 tasks
 

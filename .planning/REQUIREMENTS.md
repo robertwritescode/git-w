@@ -1,12 +1,12 @@
 # Requirements: git-w v2
 
 **Defined:** 2026-04-01
-**Updated:** 2026-04-08 after M1 milestone (CFG requirements archived to `.planning/milestones/v1.0-REQUIREMENTS.md`)
+**Updated:** 2026-04-08 after M1 milestone (CFG requirements archived to `.planning/milestones/v2.0-m1-REQUIREMENTS.md`)
 **Core Value:** Multi-repo orchestration that keeps repos organized, synced, and safe from accidental pushes while giving AI agents full visibility into the workspace structure.
 
 ## v1 Requirements
 
-Requirements for v2.0 release. CFG requirements (M1) are complete — see [archive](.planning/milestones/v1.0-REQUIREMENTS.md).
+Requirements for v2.0 release. CFG requirements (M1) are complete — see [archive](.planning/milestones/v2.0-m1-REQUIREMENTS.md).
 
 ### Branch Rules
 
@@ -125,7 +125,7 @@ Deferred to post-v2.0. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 through CFG-12 | Phases 1-13 (M1) | **Complete** — see [archive](.planning/milestones/v1.0-REQUIREMENTS.md) |
+| CFG-01 through CFG-12 | Phases 1-13 (M1) | **Complete** — see [archive](.planning/milestones/v2.0-m1-REQUIREMENTS.md) |
 | BRULE-01 | Phase 15 (M2 #47) | Pending |
 | BRULE-02 | Phase 16 (M2 #48) | Pending |
 | BRULE-03 | Phase 17 (M2 #49) | Pending |

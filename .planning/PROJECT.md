@@ -18,7 +18,7 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - `EvaluateRule` pure function: four action tiers, all criteria combinations
 - Table-driven tests covering every criteria × action tier combination
 
-**M1 shipped:** 2026-04-08 — full v2 config schema + loader (13 phases, 26 plans) · [archive](.planning/milestones/v1.0-ROADMAP.md)
+**M1 shipped:** 2026-04-08 — full v2 config schema + loader (13 phases, 26 plans) · [archive](.planning/milestones/v2.0-m1-ROADMAP.md)
 
 ## Requirements
 
@@ -34,18 +34,18 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - ✓ Config local overrides (`.gitw.local`) — existing
 - ✓ Shell completion — existing
 - ✓ GoReleaser + Homebrew distribution — existing
-- ✓ `[[workspace]]` blocks with name, description, repos list; `agentic_frameworks` validation against framework registry (`CFG-01`, `CFG-11`) — v1.0, Phase 01
-- ✓ `track_branch` and `upstream` fields on `[[repo]]` for env alias annotation; `IsAlias()` method; `validateAliasFields` co-presence + uniqueness checks (`CFG-02`) — v1.0, Phase 02
-- ✓ Load-time warnings for non-conforming repo paths with `repos/<n>` suggestion; `cfg.Warnings` field; `warnNonConformingRepoPaths` (`CFG-03`) — v1.0, Phase 03
-- ✓ `[[remote]]` and `[[remote.branch_rule]]` blocks with full field set; `validateRemotes`; branch rules preserve declaration order (`CFG-04`) — v1.0, Phase 04
-- ✓ `[[sync_pair]]` blocks with DFS cycle detection at load time; `validateSyncPairFields`; `detectSyncCycles` (`CFG-05`) — v1.0, Phase 05
-- ✓ `[[workstream]]` root config block with strict-key validation, remote reference integrity, duplicate rejection (`CFG-06`) — v1.0, Phase 06
-- ✓ Two-file config merge (`.gitw` + `.git/.gitw`) with field-level semantics; private file wins on conflict; `private = true` rejected (`CFG-07`) — v1.0, Phase 07
-- ✓ `.gitw-stream` manifest with `[[worktree]]` entries (name, path, scope); `LoadStream` with parse-default-validate pipeline (`CFG-08`) — v1.0, Phase 08
-- ✓ `[metarepo] default_remotes` cascade: metarepo → workstream → repo (innermost wins); `ResolveRepoRemotes` / `ResolveWorkstreamRemotes` (`CFG-09`) — v1.0, Phase 09
-- ✓ v1 `[[workgroup]]` detection: hard error at load time directing user to `git w migrate` (`CFG-10`) — v1.0, Phase 10
-- ✓ `UpdatePreservingComments` round-trip fidelity for all v2 fields; `interface{}` → `any` tech debt resolved; `applySmartUpdate` error propagation fixed (`CFG-12`) — v1.0, Phase 11
-- ✓ Post-merge validation: `revalidateWorkstreamRemotes` after merge (INT-01); `sync_pair` from/to remote name validation (INT-02); path warnings preserved on alias error (INT-03) — v1.0, Phase 13
+- ✓ `[[workspace]]` blocks with name, description, repos list; `agentic_frameworks` validation against framework registry (`CFG-01`, `CFG-11`) — v2.0 M1, Phase 01
+- ✓ `track_branch` and `upstream` fields on `[[repo]]` for env alias annotation; `IsAlias()` method; `validateAliasFields` co-presence + uniqueness checks (`CFG-02`) — v2.0 M1, Phase 02
+- ✓ Load-time warnings for non-conforming repo paths with `repos/<n>` suggestion; `cfg.Warnings` field; `warnNonConformingRepoPaths` (`CFG-03`) — v2.0 M1, Phase 03
+- ✓ `[[remote]]` and `[[remote.branch_rule]]` blocks with full field set; `validateRemotes`; branch rules preserve declaration order (`CFG-04`) — v2.0 M1, Phase 04
+- ✓ `[[sync_pair]]` blocks with DFS cycle detection at load time; `validateSyncPairFields`; `detectSyncCycles` (`CFG-05`) — v2.0 M1, Phase 05
+- ✓ `[[workstream]]` root config block with strict-key validation, remote reference integrity, duplicate rejection (`CFG-06`) — v2.0 M1, Phase 06
+- ✓ Two-file config merge (`.gitw` + `.git/.gitw`) with field-level semantics; private file wins on conflict; `private = true` rejected (`CFG-07`) — v2.0 M1, Phase 07
+- ✓ `.gitw-stream` manifest with `[[worktree]]` entries (name, path, scope); `LoadStream` with parse-default-validate pipeline (`CFG-08`) — v2.0 M1, Phase 08
+- ✓ `[metarepo] default_remotes` cascade: metarepo → workstream → repo (innermost wins); `ResolveRepoRemotes` / `ResolveWorkstreamRemotes` (`CFG-09`) — v2.0 M1, Phase 09
+- ✓ v1 `[[workgroup]]` detection: hard error at load time directing user to `git w migrate` (`CFG-10`) — v2.0 M1, Phase 10
+- ✓ `UpdatePreservingComments` round-trip fidelity for all v2 fields; `interface{}` → `any` tech debt resolved; `applySmartUpdate` error propagation fixed (`CFG-12`) — v2.0 M1, Phase 11
+- ✓ Post-merge validation: `revalidateWorkstreamRemotes` after merge (INT-01); `sync_pair` from/to remote name validation (INT-02); path warnings preserved on alias error (INT-03) — v2.0 M1, Phase 13
 
 ### Active
 
@@ -148,4 +148,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after v1.0 milestone — M1 Config Schema + Loader complete (13 phases, 26 plans); all CFG requirements validated and archived; M2 Branch Rule Engine is next*
+*Last updated: 2026-04-08 after v2.0 M1 milestone — M1 Config Schema + Loader complete (13 phases, 26 plans); all CFG requirements validated and archived; M2 Branch Rule Engine is next*
