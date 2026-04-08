@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: unknown
-stopped_at: Phase 11 context gathered
-last_updated: "2026-04-08T00:20:29.714Z"
+milestone: v2.0
+milestone_name: "M2: Branch Rule Engine"
+status: planning
+stopped_at: M1 complete, ready for M2 Phase 15
+last_updated: "2026-04-08T00:00:00.000Z"
 progress:
   total_phases: 65
   completed_phases: 13
@@ -16,10 +16,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-01)
+See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Multi-repo orchestration that keeps repos organized, synced, and safe from accidental pushes while giving AI agents full visibility into the workspace structure.
-**Current focus:** Phase 13 — fix-post-merge-validation
+**Current focus:** M2 — Branch Rule Engine (Phase 15 next)
 
 ## Current Position
 
@@ -30,68 +30,56 @@ Plan: Not started
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 26 (M1)
+- Average duration: ~5 min/plan
+- Total execution time: ~13 phases over ~41 days
 
-**By Phase:**
+**By Phase (M1 summary):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
-
-**Recent Trend:**
-
-- Last 5 plans: -
-- Trend: -
+| 01-add-workspace-block | 3 | 3 | - |
+| 02-add-track-branch-and-upstream-fields | 2 | 2 | - |
+| 03-enforce-repos-n-path-convention | 1 | 1 | - |
+| 04-add-remote-and-remote-branch-rule | 2 | 2 | 337s/167s |
+| 05-add-sync-pair-parsing | 2 | 2 | - |
+| 06-add-workstream-root-config-block | 2 | 2 | 2min/5min |
+| 07-two-file-config-merge | 2 | 2 | 3min/5min |
+| 08-parse-gitw-stream-manifest | 2 | 2 | 1min/4min |
+| 09-default-remotes-cascade | 2 | 2 | - |
+| 10-detect-v1-workgroup-blocks | 1 | 1 | - |
+| 11-updatepreservingcomments-round-trip | 2 | 2 | - |
+| 12-verify-m1-phases | 4 | 4 | - |
+| 13-fix-post-merge-validation | 1 | 1 | - |
 
 *Updated after each plan completion*
-| Phase 04 P01 | 337 | 2 tasks | 4 files |
-| Phase 04 P02 | 167 | 1 tasks | 2 files |
-| Phase 05 P01 | - | 1 task | 2 files |
-| Phase 05 P02 | - | 2 tasks | 2 files |
-| Phase 06 P01 | 2 min | 2 tasks | 2 files |
-| Phase 06 P02 | 5 min | 2 tasks | 2 files |
-| Phase 07-two-file-config-merge P01 | 3 min | 1 tasks | 2 files |
-| Phase 07-two-file-config-merge P02 | 5min | 1 tasks | 2 files |
-| Phase 08-parse-gitw-stream-manifest P01 | 1min | 1 tasks | 1 files |
-| Phase 08-parse-gitw-stream-manifest P02 | 4min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+M1 decisions (archived — see .planning/v2/phases/ for phase artifacts):
 
-- [Init]: 63 phases across 12 milestones; each GitHub issue = one GSD phase
-- [Init]: M12 (Migration) can run parallel after M1 completes
-- [Init]: GSD branching_strategy is `none` (commits directly to active branch)
-- [Phase 04]: Remotes []RemoteConfig lives directly on WorkspaceConfig (no diskConfig split) matching WorkspaceBlock array-of-tables pattern
-- [Phase 04]: validateRemotes is a single consolidated function covering all 5 checks (D-08 + D-09); private enforcement uses filepath.ToSlash path suffix detection
-- [Phase 05]: SyncPairs []SyncPairConfig lives directly on WorkspaceConfig (no diskConfig split), same pattern as Remotes
-- [Phase 05]: Two separate validation functions (validateSyncPairFields, detectSyncCycles) called from buildAndValidate after validateRemotes
-- [Phase 05]: DFS cycle detection with visited/in-stack sets; error format "sync_pair cycle detected: A → B → A"
-- [Phase 06]: Model workstream entries as an in-memory WorkstreamConfig slice on WorkspaceConfig for loader-populated array-of-table parity — Aligns with established schema patterns and prepares loader wiring.
-- [Phase 06]: Use MergeWorkstream semantics where remotes override only when non-empty — Preserves explicit empty/nil distinction for downstream loader validation semantics.
-- [Phase 06]: Use a targeted raw TOML pass for [[workstream]] strict-key checks instead of globally tightening unknown-key behavior.
-- [Phase 06]: Validate workstreams immediately after remotes and normalize both workstream names and remotes lists during load.
-- [Phase 07-two-file-config-merge]: mergePrivateConfig placed between loadMainConfig and mergeLocalConfig so .gitw.local context always wins
-- [Phase 08-parse-gitw-stream-manifest]: Types placed in config.go alongside existing config types per D-01
-- [Phase 08-parse-gitw-stream-manifest]: WorkstreamStatus follows BranchAction typed string alias pattern per D-02
-- [Phase 08-parse-gitw-stream-manifest]: ShipState and StreamContext defined with all schema-specified fields per D-06
-- [Phase 09]: ResolveRepoRemotes and ResolveWorkstreamRemotes as two methods returning ([]string, string); nil = fall through, []string{} = stop cascade; MergeWorkstream/MergeRepo guards changed to != nil
+- [M1] Remotes/SyncPairs/Workstreams live directly on WorkspaceConfig (no diskConfig split)
+- [M1] mergePrivateConfig placed between loadMainConfig and mergeLocalConfig
+- [M1] revalidateWorkstreamRemotes added after mergePrivateConfig (INT-01 fix)
+- [M1] WorkstreamStatus follows typed string alias pattern (consistent with BranchAction)
+- [M1] ResolveRepoRemotes/ResolveWorkstreamRemotes: nil = fall through, []string{} = stop cascade
+
+Active decisions for M2:
+- None yet — Phase 15 planning not started
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-None yet.
+None.
 
 ## Session Continuity
 
-Last session: 2026-04-07
-Stopped at: Phase 11 context gathered
-Resume file: .planning/phases/11-updatepreservingcomments-round-trip/11-CONTEXT.md
+Last session: 2026-04-08
+Stopped at: M1 archived, M2 Phase 15 ready to start
+Resume with: `/gsd-plan-phase` for Phase 15 (`BranchInfo` type and glob package)
