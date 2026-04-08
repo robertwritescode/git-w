@@ -20,7 +20,7 @@ import (
 func Load(configPath string) (*WorkspaceConfig, error) {
 	cfg, err := loadMainConfig(configPath)
 	if err != nil {
-		return nil, err
+		return cfg, err
 	}
 
 	if err := mergePrivateConfig(cfg, configPath); err != nil {
@@ -91,7 +91,7 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 	cfg.V1WorkgroupCount = countV1WorkgroupBlocks(data)
 
 	if err := buildAndValidate(configPath, cfg); err != nil {
-		return nil, err
+		return cfg, err
 	}
 
 	applyMetarepoDefaults(cfg)
@@ -1003,6 +1003,11 @@ func LoadConfig(cmd *cobra.Command) (*WorkspaceConfig, string, error) {
 
 	cfg, cfgPath, err := LoadCWD(override)
 	if err != nil {
+		if cfg != nil {
+			for _, w := range cfg.Warnings {
+				output.Writef(cmd.ErrOrStderr(), "%s\n", w)
+			}
+		}
 		return nil, "", err
 	}
 

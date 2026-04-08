@@ -833,6 +833,34 @@ path = "svc-b"
 	s.Assert().False(cfg.Repos["svc-b"].IsAlias())
 }
 
+func (s *LoaderSuite) TestPathWarningsPreservedOnAliasError() {
+	toml := `[metarepo]
+name = "ws"
+
+[[repo]]
+name = "api"
+path = "apps/api"
+track_branch = "main"
+`
+
+	cfgPath := filepath.Join(s.T().TempDir(), ".gitw")
+	s.Require().NoError(os.WriteFile(cfgPath, []byte(toml), 0o644))
+
+	cfg, err := config.Load(cfgPath)
+	s.Require().Error(err)
+	s.Assert().Contains(err.Error(), "track_branch")
+
+	s.Require().NotNil(cfg, "cfg must be non-nil even when error is returned")
+	found := false
+	for _, w := range cfg.Warnings {
+		if strings.Contains(w, "apps/api") {
+			found = true
+			break
+		}
+	}
+	s.Assert().True(found, "expected path warning containing \"apps/api\", got: %v", cfg.Warnings)
+}
+
 func (s *LoaderSuite) TestPathConventionWarnings() {
 	tests := []struct {
 		name         string
