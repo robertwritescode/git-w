@@ -45,6 +45,7 @@ Multi-repo orchestration that keeps repos organized, synced, and safe from accid
 - ✓ v1 `[[workgroup]]` detection: hard error at load time directing user to `git w migrate` (`CFG-10`) -- validated in Phase 10
 - ✓ `UpdatePreservingComments` round-trip fidelity for all v2 fields + `interface{}` tech debt resolved (`CFG-12`) -- validated in Phase 11
 - ✓ M1 phases 01–05 and 09 verified passed; Phase 02 SUMMARY.md files reconstructed; all 6 phases confirmed complete (`CFG-01`, `CFG-02`, `CFG-03`, `CFG-04`, `CFG-05`, `CFG-09`, `CFG-11`) -- validated in Phase 12
+- ✓ Three post-merge validation gaps closed: private-config workstream remotes re-validated after merge, sync_pair from/to remote names checked at load time, path warnings preserved on alias field error (`CFG-05`, `CFG-07`, `CFG-02`, `CFG-03`) -- validated in Phase 13
 
 ### Active
 
@@ -142,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 — Phase 12 complete (M1 phases 01–05 and 09 all verified passed; Phase 02 SUMMARY.md files reconstructed; CFG-01/02/03/04/05/09/11 all validated)*
+*Last updated: 2026-04-07 — Phase 13 complete (three post-merge validation gaps closed: INT-01 workstream remote re-validation, INT-02 sync_pair remote existence checks, INT-03 path warning preservation on error)*
