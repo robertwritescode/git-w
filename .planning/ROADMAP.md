@@ -1186,7 +1186,7 @@ M12 (Phases 62-66) can run in parallel after M1 (Phases 1-13) completes.
 | 10. Detect v1 `[[workgroup]]` | M1 | 1/1 | Complete    | 2026-04-07 |
 | 11. `UpdatePreservingComments` round-trip | M1 | 2/2 | Complete    | 2026-04-07 |
 | 12. Verify M1 Phases 01-05 and 09 | M1 | 0/? | Complete    | 2026-04-07 |
-| 13. Fix post-merge validation | M1 | 1/1 | Complete   | 2026-04-08 |
+| 13. Fix post-merge validation | M1 | 1/1 | Complete    | 2026-04-08 |
 | 15. `BranchInfo` + glob package | M2 | 0/? | Not started | - |
 | 16. `EvaluateRule` pure function | M2 | 0/? | Not started | - |
 | 17. Rule criteria tests | M2 | 0/? | Not started | - |
