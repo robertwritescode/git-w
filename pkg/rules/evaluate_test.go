@@ -43,3 +43,38 @@ func assertRuleField(t *testing.T, ruleType reflect.Type, name string, want refl
 		t.Fatalf("BranchRule.%s type = %v, want %v", name, field.Type, want)
 	}
 }
+
+func TestEvaluateRule(t *testing.T) {
+	t.Run("returns default allow when no rules match", func(t *testing.T) {
+		action, matched := EvaluateRule(
+			BranchInfo{Name: "main"},
+			[]BranchRule{{Pattern: "release/**", Action: ActionBlock}},
+			"origin",
+		)
+
+		if action != ActionAllow {
+			t.Fatalf("action = %q, want %q", action, ActionAllow)
+		}
+
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+	})
+
+	t.Run("returns the first matching rule", func(t *testing.T) {
+		rules := []BranchRule{
+			{Pattern: "feature/*", Action: ActionWarn},
+			{Pattern: "feature/*", Action: ActionBlock},
+		}
+
+		action, matched := EvaluateRule(BranchInfo{Name: "feature/login"}, rules, "origin")
+
+		if action != ActionWarn {
+			t.Fatalf("action = %q, want %q", action, ActionWarn)
+		}
+
+		if matched != &rules[0] {
+			t.Fatalf("matched = %p, want %p", matched, &rules[0])
+		}
+	})
+}
