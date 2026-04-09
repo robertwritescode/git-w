@@ -42,7 +42,7 @@ func (s *InfoSuite) TestInfo_Output() {
 		s.Run(tt.name, func() {
 			wsDir := s.T().TempDir()
 			cfgPath := filepath.Join(wsDir, ".gitw")
-			s.Require().NoError(os.WriteFile(cfgPath, []byte("[workspace]\nname = \"testws\"\n"), 0o644))
+			s.Require().NoError(os.WriteFile(cfgPath, []byte("[metarepo]\nname = \"testws\"\n"), 0o644))
 			s.ChangeToDir(wsDir)
 
 			// Register repos directly in config rather than using add command.
@@ -141,7 +141,7 @@ func (s *InfoSuite) TestInfo_WorktreeSetCollapsing() {
 	s.RunGit(serviceDir, "config", "user.name", "Test User")
 	s.RunGit(serviceDir, "commit", "--allow-empty", "-m", "init")
 
-	cfgContent := `[workspace]
+	cfgContent := `[metarepo]
 name = "test"
 
 [worktrees.infra]
@@ -152,7 +152,8 @@ bare_path = "infra/.bare"
 dev = "infra/dev"
 prod = "infra/prod"
 
-[repos.service-a]
+[[repo]]
+name = "service-a"
 path = "service-a"
 `
 
@@ -198,10 +199,11 @@ func (s *InfoSuite) TestInfo_WorkgroupSection() {
 	s.RunGit(regularDir, "config", "user.name", "Test User")
 	s.RunGit(regularDir, "commit", "--allow-empty", "-m", "init")
 
-	cfgContent := `[workspace]
+	cfgContent := `[metarepo]
 name = "test"
 
-[repos.regular-repo]
+[[repo]]
+name = "regular-repo"
 path = "regular-repo"
 
 [workgroup.fix-auth]
@@ -245,7 +247,7 @@ func (s *InfoSuite) TestInfo_WorkgroupWithMissingWorktree() {
 	s.RunGit(service1Dir, "config", "user.name", "Test User")
 	s.RunGit(service1Dir, "commit", "--allow-empty", "-m", "init")
 
-	cfgContent := `[workspace]
+	cfgContent := `[metarepo]
 name = "test"
 
 [workgroup.fix-auth]
@@ -293,7 +295,7 @@ func (s *InfoSuite) TestInfo_BothFeatures() {
 	s.RunGit(regularDir, "config", "user.name", "Test User")
 	s.RunGit(regularDir, "commit", "--allow-empty", "-m", "init")
 
-	cfgContent := `[workspace]
+	cfgContent := `[metarepo]
 name = "test"
 
 [worktrees.infra]
@@ -304,7 +306,8 @@ bare_path = "infra/.bare"
 dev = "infra/dev"
 prod = "infra/prod"
 
-[repos.regular-repo]
+[[repo]]
+name = "regular-repo"
 path = "regular-repo"
 
 [workgroup.fix-auth]

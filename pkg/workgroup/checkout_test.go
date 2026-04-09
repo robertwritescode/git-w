@@ -41,7 +41,7 @@ func (s *CheckoutSuite) TestCheckout_LocalBranch_CreatesWorktree() {
 	wsDir, names := makeWorkspaceWithLocalRepos(&s.CmdSuite, 1)
 	s.ChangeToDir(wsDir)
 
-	repoDir := filepath.Join(wsDir, names[0])
+	repoDir := filepath.Join(wsDir, "repos", names[0])
 	s.RunGit(repoDir, "checkout", "-b", "feat")
 	s.RunGit(repoDir, "checkout", "-")
 
@@ -90,7 +90,7 @@ func (s *CheckoutSuite) TestCheckout_ExistingWorkgroup_UsesStoredRepos() {
 
 	// Remove worktree manually to simulate a fresh machine scenario
 	treePath := filepath.Join(wsDir, ".workgroup", "feat", names[0])
-	s.Require().NoError(exec.Command("git", "-C", filepath.Join(wsDir, names[0]), "worktree", "remove", treePath).Run())
+	s.Require().NoError(exec.Command("git", "-C", filepath.Join(wsDir, "repos", names[0]), "worktree", "remove", treePath).Run())
 
 	// Checkout with no explicit repos - should use stored list
 	out, err = s.ExecuteCmd("workgroup", "checkout", "feat", "--no-push", "--no-upstream")
@@ -134,7 +134,7 @@ func (s *CheckoutSuite) TestCheckout_Summary() {
 
 func (s *CheckoutSuite) setupRemoteWorkspace(n int) (string, []string, string) {
 	wsDir, names := makeWorkspaceWithRemoteRepos(&s.CmdSuite, n)
-	remoteURL := remoteURLAt(s.T(), filepath.Join(wsDir, names[0]))
+	remoteURL := remoteURLAt(s.T(), filepath.Join(wsDir, "repos", names[0]))
 	return wsDir, names, remoteURL
 }
 

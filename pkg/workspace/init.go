@@ -59,7 +59,7 @@ func writeInitialConfig(configPath, name string) error {
 		return err
 	}
 
-	content := fmt.Sprintf(`[workspace]
+	content := fmt.Sprintf(`[metarepo]
 name = %q
 
 # Optional workspace-level defaults (uncomment to override)

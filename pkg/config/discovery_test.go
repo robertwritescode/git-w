@@ -19,7 +19,7 @@ type DiscoverySuite struct {
 func (s *DiscoverySuite) SetupTest() {
 	s.root = s.T().TempDir()
 	s.cfgPath = filepath.Join(s.root, ".gitw")
-	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[workspace]\nname=\"t\"\n"), 0o644))
+	s.Require().NoError(os.WriteFile(s.cfgPath, []byte("[metarepo]\nname=\"t\"\n"), 0o644))
 }
 
 func TestDiscoverySuite(t *testing.T) {

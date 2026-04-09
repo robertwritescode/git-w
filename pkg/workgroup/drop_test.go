@@ -112,7 +112,7 @@ func (s *DropSuite) TestDrop_DeleteBranch() {
 	out, err := s.ExecuteCmd("workgroup", "drop", "feat", "--delete-branch")
 	s.Require().NoError(err, out)
 
-	repoDir := filepath.Join(wsDir, names[0])
+	repoDir := filepath.Join(wsDir, "repos", names[0])
 	exists, err := branchExists(repoDir, "feat")
 	s.Require().NoError(err)
 	s.Assert().False(exists, "branch should be deleted")

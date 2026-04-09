@@ -359,7 +359,7 @@ func (s *BranchCreateSuite) TestCreate_PartialFailureReturnsError() {
 
 func (s *BranchCreateSuite) TestCreate_NoReposIsError() {
 	wsDir := s.T().TempDir()
-	writeWorkspaceFile(s, wsDir, "[workspace]\nname = \"empty\"\n")
+	writeWorkspaceFile(s, wsDir, "[metarepo]\nname = \"empty\"\n")
 
 	_, err := s.runBranchCreate(wsDir, "feat")
 	s.Require().Error(err)
@@ -505,7 +505,7 @@ func (s *BranchCreateSuite) writeWorkspaceConfig(wsDir string, names []string, w
 
 func workspaceBuilder(workspaceExtra string) *strings.Builder {
 	builder := new(strings.Builder)
-	builder.WriteString("[workspace]\nname = \"test\"\n")
+	builder.WriteString("[metarepo]\nname = \"test\"\n")
 	if workspaceExtra != "" {
 		builder.WriteString(workspaceExtra)
 	}
@@ -516,7 +516,7 @@ func workspaceBuilder(workspaceExtra string) *strings.Builder {
 
 func appendRepoEntries(builder *strings.Builder, names []string, repoDefaults map[string]string) {
 	for _, name := range names {
-		fmt.Fprintf(builder, "[repos.%s]\npath = %q\n", name, name)
+		fmt.Fprintf(builder, "[[repo]]\nname = %q\npath = %q\n", name, "repos/"+name)
 		if branch, ok := repoDefaults[name]; ok && branch != "" {
 			fmt.Fprintf(builder, "default_branch = %q\n", branch)
 		}
@@ -540,7 +540,7 @@ func (s *BranchCreateSuite) runBranchCreate(wsDir, branchName string, args ...st
 }
 
 func repoPath(wsDir, name string) string {
-	return filepath.Join(wsDir, name)
+	return filepath.Join(wsDir, "repos", name)
 }
 
 func (s *BranchCreateSuite) currentBranch(repoPath string) string {
@@ -634,7 +634,7 @@ func (s *BranchCreateSuite) addInfraWorktree(bareAbs, wsDir, branch string) stri
 }
 
 func (s *BranchCreateSuite) writeInfraWorktreeConfig(wsDir, remoteURL, barePath, workspaceExtra string) {
-	cfg := fmt.Sprintf("[workspace]\nname = \"ws\"\n%s\n[worktrees.infra]\nurl=%q\nbare_path=%q\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", workspaceExtra, remoteURL, barePath)
+	cfg := fmt.Sprintf("[metarepo]\nname = \"ws\"\n%s\n[worktrees.infra]\nurl=%q\nbare_path=%q\n\n[worktrees.infra.branches]\ndev=\"infra/dev\"\ntest=\"infra/test\"\n", workspaceExtra, remoteURL, barePath)
 	writeWorkspaceFile(s, wsDir, cfg)
 }
 
