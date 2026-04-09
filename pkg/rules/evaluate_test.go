@@ -130,6 +130,171 @@ func TestEvaluateRuleMatrix(t *testing.T) {
 	}
 }
 
+func TestEvaluateRuleFirstMatchWins(t *testing.T) {
+	rules := []BranchRule{
+		{Action: ActionWarn},
+		{Action: ActionBlock},
+	}
+
+	action, matched := EvaluateRule(BranchInfo{Name: "feature/login"}, rules, "origin")
+
+	if action != ActionWarn {
+		t.Fatalf("action = %q, want %q", action, ActionWarn)
+	}
+
+	assertMatchedRule(t, matched, rules, intPtr(0))
+}
+
+func TestEvaluateRuleDefaultAllowWithNilRule(t *testing.T) {
+	action, matched := EvaluateRule(
+		BranchInfo{Name: "main"},
+		[]BranchRule{{Pattern: "feature/*", Action: ActionBlock}},
+		"origin",
+	)
+
+	if action != ActionAllow {
+		t.Fatalf("action = %q, want %q", action, ActionAllow)
+	}
+
+	if matched != nil {
+		t.Fatalf("matched = %#v, want nil", matched)
+	}
+}
+
+func TestEvaluateRuleNoCriteriaCatchAll(t *testing.T) {
+	rules := []BranchRule{{Action: ActionBlock}}
+
+	action, matched := EvaluateRule(BranchInfo{Name: "release/2026/q2"}, rules, "origin")
+
+	if action != ActionBlock {
+		t.Fatalf("action = %q, want %q", action, ActionBlock)
+	}
+
+	assertMatchedRule(t, matched, rules, intPtr(0))
+}
+
+func TestEvaluateRuleEmptyPatternActsLikeNoBranchFilter(t *testing.T) {
+	rules := []BranchRule{{
+		Pattern:  "",
+		Action:   ActionRequireFlag,
+		Flag:     "--push-wip",
+		Explicit: boolPtr(true),
+	}}
+
+	action, matched := EvaluateRule(
+		BranchInfo{
+			Name: "arbitrary/topic/name",
+			ExplicitOn: func(remoteName string) bool {
+				return remoteName == "origin"
+			},
+		},
+		rules,
+		"origin",
+	)
+
+	if action != ActionRequireFlag {
+		t.Fatalf("action = %q, want %q", action, ActionRequireFlag)
+	}
+
+	assertMatchedRule(t, matched, rules, intPtr(0))
+
+	if matched.Flag != "--push-wip" {
+		t.Fatalf("matched.Flag = %q, want %q", matched.Flag, "--push-wip")
+	}
+}
+
+func TestEvaluateRuleConflictingCriteriaReturnsDefaultAllow(t *testing.T) {
+	t.Run("pattern matches but explicit fails", func(t *testing.T) {
+		action, matched := EvaluateRule(
+			BranchInfo{
+				Name: "feature/login",
+				ExplicitOn: func(remoteName string) bool {
+					return false
+				},
+			},
+			[]BranchRule{{
+				Pattern:  "feature/*",
+				Action:   ActionBlock,
+				Explicit: boolPtr(true),
+			}},
+			"origin",
+		)
+
+		if action != ActionAllow {
+			t.Fatalf("action = %q, want %q", action, ActionAllow)
+		}
+
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+	})
+
+	t.Run("untracked matches but pattern fails", func(t *testing.T) {
+		action, matched := EvaluateRule(
+			BranchInfo{
+				Name: "feature/login",
+				HasUpstreamOn: func(remoteName string) bool {
+					return false
+				},
+			},
+			[]BranchRule{{
+				Pattern:   "main",
+				Action:    ActionWarn,
+				Untracked: boolPtr(true),
+			}},
+			"origin",
+		)
+
+		if action != ActionAllow {
+			t.Fatalf("action = %q, want %q", action, ActionAllow)
+		}
+
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+	})
+}
+
+func TestEvaluateRuleForwardsProvidedRemoteName(t *testing.T) {
+	var upstreamRemote string
+	var explicitRemote string
+
+	rules := []BranchRule{{
+		Action:    ActionRequireFlag,
+		Flag:      "--push-wip",
+		Untracked: boolPtr(true),
+		Explicit:  boolPtr(true),
+	}}
+
+	_, matched := EvaluateRule(
+		BranchInfo{
+			Name: "feature/login",
+			HasUpstreamOn: func(remoteName string) bool {
+				upstreamRemote = remoteName
+				return false
+			},
+			ExplicitOn: func(remoteName string) bool {
+				explicitRemote = remoteName
+				return true
+			},
+		},
+		rules,
+		"personal",
+	)
+
+	if matched == nil {
+		t.Fatal("matched = nil, want matching rule")
+	}
+
+	if upstreamRemote != "personal" {
+		t.Fatalf("upstream remote = %q, want %q", upstreamRemote, "personal")
+	}
+
+	if explicitRemote != "personal" {
+		t.Fatalf("explicit remote = %q, want %q", explicitRemote, "personal")
+	}
+}
+
 func assertRuleField(t *testing.T, ruleType reflect.Type, name string, want reflect.Type) {
 	t.Helper()
 
@@ -140,5 +305,29 @@ func assertRuleField(t *testing.T, ruleType reflect.Type, name string, want refl
 
 	if field.Type != want {
 		t.Fatalf("BranchRule.%s type = %v, want %v", name, field.Type, want)
+	}
+}
+
+func intPtr(v int) *int {
+	return &v
+}
+
+func assertMatchedRule(t *testing.T, matched *BranchRule, rules []BranchRule, wantMatch *int) {
+	t.Helper()
+
+	if wantMatch == nil {
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+
+		return
+	}
+
+	if matched == nil {
+		t.Fatal("matched = nil, want matching rule")
+	}
+
+	if matched != &rules[*wantMatch] {
+		t.Fatalf("matched = %p, want %p", matched, &rules[*wantMatch])
 	}
 }
