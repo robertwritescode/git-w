@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/robertwritescode/git-w/compare/v1.6.0...v1.7.0) (2026-04-09)
+
+
+### Features
+
+* **V2-M1:** Config schema + loader ([#114](https://github.com/robertwritescode/git-w/issues/114)) ([41b4322](https://github.com/robertwritescode/git-w/commit/41b432242ae0a573358a41d27e5909677b9a2f68))
+
 ## [1.6.0](https://github.com/robertwritescode/git-w/compare/v1.5.0...v1.6.0) (2026-03-05)
 
 
