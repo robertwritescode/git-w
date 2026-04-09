@@ -77,4 +77,62 @@ func TestEvaluateRule(t *testing.T) {
 			t.Fatalf("matched = %p, want %p", matched, &rules[0])
 		}
 	})
+
+	t.Run("treats empty pattern as wildcard", func(t *testing.T) {
+		action, matched := EvaluateRule(
+			BranchInfo{Name: "release/v1"},
+			[]BranchRule{{Action: ActionBlock}},
+			"origin",
+		)
+
+		if action != ActionBlock {
+			t.Fatalf("action = %q, want %q", action, ActionBlock)
+		}
+
+		if matched == nil {
+			t.Fatal("matched = nil, want matching rule")
+		}
+	})
+
+	t.Run("uses the provided remote name for predicates", func(t *testing.T) {
+		var upstreamRemote string
+		var explicitRemote string
+		wantTrue := true
+
+		action, matched := EvaluateRule(
+			BranchInfo{
+				Name: "feature/login",
+				HasUpstreamOn: func(remoteName string) bool {
+					upstreamRemote = remoteName
+					return false
+				},
+				ExplicitOn: func(remoteName string) bool {
+					explicitRemote = remoteName
+					return true
+				},
+			},
+			[]BranchRule{{Action: ActionRequireFlag, Flag: "--push-wip", Untracked: &wantTrue, Explicit: &wantTrue}},
+			"personal",
+		)
+
+		if action != ActionRequireFlag {
+			t.Fatalf("action = %q, want %q", action, ActionRequireFlag)
+		}
+
+		if matched == nil {
+			t.Fatal("matched = nil, want matching rule")
+		}
+
+		if matched.Flag != "--push-wip" {
+			t.Fatalf("matched.Flag = %q, want %q", matched.Flag, "--push-wip")
+		}
+
+		if upstreamRemote != "personal" {
+			t.Fatalf("upstream remote = %q, want %q", upstreamRemote, "personal")
+		}
+
+		if explicitRemote != "personal" {
+			t.Fatalf("explicit remote = %q, want %q", explicitRemote, "personal")
+		}
+	})
 }
