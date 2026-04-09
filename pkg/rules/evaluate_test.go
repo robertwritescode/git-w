@@ -85,6 +85,31 @@ func TestEvaluateRule(t *testing.T) {
 			wantMatch:  intPtr(0),
 		},
 		{
+			name: "empty pattern still respects untracked criterion",
+			branch: BranchInfo{
+				Name: "topic",
+				HasUpstreamOn: func(remoteName string) bool {
+					return true
+				},
+			},
+			rules:      []BranchRule{{Action: ActionBlock, Untracked: boolPtr(true)}},
+			remoteName: "origin",
+			wantAction: ActionAllow,
+		},
+		{
+			name: "empty pattern still respects explicit criterion",
+			branch: BranchInfo{
+				Name: "topic",
+				ExplicitOn: func(remoteName string) bool {
+					return true
+				},
+			},
+			rules:      []BranchRule{{Action: ActionWarn, Explicit: boolPtr(true)}},
+			remoteName: "origin",
+			wantAction: ActionWarn,
+			wantMatch:  intPtr(0),
+		},
+		{
 			name: "matches untracked true when branch lacks upstream",
 			branch: BranchInfo{
 				Name: "topic",
