@@ -1,6 +1,7 @@
 package rules
 
 // EvaluateRule returns the action and first matching rule for a branch.
+// Criteria that cannot be evaluated because a required predicate is missing do not match.
 func EvaluateRule(branch BranchInfo, rules []BranchRule, remoteName string) (Action, *BranchRule) {
 	for i := range rules {
 		if !matchesRule(branch, rules[i], remoteName) {

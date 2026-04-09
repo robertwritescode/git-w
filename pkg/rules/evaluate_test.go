@@ -159,6 +159,68 @@ func TestEvaluateRule(t *testing.T) {
 			wantMatch:  intPtr(0),
 			wantFlag:   "--push-wip",
 		},
+		{
+			name: "does not match when explicit criterion fails",
+			branch: BranchInfo{
+				Name: "feature/login",
+				HasUpstreamOn: func(remoteName string) bool {
+					return false
+				},
+				ExplicitOn: func(remoteName string) bool {
+					return false
+				},
+			},
+			rules: []BranchRule{{
+				Pattern:   "feature/*",
+				Action:    ActionBlock,
+				Untracked: boolPtr(true),
+				Explicit:  boolPtr(true),
+			}},
+			remoteName: "origin",
+			wantAction: ActionAllow,
+		},
+		{
+			name: "does not match when untracked criterion fails",
+			branch: BranchInfo{
+				Name: "feature/login",
+				HasUpstreamOn: func(remoteName string) bool {
+					return true
+				},
+				ExplicitOn: func(remoteName string) bool {
+					return true
+				},
+			},
+			rules: []BranchRule{{
+				Pattern:   "feature/*",
+				Action:    ActionBlock,
+				Untracked: boolPtr(true),
+				Explicit:  boolPtr(true),
+			}},
+			remoteName: "origin",
+			wantAction: ActionAllow,
+		},
+		{
+			name:       "does not match untracked criterion when predicate is missing",
+			branch:     BranchInfo{Name: "feature/login"},
+			rules:      []BranchRule{{Pattern: "feature/*", Action: ActionBlock, Untracked: boolPtr(true)}},
+			remoteName: "origin",
+			wantAction: ActionAllow,
+		},
+		{
+			name:       "does not match explicit criterion when predicate is missing",
+			branch:     BranchInfo{Name: "feature/login"},
+			rules:      []BranchRule{{Pattern: "feature/*", Action: ActionBlock, Explicit: boolPtr(true)}},
+			remoteName: "origin",
+			wantAction: ActionAllow,
+		},
+		{
+			name:       "omitted criteria still behave as wildcards when predicates are missing",
+			branch:     BranchInfo{Name: "feature/login"},
+			rules:      []BranchRule{{Pattern: "feature/*", Action: ActionWarn}},
+			remoteName: "origin",
+			wantAction: ActionWarn,
+			wantMatch:  intPtr(0),
+		},
 	}
 
 	for _, tt := range tests {
