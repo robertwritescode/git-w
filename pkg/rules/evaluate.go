@@ -1,8 +1,8 @@
 package rules
 
-// EvaluateRule returns the action and first matching rule for a branch.
+// Evaluate returns the action and first matching rule for a branch.
 // Criteria that cannot be evaluated because a required predicate is missing do not match.
-func EvaluateRule(branch BranchInfo, rules []BranchRule, remoteName string) (Action, *BranchRule) {
+func Evaluate(branch Branch, rules []Rule, remoteName string) (Action, *Rule) {
 	for i := range rules {
 		if !matchesRule(branch, rules[i], remoteName) {
 			continue
@@ -14,7 +14,7 @@ func EvaluateRule(branch BranchInfo, rules []BranchRule, remoteName string) (Act
 	return ActionAllow, nil
 }
 
-func matchesRule(branch BranchInfo, rule BranchRule, remoteName string) bool {
+func matchesRule(branch Branch, rule Rule, remoteName string) bool {
 	if !matchesPattern(rule.Pattern, branch.Name) {
 		return false
 	}
@@ -38,7 +38,7 @@ func matchesPattern(pattern, branchName string) bool {
 	return Match(pattern, branchName)
 }
 
-func matchesUntracked(branch BranchInfo, want *bool, remoteName string) bool {
+func matchesUntracked(branch Branch, want *bool, remoteName string) bool {
 	if want == nil || branch.HasUpstreamOn == nil {
 		return want == nil
 	}
@@ -51,7 +51,7 @@ func matchesUntracked(branch BranchInfo, want *bool, remoteName string) bool {
 	return hasUpstream
 }
 
-func matchesExplicit(branch BranchInfo, want *bool, remoteName string) bool {
+func matchesExplicit(branch Branch, want *bool, remoteName string) bool {
 	if want == nil || branch.ExplicitOn == nil {
 		return want == nil
 	}

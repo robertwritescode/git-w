@@ -10,8 +10,8 @@ const (
 	ActionRequireFlag Action = "require-flag"
 )
 
-// BranchRule is the engine-local branch rule shape used by the evaluator.
-type BranchRule struct {
+// Rule is the engine-local branch rule shape used by the evaluator.
+type Rule struct {
 	Pattern   string
 	Action    Action
 	Reason    string
