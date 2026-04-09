@@ -63,7 +63,7 @@ func TestEvaluateRuleMatrix(t *testing.T) {
 		{name: "untracked only", branchName: "main", untracked: boolPtr(true), hasUpstream: false, expectedMatch: true},
 		{name: "explicit only", branchName: "release/2026/q2", explicit: boolPtr(true), isExplicit: true, expectedMatch: true},
 		{name: "pattern and untracked", branchName: "feature/login", pattern: "feature/*", untracked: boolPtr(true), hasUpstream: false, expectedMatch: true},
-		{name: "pattern and explicit", branchName: "release/2026/q2", pattern: "release/**", explicit: boolPtr(true), isExplicit: true, expectedMatch: true},
+		{name: "pattern and explicit", branchName: "release/2026/q2", pattern: "release/**", explicit: boolPtr(false), isExplicit: false, expectedMatch: true},
 		{name: "untracked and explicit", branchName: "main", untracked: boolPtr(false), hasUpstream: true, explicit: boolPtr(true), isExplicit: true, expectedMatch: true},
 		{name: "pattern untracked and explicit", branchName: "feature/login", pattern: "feature/*", untracked: boolPtr(true), hasUpstream: false, explicit: boolPtr(true), isExplicit: true, expectedMatch: true},
 	}
@@ -241,6 +241,73 @@ func TestEvaluateRuleConflictingCriteriaReturnsDefaultAllow(t *testing.T) {
 				Pattern:   "main",
 				Action:    ActionWarn,
 				Untracked: boolPtr(true),
+			}},
+			"origin",
+		)
+
+		if action != ActionAllow {
+			t.Fatalf("action = %q, want %q", action, ActionAllow)
+		}
+
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+	})
+
+	t.Run("pattern matches but explicit false fails on explicit branch", func(t *testing.T) {
+		action, matched := EvaluateRule(
+			BranchInfo{
+				Name: "release/2026/q2",
+				ExplicitOn: func(remoteName string) bool {
+					return remoteName == "origin"
+				},
+			},
+			[]BranchRule{{
+				Pattern:  "release/**",
+				Action:   ActionBlock,
+				Explicit: boolPtr(false),
+			}},
+			"origin",
+		)
+
+		if action != ActionAllow {
+			t.Fatalf("action = %q, want %q", action, ActionAllow)
+		}
+
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+	})
+}
+
+func TestEvaluateRuleMissingPredicatesDoNotMatch(t *testing.T) {
+	t.Run("untracked criterion with nil upstream predicate", func(t *testing.T) {
+		action, matched := EvaluateRule(
+			BranchInfo{Name: "feature/login"},
+			[]BranchRule{{
+				Pattern:   "feature/*",
+				Action:    ActionBlock,
+				Untracked: boolPtr(true),
+			}},
+			"origin",
+		)
+
+		if action != ActionAllow {
+			t.Fatalf("action = %q, want %q", action, ActionAllow)
+		}
+
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+	})
+
+	t.Run("explicit criterion with nil explicit predicate", func(t *testing.T) {
+		action, matched := EvaluateRule(
+			BranchInfo{Name: "feature/login"},
+			[]BranchRule{{
+				Pattern:  "feature/*",
+				Action:   ActionWarn,
+				Explicit: boolPtr(true),
 			}},
 			"origin",
 		)
