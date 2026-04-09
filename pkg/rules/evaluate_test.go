@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func TestRuleTypes(t *testing.T) {
 	if ActionAllow != "allow" {
 		t.Fatalf("ActionAllow = %q, want %q", ActionAllow, "allow")
@@ -45,61 +49,139 @@ func assertRuleField(t *testing.T, ruleType reflect.Type, name string, want refl
 }
 
 func TestEvaluateRule(t *testing.T) {
-	t.Run("returns default allow when no rules match", func(t *testing.T) {
-		action, matched := EvaluateRule(
-			BranchInfo{Name: "main"},
-			[]BranchRule{{Pattern: "release/**", Action: ActionBlock}},
-			"origin",
-		)
+	tests := []struct {
+		name       string
+		branch     BranchInfo
+		rules      []BranchRule
+		remoteName string
+		wantAction Action
+		wantMatch  *int
+		wantFlag   string
+	}{
+		{
+			name:       "returns default allow when no rules match",
+			branch:     BranchInfo{Name: "main"},
+			rules:      []BranchRule{{Pattern: "release/**", Action: ActionBlock}},
+			remoteName: "origin",
+			wantAction: ActionAllow,
+		},
+		{
+			name:   "returns the first matching rule",
+			branch: BranchInfo{Name: "feature/login"},
+			rules: []BranchRule{
+				{Pattern: "feature/*", Action: ActionWarn},
+				{Pattern: "feature/*", Action: ActionBlock},
+			},
+			remoteName: "origin",
+			wantAction: ActionWarn,
+			wantMatch:  intPtr(0),
+		},
+		{
+			name:       "treats empty pattern as wildcard",
+			branch:     BranchInfo{Name: "release/v1"},
+			rules:      []BranchRule{{Action: ActionBlock}},
+			remoteName: "origin",
+			wantAction: ActionBlock,
+			wantMatch:  intPtr(0),
+		},
+		{
+			name: "matches untracked true when branch lacks upstream",
+			branch: BranchInfo{
+				Name: "topic",
+				HasUpstreamOn: func(remoteName string) bool {
+					return remoteName == "other"
+				},
+			},
+			rules:      []BranchRule{{Action: ActionBlock, Untracked: boolPtr(true)}},
+			remoteName: "origin",
+			wantAction: ActionBlock,
+			wantMatch:  intPtr(0),
+		},
+		{
+			name: "matches untracked false when branch has upstream",
+			branch: BranchInfo{
+				Name: "topic",
+				HasUpstreamOn: func(remoteName string) bool {
+					return remoteName == "origin"
+				},
+			},
+			rules:      []BranchRule{{Action: ActionWarn, Untracked: boolPtr(false)}},
+			remoteName: "origin",
+			wantAction: ActionWarn,
+			wantMatch:  intPtr(0),
+		},
+		{
+			name: "matches explicit true when branch is explicit on remote",
+			branch: BranchInfo{
+				Name: "topic",
+				ExplicitOn: func(remoteName string) bool {
+					return remoteName == "personal"
+				},
+			},
+			rules:      []BranchRule{{Action: ActionAllow, Explicit: boolPtr(true)}},
+			remoteName: "personal",
+			wantAction: ActionAllow,
+			wantMatch:  intPtr(0),
+		},
+		{
+			name: "matches explicit false when branch is not explicit on remote",
+			branch: BranchInfo{
+				Name: "topic",
+				ExplicitOn: func(remoteName string) bool {
+					return remoteName == "other"
+				},
+			},
+			rules:      []BranchRule{{Action: ActionBlock, Explicit: boolPtr(false)}},
+			remoteName: "origin",
+			wantAction: ActionBlock,
+			wantMatch:  intPtr(0),
+		},
+		{
+			name: "round trips require flag action and payload",
+			branch: BranchInfo{
+				Name: "feature/login",
+				HasUpstreamOn: func(remoteName string) bool {
+					return false
+				},
+				ExplicitOn: func(remoteName string) bool {
+					return true
+				},
+			},
+			rules: []BranchRule{{
+				Pattern:   "feature/*",
+				Action:    ActionRequireFlag,
+				Flag:      "--push-wip",
+				Untracked: boolPtr(true),
+				Explicit:  boolPtr(true),
+			}},
+			remoteName: "personal",
+			wantAction: ActionRequireFlag,
+			wantMatch:  intPtr(0),
+			wantFlag:   "--push-wip",
+		},
+	}
 
-		if action != ActionAllow {
-			t.Fatalf("action = %q, want %q", action, ActionAllow)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			action, matched := EvaluateRule(tt.branch, tt.rules, tt.remoteName)
 
-		if matched != nil {
-			t.Fatalf("matched = %#v, want nil", matched)
-		}
-	})
+			if action != tt.wantAction {
+				t.Fatalf("action = %q, want %q", action, tt.wantAction)
+			}
 
-	t.Run("returns the first matching rule", func(t *testing.T) {
-		rules := []BranchRule{
-			{Pattern: "feature/*", Action: ActionWarn},
-			{Pattern: "feature/*", Action: ActionBlock},
-		}
+			assertMatchedRule(t, matched, tt.rules, tt.wantMatch)
 
-		action, matched := EvaluateRule(BranchInfo{Name: "feature/login"}, rules, "origin")
+			if tt.wantFlag != "" && matched.Flag != tt.wantFlag {
+				t.Fatalf("matched.Flag = %q, want %q", matched.Flag, tt.wantFlag)
+			}
+		})
+	}
 
-		if action != ActionWarn {
-			t.Fatalf("action = %q, want %q", action, ActionWarn)
-		}
-
-		if matched != &rules[0] {
-			t.Fatalf("matched = %p, want %p", matched, &rules[0])
-		}
-	})
-
-	t.Run("treats empty pattern as wildcard", func(t *testing.T) {
-		action, matched := EvaluateRule(
-			BranchInfo{Name: "release/v1"},
-			[]BranchRule{{Action: ActionBlock}},
-			"origin",
-		)
-
-		if action != ActionBlock {
-			t.Fatalf("action = %q, want %q", action, ActionBlock)
-		}
-
-		if matched == nil {
-			t.Fatal("matched = nil, want matching rule")
-		}
-	})
-
-	t.Run("uses the provided remote name for predicates", func(t *testing.T) {
+	t.Run("forwards the provided remote name to both predicates", func(t *testing.T) {
 		var upstreamRemote string
 		var explicitRemote string
-		wantTrue := true
 
-		action, matched := EvaluateRule(
+		_, matched := EvaluateRule(
 			BranchInfo{
 				Name: "feature/login",
 				HasUpstreamOn: func(remoteName string) bool {
@@ -111,20 +193,12 @@ func TestEvaluateRule(t *testing.T) {
 					return true
 				},
 			},
-			[]BranchRule{{Action: ActionRequireFlag, Flag: "--push-wip", Untracked: &wantTrue, Explicit: &wantTrue}},
+			[]BranchRule{{Action: ActionRequireFlag, Flag: "--push-wip", Untracked: boolPtr(true), Explicit: boolPtr(true)}},
 			"personal",
 		)
 
-		if action != ActionRequireFlag {
-			t.Fatalf("action = %q, want %q", action, ActionRequireFlag)
-		}
-
 		if matched == nil {
 			t.Fatal("matched = nil, want matching rule")
-		}
-
-		if matched.Flag != "--push-wip" {
-			t.Fatalf("matched.Flag = %q, want %q", matched.Flag, "--push-wip")
 		}
 
 		if upstreamRemote != "personal" {
@@ -135,4 +209,28 @@ func TestEvaluateRule(t *testing.T) {
 			t.Fatalf("explicit remote = %q, want %q", explicitRemote, "personal")
 		}
 	})
+}
+
+func intPtr(v int) *int {
+	return &v
+}
+
+func assertMatchedRule(t *testing.T, matched *BranchRule, rules []BranchRule, wantMatch *int) {
+	t.Helper()
+
+	if wantMatch == nil {
+		if matched != nil {
+			t.Fatalf("matched = %#v, want nil", matched)
+		}
+
+		return
+	}
+
+	if matched == nil {
+		t.Fatal("matched = nil, want matching rule")
+	}
+
+	if matched != &rules[*wantMatch] {
+		t.Fatalf("matched = %p, want %p", matched, &rules[*wantMatch])
+	}
 }
