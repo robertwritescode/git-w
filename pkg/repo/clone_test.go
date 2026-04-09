@@ -57,7 +57,7 @@ func (s *CloneSuite) TestClone() {
 				break
 			}
 
-			s.Assert().Equal(fileURL, repoCfg.URL)
+			s.Assert().Equal(fileURL, repoCfg.CloneURL)
 
 			cloneDest := filepath.Join(wsDir, repoCfg.Path)
 			s.Assert().True(repo.IsGitRepo(cloneDest))
@@ -87,7 +87,7 @@ func (s *CloneSuite) TestCloneErrorAlreadyRegistered() {
 	wsDir := s.T().TempDir()
 	s.Require().NoError(os.WriteFile(
 		filepath.Join(wsDir, ".gitw"),
-		[]byte("[workspace]\nname = \"testws\"\n"), 0o644,
+		[]byte("[metarepo]\nname = \"testws\"\n"), 0o644,
 	))
 
 	s.ChangeToDir(wsDir)

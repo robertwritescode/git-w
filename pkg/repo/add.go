@@ -76,8 +76,8 @@ func runAddSingle(cmd *cobra.Command, cfg *config.WorkspaceConfig, cfgPath, path
 	}
 
 	cfg.Repos[name] = config.RepoConfig{
-		Path: relPath,
-		URL:  gitutil.RemoteURL(cmd.Context(), absPath),
+		Path:     relPath,
+		CloneURL: gitutil.RemoteURL(cmd.Context(), absPath),
 	}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, group)
@@ -210,7 +210,7 @@ func registerSingleRepo(ctx context.Context, cmd *cobra.Command, cfg *config.Wor
 		return false, err // real error, propagate
 	}
 
-	cfg.Repos[name] = config.RepoConfig{Path: relPath, URL: gitutil.RemoteURL(ctx, absPath)}
+	cfg.Repos[name] = config.RepoConfig{Path: relPath, CloneURL: gitutil.RemoteURL(ctx, absPath)}
 
 	applyMeta(cmd, cfg, cfgPath, relPath, name, groupName)
 
