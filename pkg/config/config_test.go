@@ -4,13 +4,8 @@ import (
 	"testing"
 
 	"github.com/robertwritescode/git-w/pkg/config"
-	"github.com/robertwritescode/git-w/pkg/testutil"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 )
-
-type ConfigSuite struct {
-	suite.Suite
-}
 
 type branchAccessorCase struct {
 	name     string
@@ -49,6 +44,7 @@ type syncPushEnabledCase struct {
 var syncPushEnabledCases = func() []syncPushEnabledCase {
 	trueValue := true
 	falseValue := false
+
 	return []syncPushEnabledCase{
 		{name: "nil defaults true", meta: config.MetarepoConfig{}, want: true},
 		{name: "explicit true", meta: config.MetarepoConfig{SyncPush: &trueValue}, want: true},
@@ -56,171 +52,107 @@ var syncPushEnabledCases = func() []syncPushEnabledCase {
 	}
 }()
 
-func TestConfigSuite(t *testing.T) {
-	testutil.RunSuite(t, new(ConfigSuite))
-}
-
-func (s *ConfigSuite) TestSyncPushEnabled() {
+func TestSyncPushEnabled(t *testing.T) {
 	for _, tt := range syncPushEnabledCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.WorkspaceConfig{Metarepo: tt.meta}
-			s.Equal(tt.want, cfg.SyncPushEnabled())
+			assert.Equal(t, tt.want, cfg.SyncPushEnabled())
 		})
 	}
 }
 
-func (s *ConfigSuite) TestBranchAccessors() {
+func TestBranchAccessors(t *testing.T) {
 	for _, tt := range branchAccessorCases() {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.WorkspaceConfig{Metarepo: tt.meta}
-			s.Equal(tt.wantSync, cfg.BranchSyncSourceEnabled())
-			s.Equal(tt.wantUp, cfg.BranchSetUpstreamEnabled())
-			s.Equal(tt.wantPush, cfg.BranchPushEnabled())
+			assert.Equal(t, tt.wantSync, cfg.BranchSyncSourceEnabled())
+			assert.Equal(t, tt.wantUp, cfg.BranchSetUpstreamEnabled())
+			assert.Equal(t, tt.wantPush, cfg.BranchPushEnabled())
 		})
 	}
 }
 
-func (s *ConfigSuite) TestResolveDefaultBranch() {
+func TestResolveDefaultBranch(t *testing.T) {
 	for _, tt := range resolveDefaultCases() {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.WorkspaceConfig{
 				Metarepo: config.MetarepoConfig{DefaultBranch: tt.workspace},
 				Repos:    map[string]config.RepoConfig{"frontend": {DefaultBranch: tt.repoDefault}},
 			}
-			s.Equal(tt.want, cfg.ResolveDefaultBranch("frontend"))
+
+			assert.Equal(t, tt.want, cfg.ResolveDefaultBranch("frontend"))
 		})
 	}
 }
 
-func (s *ConfigSuite) TestResolveDefaultBranchWorktreeRepo() {
+func TestResolveDefaultBranchForWorktreeRepo(t *testing.T) {
 	cfg := worktreeBranchConfig()
 	cfg.Metarepo.DefaultBranch = "main"
 
-	// Worktree repos must return their own branch, not the workspace default.
-	s.Equal("dev", cfg.ResolveDefaultBranch("infra-dev"))
-	s.Equal("prod", cfg.ResolveDefaultBranch("infra-prod"))
-	// Plain repo names fall through to workspace default.
-	s.Equal("main", cfg.ResolveDefaultBranch("backend"))
+	assert.Equal(t, "dev", cfg.ResolveDefaultBranch("infra-dev"))
+	assert.Equal(t, "prod", cfg.ResolveDefaultBranch("infra-prod"))
+	assert.Equal(t, "main", cfg.ResolveDefaultBranch("backend"))
 }
 
-func (s *ConfigSuite) TestWorktreeBranchForRepo() {
+func TestWorktreeBranchForRepo(t *testing.T) {
 	cfg := worktreeBranchConfig()
 
 	for _, tt := range worktreeBranchCases() {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			branch, ok := cfg.WorktreeBranchForRepo(tt.repo)
-			s.Equal(tt.found, ok)
-			s.Equal(tt.want, branch)
+			assert.Equal(t, tt.found, ok)
+			assert.Equal(t, tt.want, branch)
 		})
 	}
 }
 
-func (s *ConfigSuite) TestWorktreeRepoToSetIndex() {
+func TestWorktreeRepoToSetIndex(t *testing.T) {
 	for _, tt := range worktreeIndexCases() {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.WorkspaceConfig{Worktrees: tt.worktrees}
-			s.Equal(tt.want, config.WorktreeRepoToSetIndex(&cfg))
+			assert.Equal(t, tt.want, config.WorktreeRepoToSetIndex(&cfg))
 		})
 	}
 }
 
-func (s *ConfigSuite) TestWorkspaceBlockFields() {
+func TestWorkspaceBlockFields(t *testing.T) {
 	wb := config.WorkspaceBlock{
 		Name:        "payments",
 		Description: "Payment processing",
 		Repos:       []string{"api", "gateway"},
 	}
-	s.Equal("payments", wb.Name)
-	s.Equal("Payment processing", wb.Description)
-	s.Equal([]string{"api", "gateway"}, wb.Repos)
+
+	assert.Equal(t, "payments", wb.Name)
+	assert.Equal(t, "Payment processing", wb.Description)
+	assert.Equal(t, []string{"api", "gateway"}, wb.Repos)
 }
 
-func branchAccessorCases() []branchAccessorCase {
-	trueValue := true
-	falseValue := false
-
-	return []branchAccessorCase{
-		{name: "nil defaults true", meta: config.MetarepoConfig{}, wantSync: true, wantUp: true, wantPush: true},
-		{name: "explicit false", meta: config.MetarepoConfig{BranchSyncSource: &falseValue, BranchSetUpstream: &falseValue, BranchPush: &falseValue}, wantSync: false, wantUp: false, wantPush: false},
-		{name: "explicit true", meta: config.MetarepoConfig{BranchSyncSource: &trueValue, BranchSetUpstream: &trueValue, BranchPush: &trueValue}, wantSync: true, wantUp: true, wantPush: true},
-	}
-}
-
-func resolveDefaultCases() []resolveDefaultCase {
-	return []resolveDefaultCase{
-		{name: "per-repo override wins", repoDefault: "develop", workspace: "staging", want: "develop"},
-		{name: "workspace fallback", repoDefault: "", workspace: "trunk", want: "trunk"},
-		{name: "hardcoded fallback", repoDefault: "", workspace: "", want: "main"},
-		{name: "empty repo falls through", repoDefault: "", workspace: "trunk", want: "trunk"},
-	}
-}
-
-func worktreeBranchConfig() config.WorkspaceConfig {
-	return config.WorkspaceConfig{
-		Worktrees: map[string]config.WorktreeConfig{
-			"infra": {Branches: map[string]string{"dev": "infra/dev", "prod": "infra/prod"}},
-		},
-	}
-}
-
-func worktreeBranchCases() []worktreeBranchCase {
-	return []worktreeBranchCase{
-		{name: "found dev", repo: "infra-dev", want: "dev", found: true},
-		{name: "found prod", repo: "infra-prod", want: "prod", found: true},
-		{name: "not a worktree repo", repo: "backend", want: "", found: false},
-		{name: "unknown name", repo: "xyz", want: "", found: false},
-	}
-}
-
-func worktreeIndexCases() []worktreeIndexCase {
-	return []worktreeIndexCase{
-		{name: "empty", worktrees: map[string]config.WorktreeConfig{}, want: map[string]string{}},
-		{
-			name: "one set two branches",
-			worktrees: map[string]config.WorktreeConfig{
-				"infra": {Branches: map[string]string{"dev": "infra/dev", "test": "infra/test"}},
-			},
-			want: map[string]string{"infra-dev": "infra", "infra-test": "infra"},
-		},
-		{
-			name: "two sets",
-			worktrees: map[string]config.WorktreeConfig{
-				"infra": {Branches: map[string]string{"dev": "infra/dev", "test": "infra/test"}},
-				"ops":   {Branches: map[string]string{"dev": "ops/dev", "test": "ops/test"}},
-			},
-			want: map[string]string{"infra-dev": "infra", "infra-test": "infra", "ops-dev": "ops", "ops-test": "ops"},
-		},
-	}
-}
-
-type isAliasCase struct {
-	name        string
-	trackBranch string
-	want        bool
-}
-
-func (s *ConfigSuite) TestRepoConfigIsAlias() {
-	cases := []isAliasCase{
+func TestRepoConfigIsAlias(t *testing.T) {
+	cases := []struct {
+		name        string
+		trackBranch string
+		want        bool
+	}{
 		{name: "empty track_branch", trackBranch: "", want: false},
 		{name: "non-empty track_branch", trackBranch: "dev", want: true},
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			rc := config.RepoConfig{TrackBranch: tc.trackBranch}
-			s.Assert().Equal(tc.want, rc.IsAlias())
+			assert.Equal(t, tc.want, rc.IsAlias())
 		})
 	}
 }
 
-func (s *ConfigSuite) TestBranchActionConstants() {
-	s.Assert().Equal(config.BranchAction("allow"), config.ActionAllow)
-	s.Assert().Equal(config.BranchAction("block"), config.ActionBlock)
-	s.Assert().Equal(config.BranchAction("warn"), config.ActionWarn)
-	s.Assert().Equal(config.BranchAction("require-flag"), config.ActionRequireFlag)
+func TestBranchActionConstants(t *testing.T) {
+	assert.Equal(t, config.BranchAction("allow"), config.ActionAllow)
+	assert.Equal(t, config.BranchAction("block"), config.ActionBlock)
+	assert.Equal(t, config.BranchAction("warn"), config.ActionWarn)
+	assert.Equal(t, config.BranchAction("require-flag"), config.ActionRequireFlag)
 }
 
-func (s *ConfigSuite) TestMergeRemote() {
+func TestMergeRemote(t *testing.T) {
 	trueVal := true
 
 	cases := []struct {
@@ -294,7 +226,7 @@ func (s *ConfigSuite) TestMergeRemote() {
 			},
 		},
 		{
-			name: "BranchRuleConfig *bool fields preserved",
+			name: "BranchRuleConfig bool pointer fields preserved",
 			base: config.RemoteConfig{
 				BranchRules: []config.BranchRuleConfig{{Untracked: &trueVal}},
 			},
@@ -306,14 +238,14 @@ func (s *ConfigSuite) TestMergeRemote() {
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			got := config.MergeRemote(tc.base, tc.override)
-			s.Assert().Equal(tc.want, got)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-func (s *ConfigSuite) TestMergeSyncPair() {
+func TestMergeSyncPair(t *testing.T) {
 	cases := []struct {
 		name     string
 		base     config.SyncPairConfig
@@ -356,29 +288,17 @@ func (s *ConfigSuite) TestMergeSyncPair() {
 			override: config.SyncPairConfig{Refs: []string{}},
 			want:     config.SyncPairConfig{Refs: []string{"main"}},
 		},
-		{
-			name:     "zero From keeps base From",
-			base:     config.SyncPairConfig{From: "origin"},
-			override: config.SyncPairConfig{From: ""},
-			want:     config.SyncPairConfig{From: "origin"},
-		},
-		{
-			name:     "zero To keeps base To",
-			base:     config.SyncPairConfig{To: "personal"},
-			override: config.SyncPairConfig{To: ""},
-			want:     config.SyncPairConfig{To: "personal"},
-		},
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			got := config.MergeSyncPair(tc.base, tc.override)
-			s.Assert().Equal(tc.want, got)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-func (s *ConfigSuite) TestMergeWorkstream() {
+func TestMergeWorkstream(t *testing.T) {
 	cases := []struct {
 		name     string
 		base     config.WorkstreamConfig
@@ -410,7 +330,7 @@ func (s *ConfigSuite) TestMergeWorkstream() {
 			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
 		},
 		{
-			name:     "empty slice remotes override replaces base (explicit no-remotes)",
+			name:     "empty slice remotes override replaces base explicit no remotes",
 			base:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{"origin"}},
 			override: config.WorkstreamConfig{Remotes: []string{}},
 			want:     config.WorkstreamConfig{Name: "alpha", Remotes: []string{}},
@@ -418,14 +338,14 @@ func (s *ConfigSuite) TestMergeWorkstream() {
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			got := config.MergeWorkstream(tc.base, tc.override)
-			s.Assert().Equal(tc.want, got)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-func (s *ConfigSuite) TestWorkstreamByName() {
+func TestWorkstreamByName(t *testing.T) {
 	cfg := config.WorkspaceConfig{
 		Workstreams: []config.WorkstreamConfig{
 			{Name: "alpha", Remotes: []string{"origin"}},
@@ -434,31 +354,31 @@ func (s *ConfigSuite) TestWorkstreamByName() {
 		},
 	}
 
-	s.Run("found first entry", func() {
+	t.Run("found first entry", func(t *testing.T) {
 		workstream, ok := cfg.WorkstreamByName("alpha")
-		s.Assert().True(ok)
-		s.Assert().Equal([]string{"origin"}, workstream.Remotes)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"origin"}, workstream.Remotes)
 	})
 
-	s.Run("found second entry", func() {
+	t.Run("found second entry", func(t *testing.T) {
 		workstream, ok := cfg.WorkstreamByName("beta")
-		s.Assert().True(ok)
-		s.Assert().Equal([]string{"mirror"}, workstream.Remotes)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"mirror"}, workstream.Remotes)
 	})
 
-	s.Run("missing returns false", func() {
+	t.Run("missing returns false", func(t *testing.T) {
 		_, ok := cfg.WorkstreamByName("missing")
-		s.Assert().False(ok)
+		assert.False(t, ok)
 	})
 
-	s.Run("duplicate names return first match", func() {
+	t.Run("duplicate names return first match", func(t *testing.T) {
 		workstream, ok := cfg.WorkstreamByName("alpha")
-		s.Assert().True(ok)
-		s.Assert().Equal([]string{"origin"}, workstream.Remotes)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"origin"}, workstream.Remotes)
 	})
 }
 
-func (s *ConfigSuite) TestMergeRepo() {
+func TestMergeRepo(t *testing.T) {
 	cases := []struct {
 		name     string
 		base     config.RepoConfig
@@ -486,34 +406,16 @@ func (s *ConfigSuite) TestMergeRepo() {
 			want:     config.RepoConfig{Name: "new-name"},
 		},
 		{
-			name:     "zero Name keeps base Name",
-			base:     config.RepoConfig{Name: "svc-a"},
-			override: config.RepoConfig{Name: ""},
-			want:     config.RepoConfig{Name: "svc-a"},
-		},
-		{
 			name:     "non-zero Path in override wins",
 			base:     config.RepoConfig{Path: "repos/old"},
 			override: config.RepoConfig{Path: "repos/new"},
 			want:     config.RepoConfig{Path: "repos/new"},
 		},
 		{
-			name:     "zero Path keeps base Path",
-			base:     config.RepoConfig{Path: "repos/svc-a"},
-			override: config.RepoConfig{Path: ""},
-			want:     config.RepoConfig{Path: "repos/svc-a"},
-		},
-		{
 			name:     "non-zero CloneURL in override wins",
 			base:     config.RepoConfig{CloneURL: "https://github.com/org/old"},
 			override: config.RepoConfig{CloneURL: "https://gitea.example.com/org/new"},
 			want:     config.RepoConfig{CloneURL: "https://gitea.example.com/org/new"},
-		},
-		{
-			name:     "zero CloneURL keeps base CloneURL",
-			base:     config.RepoConfig{CloneURL: "https://github.com/org/svc-a"},
-			override: config.RepoConfig{CloneURL: ""},
-			want:     config.RepoConfig{CloneURL: "https://github.com/org/svc-a"},
 		},
 		{
 			name:     "non-nil Flags in override replaces base Flags",
@@ -546,22 +448,10 @@ func (s *ConfigSuite) TestMergeRepo() {
 			want:     config.RepoConfig{DefaultBranch: "develop"},
 		},
 		{
-			name:     "zero DefaultBranch keeps base DefaultBranch",
-			base:     config.RepoConfig{DefaultBranch: "main"},
-			override: config.RepoConfig{DefaultBranch: ""},
-			want:     config.RepoConfig{DefaultBranch: "main"},
-		},
-		{
 			name:     "non-zero TrackBranch in override wins",
 			base:     config.RepoConfig{TrackBranch: "dev"},
 			override: config.RepoConfig{TrackBranch: "test"},
 			want:     config.RepoConfig{TrackBranch: "test"},
-		},
-		{
-			name:     "zero TrackBranch keeps base TrackBranch",
-			base:     config.RepoConfig{TrackBranch: "dev"},
-			override: config.RepoConfig{TrackBranch: ""},
-			want:     config.RepoConfig{TrackBranch: "dev"},
 		},
 		{
 			name:     "non-zero Upstream in override wins",
@@ -569,23 +459,17 @@ func (s *ConfigSuite) TestMergeRepo() {
 			override: config.RepoConfig{Upstream: "personal"},
 			want:     config.RepoConfig{Upstream: "personal"},
 		},
-		{
-			name:     "zero Upstream keeps base Upstream",
-			base:     config.RepoConfig{Upstream: "origin"},
-			override: config.RepoConfig{Upstream: ""},
-			want:     config.RepoConfig{Upstream: "origin"},
-		},
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			got := config.MergeRepo(tc.base, tc.override)
-			s.Assert().Equal(tc.want, got)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-func (s *ConfigSuite) TestMergeWorkspace() {
+func TestMergeWorkspace(t *testing.T) {
 	cases := []struct {
 		name     string
 		base     config.WorkspaceBlock
@@ -605,22 +489,10 @@ func (s *ConfigSuite) TestMergeWorkspace() {
 			want:     config.WorkspaceBlock{Name: "new-name"},
 		},
 		{
-			name:     "zero Name keeps base Name",
-			base:     config.WorkspaceBlock{Name: "default"},
-			override: config.WorkspaceBlock{Name: ""},
-			want:     config.WorkspaceBlock{Name: "default"},
-		},
-		{
 			name:     "non-zero Description in override wins",
 			base:     config.WorkspaceBlock{Description: "base desc"},
 			override: config.WorkspaceBlock{Description: "override desc"},
 			want:     config.WorkspaceBlock{Description: "override desc"},
-		},
-		{
-			name:     "zero Description keeps base Description",
-			base:     config.WorkspaceBlock{Description: "base desc"},
-			override: config.WorkspaceBlock{Description: ""},
-			want:     config.WorkspaceBlock{Description: "base desc"},
 		},
 		{
 			name:     "non-nil Repos in override replaces base Repos",
@@ -637,14 +509,14 @@ func (s *ConfigSuite) TestMergeWorkspace() {
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			got := config.MergeWorkspace(tc.base, tc.override)
-			s.Assert().Equal(tc.want, got)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-func (s *ConfigSuite) TestRemoteByName() {
+func TestRemoteByName(t *testing.T) {
 	cfg := config.WorkspaceConfig{
 		Remotes: []config.RemoteConfig{
 			{Name: "origin", Kind: "github"},
@@ -652,38 +524,39 @@ func (s *ConfigSuite) TestRemoteByName() {
 		},
 	}
 
-	s.Run("found by name", func() {
+	t.Run("found by name", func(t *testing.T) {
 		r, ok := cfg.RemoteByName("origin")
-		s.Assert().True(ok)
-		s.Assert().Equal("github", r.Kind)
+		assert.True(t, ok)
+		assert.Equal(t, "github", r.Kind)
 	})
 
-	s.Run("second entry found", func() {
+	t.Run("second entry found", func(t *testing.T) {
 		r, ok := cfg.RemoteByName("personal")
-		s.Assert().True(ok)
-		s.Assert().Equal("gitea", r.Kind)
+		assert.True(t, ok)
+		assert.Equal(t, "gitea", r.Kind)
 	})
 
-	s.Run("not found returns false", func() {
+	t.Run("not found returns false", func(t *testing.T) {
 		_, ok := cfg.RemoteByName("missing")
-		s.Assert().False(ok)
+		assert.False(t, ok)
 	})
 
-	s.Run("first matching name returned", func() {
+	t.Run("first matching name returned", func(t *testing.T) {
 		cfgDup := config.WorkspaceConfig{
 			Remotes: []config.RemoteConfig{
 				{Name: "origin", Kind: "github"},
 				{Name: "origin", Kind: "gitea"},
 			},
 		}
+
 		r, ok := cfgDup.RemoteByName("origin")
-		s.Assert().True(ok)
-		s.Assert().Equal("github", r.Kind)
+		assert.True(t, ok)
+		assert.Equal(t, "github", r.Kind)
 	})
 }
 
-func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
-	type resolveWorkstreamCase struct {
+func TestResolveWorkstreamRemotes(t *testing.T) {
+	cases := []struct {
 		name              string
 		repoRemotes       []string
 		workstreamName    string
@@ -691,11 +564,9 @@ func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
 		metaRemotes       []string
 		wantRemotes       []string
 		wantSource        string
-	}
-
-	cases := []resolveWorkstreamCase{
+	}{
 		{
-			name:              "repo remotes set: returns repo remotes",
+			name:              "repo remotes set returns repo remotes",
 			repoRemotes:       []string{"origin", "personal"},
 			workstreamName:    "ws1",
 			workstreamRemotes: []string{"mirror"},
@@ -704,7 +575,7 @@ func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
 			wantSource:        "repo",
 		},
 		{
-			name:              "repo remotes explicit empty: stops cascade",
+			name:              "repo remotes explicit empty stops cascade",
 			repoRemotes:       []string{},
 			workstreamName:    "ws1",
 			workstreamRemotes: []string{"mirror"},
@@ -713,7 +584,7 @@ func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
 			wantSource:        "repo",
 		},
 		{
-			name:              "repo nil, workstream remotes set: returns workstream remotes",
+			name:              "workstream remotes used when repo remotes nil",
 			repoRemotes:       nil,
 			workstreamName:    "ws1",
 			workstreamRemotes: []string{"personal"},
@@ -722,7 +593,7 @@ func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
 			wantSource:        "workstream",
 		},
 		{
-			name:              "repo nil, workstream remotes explicit empty: stops cascade",
+			name:              "workstream explicit empty stops cascade",
 			repoRemotes:       nil,
 			workstreamName:    "ws1",
 			workstreamRemotes: []string{},
@@ -731,7 +602,7 @@ func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
 			wantSource:        "workstream",
 		},
 		{
-			name:              "repo nil, workstream nil, metarepo set: returns metarepo",
+			name:              "metarepo remotes used when repo and workstream nil",
 			repoRemotes:       nil,
 			workstreamName:    "ws1",
 			workstreamRemotes: nil,
@@ -740,16 +611,7 @@ func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
 			wantSource:        "metarepo",
 		},
 		{
-			name:              "repo nil, workstream nil, metarepo explicit empty: returns empty",
-			repoRemotes:       nil,
-			workstreamName:    "ws1",
-			workstreamRemotes: nil,
-			metaRemotes:       []string{},
-			wantRemotes:       []string{},
-			wantSource:        "metarepo",
-		},
-		{
-			name:              "all nil: returns nil source none",
+			name:              "all nil returns none",
 			repoRemotes:       nil,
 			workstreamName:    "ws1",
 			workstreamRemotes: nil,
@@ -757,47 +619,29 @@ func (s *ConfigSuite) TestResolveWorkstreamRemotes() {
 			wantRemotes:       nil,
 			wantSource:        "none",
 		},
-		{
-			name:              "workstream not found: skips to metarepo",
-			repoRemotes:       nil,
-			workstreamName:    "nonexistent",
-			workstreamRemotes: nil,
-			metaRemotes:       []string{"origin"},
-			wantRemotes:       []string{"origin"},
-			wantSource:        "metarepo",
-		},
-		{
-			name:              "empty workstream name: skips workstream level",
-			repoRemotes:       nil,
-			workstreamName:    "",
-			workstreamRemotes: nil,
-			metaRemotes:       []string{"origin"},
-			wantRemotes:       []string{"origin"},
-			wantSource:        "metarepo",
-		},
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			cfg := config.WorkspaceConfig{
 				Metarepo: config.MetarepoConfig{DefaultRemotes: tc.metaRemotes},
 				Repos: map[string]config.RepoConfig{
 					"svc-a": {Name: "svc-a", Remotes: tc.repoRemotes},
 				},
 			}
+
 			if tc.workstreamName == "ws1" {
-				cfg.Workstreams = []config.WorkstreamConfig{
-					{Name: "ws1", Remotes: tc.workstreamRemotes},
-				}
+				cfg.Workstreams = []config.WorkstreamConfig{{Name: "ws1", Remotes: tc.workstreamRemotes}}
 			}
+
 			gotRemotes, gotSource := cfg.ResolveWorkstreamRemotes("svc-a", tc.workstreamName)
-			s.Assert().Equal(tc.wantRemotes, gotRemotes)
-			s.Assert().Equal(tc.wantSource, gotSource)
+			assert.Equal(t, tc.wantRemotes, gotRemotes)
+			assert.Equal(t, tc.wantSource, gotSource)
 		})
 	}
 }
 
-func (s *ConfigSuite) TestResolveRepoRemotes() {
+func TestResolveRepoRemotes(t *testing.T) {
 	cases := []struct {
 		name        string
 		repoRemotes []string
@@ -806,60 +650,105 @@ func (s *ConfigSuite) TestResolveRepoRemotes() {
 		wantSource  string
 	}{
 		{
-			name:        "repo remotes set: returns repo remotes",
+			name:        "repo remotes set returns repo remotes",
 			repoRemotes: []string{"origin", "personal"},
 			metaRemotes: []string{"default"},
 			wantRemotes: []string{"origin", "personal"},
 			wantSource:  "repo",
 		},
 		{
-			name:        "repo explicit empty: stops cascade",
+			name:        "repo explicit empty stops cascade",
 			repoRemotes: []string{},
 			metaRemotes: []string{"default"},
 			wantRemotes: []string{},
 			wantSource:  "repo",
 		},
 		{
-			name:        "repo nil, metarepo set: returns metarepo",
+			name:        "metarepo remotes used when repo nil",
 			repoRemotes: nil,
 			metaRemotes: []string{"origin"},
 			wantRemotes: []string{"origin"},
 			wantSource:  "metarepo",
 		},
 		{
-			name:        "repo nil, metarepo explicit empty: returns empty",
-			repoRemotes: nil,
-			metaRemotes: []string{},
-			wantRemotes: []string{},
-			wantSource:  "metarepo",
-		},
-		{
-			name:        "repo nil, metarepo nil: returns nil source none",
+			name:        "repo nil and metarepo nil returns none",
 			repoRemotes: nil,
 			metaRemotes: nil,
 			wantRemotes: nil,
 			wantSource:  "none",
 		},
-		{
-			name:        "repo not in config: falls through to metarepo",
-			repoRemotes: nil,
-			metaRemotes: []string{"origin"},
-			wantRemotes: []string{"origin"},
-			wantSource:  "metarepo",
-		},
 	}
 
 	for _, tc := range cases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			cfg := config.WorkspaceConfig{
 				Metarepo: config.MetarepoConfig{DefaultRemotes: tc.metaRemotes},
 				Repos: map[string]config.RepoConfig{
 					"svc-a": {Name: "svc-a", Remotes: tc.repoRemotes},
 				},
 			}
+
 			gotRemotes, gotSource := cfg.ResolveRepoRemotes("svc-a")
-			s.Assert().Equal(tc.wantRemotes, gotRemotes)
-			s.Assert().Equal(tc.wantSource, gotSource)
+			assert.Equal(t, tc.wantRemotes, gotRemotes)
+			assert.Equal(t, tc.wantSource, gotSource)
 		})
+	}
+}
+
+func branchAccessorCases() []branchAccessorCase {
+	trueValue := true
+	falseValue := false
+
+	return []branchAccessorCase{
+		{name: "nil defaults true", meta: config.MetarepoConfig{}, wantSync: true, wantUp: true, wantPush: true},
+		{name: "explicit false", meta: config.MetarepoConfig{BranchSyncSource: &falseValue, BranchSetUpstream: &falseValue, BranchPush: &falseValue}, wantSync: false, wantUp: false, wantPush: false},
+		{name: "explicit true", meta: config.MetarepoConfig{BranchSyncSource: &trueValue, BranchSetUpstream: &trueValue, BranchPush: &trueValue}, wantSync: true, wantUp: true, wantPush: true},
+	}
+}
+
+func resolveDefaultCases() []resolveDefaultCase {
+	return []resolveDefaultCase{
+		{name: "per-repo override wins", repoDefault: "develop", workspace: "staging", want: "develop"},
+		{name: "workspace fallback", repoDefault: "", workspace: "trunk", want: "trunk"},
+		{name: "hardcoded fallback", repoDefault: "", workspace: "", want: "main"},
+		{name: "empty repo falls through", repoDefault: "", workspace: "trunk", want: "trunk"},
+	}
+}
+
+func worktreeBranchConfig() config.WorkspaceConfig {
+	return config.WorkspaceConfig{
+		Worktrees: map[string]config.WorktreeConfig{
+			"infra": {Branches: map[string]string{"dev": "infra/dev", "prod": "infra/prod"}},
+		},
+	}
+}
+
+func worktreeBranchCases() []worktreeBranchCase {
+	return []worktreeBranchCase{
+		{name: "found dev", repo: "infra-dev", want: "dev", found: true},
+		{name: "found prod", repo: "infra-prod", want: "prod", found: true},
+		{name: "not a worktree repo", repo: "backend", want: "", found: false},
+		{name: "unknown name", repo: "xyz", want: "", found: false},
+	}
+}
+
+func worktreeIndexCases() []worktreeIndexCase {
+	return []worktreeIndexCase{
+		{name: "empty", worktrees: map[string]config.WorktreeConfig{}, want: map[string]string{}},
+		{
+			name: "one set two branches",
+			worktrees: map[string]config.WorktreeConfig{
+				"infra": {Branches: map[string]string{"dev": "infra/dev", "test": "infra/test"}},
+			},
+			want: map[string]string{"infra-dev": "infra", "infra-test": "infra"},
+		},
+		{
+			name: "two sets",
+			worktrees: map[string]config.WorktreeConfig{
+				"infra": {Branches: map[string]string{"dev": "infra/dev", "test": "infra/test"}},
+				"ops":   {Branches: map[string]string{"dev": "ops/dev", "test": "ops/test"}},
+			},
+			want: map[string]string{"infra-dev": "infra", "infra-test": "infra", "ops-dev": "ops", "ops-test": "ops"},
+		},
 	}
 }

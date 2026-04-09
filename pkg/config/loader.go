@@ -101,7 +101,7 @@ func loadMainConfig(configPath string) (*WorkspaceConfig, error) {
 
 func applyMetarepoDefaults(cfg *WorkspaceConfig) {
 	if len(cfg.Metarepo.AgenticFrameworks) == 0 {
-		cfg.Metarepo.AgenticFrameworks = []string{"gsd"}
+		cfg.Metarepo.AgenticFrameworks = []string{agents.FrameworkGSD}
 	}
 }
 
@@ -268,18 +268,25 @@ func validateWorkstreams(configPath string, cfg *WorkspaceConfig) error {
 		return err
 	}
 
-	if len(entries) != len(cfg.Workstreams) {
-		return fmt.Errorf("[[workstream]] parse mismatch: expected %d entries, got %d", len(cfg.Workstreams), len(entries))
+	if err := validateWorkstreamShape(entries, cfg.Workstreams); err != nil {
+		return err
 	}
 
-	knownRemotes := make(map[string]struct{}, len(cfg.Remotes))
-	for _, remote := range cfg.Remotes {
-		knownRemotes[remote.Name] = struct{}{}
+	if err := validateWorkstreamSemantics(cfg.Workstreams, knownRemoteSet(cfg)); err != nil {
+		return err
 	}
 
-	seenNames := make(map[string]struct{}, len(cfg.Workstreams))
+	normalizeWorkstreams(cfg)
 
-	for i := range cfg.Workstreams {
+	return nil
+}
+
+func validateWorkstreamShape(entries []map[string]any, workstreams []WorkstreamConfig) error {
+	if len(entries) != len(workstreams) {
+		return fmt.Errorf("[[workstream]] parse mismatch: expected %d entries, got %d", len(workstreams), len(entries))
+	}
+
+	for i := range workstreams {
 		entry := entries[i]
 		if err := validateWorkstreamEntryKeys(i, entry); err != nil {
 			return err
@@ -288,8 +295,17 @@ func validateWorkstreams(configPath string, cfg *WorkspaceConfig) error {
 		if _, ok := entry["remotes"]; !ok {
 			return fmt.Errorf("[[workstream]] entry at index %d: missing required remotes key", i)
 		}
+	}
 
-		workstream := &cfg.Workstreams[i]
+	return nil
+}
+
+func validateWorkstreamSemantics(workstreams []WorkstreamConfig, knownRemotes map[string]struct{}) error {
+	seenNames := make(map[string]struct{}, len(workstreams))
+
+	for i := range workstreams {
+		workstream := workstreams[i]
+
 		if strings.TrimSpace(workstream.Name) == "" {
 			return fmt.Errorf("[[workstream]] entry at index %d: missing required name field", i)
 		}
@@ -310,15 +326,28 @@ func validateWorkstreams(configPath string, cfg *WorkspaceConfig) error {
 			}
 			seenWorkstreamRemotes[remoteName] = struct{}{}
 		}
+	}
 
-		sort.Strings(workstream.Remotes)
+	return nil
+}
+
+func knownRemoteSet(cfg *WorkspaceConfig) map[string]struct{} {
+	knownRemotes := make(map[string]struct{}, len(cfg.Remotes))
+	for _, remote := range cfg.Remotes {
+		knownRemotes[remote.Name] = struct{}{}
+	}
+
+	return knownRemotes
+}
+
+func normalizeWorkstreams(cfg *WorkspaceConfig) {
+	for i := range cfg.Workstreams {
+		sort.Strings(cfg.Workstreams[i].Remotes)
 	}
 
 	sort.Slice(cfg.Workstreams, func(i, j int) bool {
 		return cfg.Workstreams[i].Name < cfg.Workstreams[j].Name
 	})
-
-	return nil
 }
 
 func loadWorkstreamRawEntries(configPath string) ([]map[string]any, error) {

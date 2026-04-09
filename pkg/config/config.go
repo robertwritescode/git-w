@@ -151,73 +151,24 @@ type WorkstreamManifest struct {
 // override value wins if non-zero; otherwise the base value is used.
 // BranchRules from override replace base BranchRules entirely if non-nil.
 func MergeRemote(base, override RemoteConfig) RemoteConfig {
-	merged := base
-
-	if override.Name != "" {
-		merged.Name = override.Name
+	return RemoteConfig{
+		Name:        pickString(override.Name, base.Name),
+		Kind:        pickString(override.Kind, base.Kind),
+		URL:         pickString(override.URL, base.URL),
+		User:        pickString(override.User, base.User),
+		TokenEnv:    pickString(override.TokenEnv, base.TokenEnv),
+		Org:         pickString(override.Org, base.Org),
+		RepoPrefix:  pickString(override.RepoPrefix, base.RepoPrefix),
+		RepoSuffix:  pickString(override.RepoSuffix, base.RepoSuffix),
+		Direction:   pickString(override.Direction, base.Direction),
+		PushMode:    pickString(override.PushMode, base.PushMode),
+		FetchMode:   pickString(override.FetchMode, base.FetchMode),
+		UseSSH:      pickTrueBool(override.UseSSH, base.UseSSH),
+		SSHHost:     pickString(override.SSHHost, base.SSHHost),
+		Critical:    pickTrueBool(override.Critical, base.Critical),
+		Private:     pickTrueBool(override.Private, base.Private),
+		BranchRules: pickSlice(override.BranchRules, base.BranchRules),
 	}
-
-	if override.Kind != "" {
-		merged.Kind = override.Kind
-	}
-
-	if override.URL != "" {
-		merged.URL = override.URL
-	}
-
-	if override.User != "" {
-		merged.User = override.User
-	}
-
-	if override.TokenEnv != "" {
-		merged.TokenEnv = override.TokenEnv
-	}
-
-	if override.Org != "" {
-		merged.Org = override.Org
-	}
-
-	if override.RepoPrefix != "" {
-		merged.RepoPrefix = override.RepoPrefix
-	}
-
-	if override.RepoSuffix != "" {
-		merged.RepoSuffix = override.RepoSuffix
-	}
-
-	if override.Direction != "" {
-		merged.Direction = override.Direction
-	}
-
-	if override.PushMode != "" {
-		merged.PushMode = override.PushMode
-	}
-
-	if override.FetchMode != "" {
-		merged.FetchMode = override.FetchMode
-	}
-
-	if override.UseSSH {
-		merged.UseSSH = override.UseSSH
-	}
-
-	if override.SSHHost != "" {
-		merged.SSHHost = override.SSHHost
-	}
-
-	if override.Critical {
-		merged.Critical = override.Critical
-	}
-
-	if override.Private {
-		merged.Private = override.Private
-	}
-
-	if override.BranchRules != nil {
-		merged.BranchRules = override.BranchRules
-	}
-
-	return merged
 }
 
 // MergeSyncPair merges base and override SyncPairConfig. For each field,
@@ -262,41 +213,16 @@ func MergeWorkstream(base, override WorkstreamConfig) WorkstreamConfig {
 // the override value wins if non-empty; otherwise the base value is used.
 // Slice fields (Flags, Remotes) from override replace base if non-nil.
 func MergeRepo(base, override RepoConfig) RepoConfig {
-	merged := base
-
-	if override.Name != "" {
-		merged.Name = override.Name
+	return RepoConfig{
+		Name:          pickString(override.Name, base.Name),
+		Path:          pickString(override.Path, base.Path),
+		CloneURL:      pickString(override.CloneURL, base.CloneURL),
+		Flags:         pickSlice(override.Flags, base.Flags),
+		DefaultBranch: pickString(override.DefaultBranch, base.DefaultBranch),
+		TrackBranch:   pickString(override.TrackBranch, base.TrackBranch),
+		Upstream:      pickString(override.Upstream, base.Upstream),
+		Remotes:       pickSlice(override.Remotes, base.Remotes),
 	}
-
-	if override.Path != "" {
-		merged.Path = override.Path
-	}
-
-	if override.CloneURL != "" {
-		merged.CloneURL = override.CloneURL
-	}
-
-	if override.DefaultBranch != "" {
-		merged.DefaultBranch = override.DefaultBranch
-	}
-
-	if override.TrackBranch != "" {
-		merged.TrackBranch = override.TrackBranch
-	}
-
-	if override.Upstream != "" {
-		merged.Upstream = override.Upstream
-	}
-
-	if override.Flags != nil {
-		merged.Flags = override.Flags
-	}
-
-	if override.Remotes != nil {
-		merged.Remotes = override.Remotes
-	}
-
-	return merged
 }
 
 // MergeWorkspace merges base and override WorkspaceBlock. For each string
@@ -323,45 +249,49 @@ func MergeWorkspace(base, override WorkspaceBlock) WorkspaceBlock {
 // mergeMetarepo merges base and override MetarepoConfig. Non-zero string
 // and non-nil slice/pointer fields in override win; otherwise base is used.
 func mergeMetarepo(base, override MetarepoConfig) MetarepoConfig {
-	merged := base
+	return MetarepoConfig{
+		Name:              pickString(override.Name, base.Name),
+		DefaultRemotes:    pickSlice(override.DefaultRemotes, base.DefaultRemotes),
+		AgenticFrameworks: pickSlice(override.AgenticFrameworks, base.AgenticFrameworks),
+		AutoGitignore:     pickPointer(override.AutoGitignore, base.AutoGitignore),
+		SyncPush:          pickPointer(override.SyncPush, base.SyncPush),
+		DefaultBranch:     pickString(override.DefaultBranch, base.DefaultBranch),
+		BranchSyncSource:  pickPointer(override.BranchSyncSource, base.BranchSyncSource),
+		BranchSetUpstream: pickPointer(override.BranchSetUpstream, base.BranchSetUpstream),
+		BranchPush:        pickPointer(override.BranchPush, base.BranchPush),
+	}
+}
 
-	if override.Name != "" {
-		merged.Name = override.Name
+func pickString(override, base string) string {
+	if override != "" {
+		return override
 	}
 
-	if override.DefaultBranch != "" {
-		merged.DefaultBranch = override.DefaultBranch
+	return base
+}
+
+func pickTrueBool(override, base bool) bool {
+	if override {
+		return true
 	}
 
-	if override.DefaultRemotes != nil {
-		merged.DefaultRemotes = override.DefaultRemotes
+	return base
+}
+
+func pickSlice[T any](override, base []T) []T {
+	if override != nil {
+		return override
 	}
 
-	if override.AgenticFrameworks != nil {
-		merged.AgenticFrameworks = override.AgenticFrameworks
+	return base
+}
+
+func pickPointer[T any](override, base *T) *T {
+	if override != nil {
+		return override
 	}
 
-	if override.AutoGitignore != nil {
-		merged.AutoGitignore = override.AutoGitignore
-	}
-
-	if override.SyncPush != nil {
-		merged.SyncPush = override.SyncPush
-	}
-
-	if override.BranchSyncSource != nil {
-		merged.BranchSyncSource = override.BranchSyncSource
-	}
-
-	if override.BranchSetUpstream != nil {
-		merged.BranchSetUpstream = override.BranchSetUpstream
-	}
-
-	if override.BranchPush != nil {
-		merged.BranchPush = override.BranchPush
-	}
-
-	return merged
+	return base
 }
 
 // RepoConfig represents one tracked repository.

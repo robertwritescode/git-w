@@ -11,7 +11,7 @@ var _ SpecFramework = GSDFramework{}
 // GSDFramework is the SpecFramework implementation for GSD.
 type GSDFramework struct{}
 
-func (GSDFramework) Name() string { return "gsd" }
+func (GSDFramework) Name() string { return FrameworkGSD }
 
 func (GSDFramework) PlanningDirExists(rootPath string) bool {
 	info, err := os.Stat(filepath.Join(rootPath, ".planning"))

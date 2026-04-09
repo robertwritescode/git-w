@@ -6,7 +6,7 @@ import (
 )
 
 var knownFrameworks = map[string]SpecFramework{
-	"gsd": GSDFramework{},
+	FrameworkGSD: GSDFramework{},
 }
 
 // FrameworkFor returns the SpecFramework registered under name.
